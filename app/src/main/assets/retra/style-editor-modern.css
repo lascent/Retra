@@ -1,0 +1,756 @@
+/* ========================================================================== 
+   v3.82 exact dual-orientation Screen Editor defaults
+   The portrait and landscape editors intentionally use different geometry.
+   Only the single outer emulator frame is visible. Back/+ belong to the
+   editor only; the native gameplay overlay hides them.
+   ========================================================================== */
+
+body.screen-editor-portrait.subpage-open main,
+body.screen-editor-landscape.subpage-open main{
+  width:100%;
+  height:100dvh;
+  min-height:0;
+  margin:0;
+  padding:0 !important;
+  overflow:hidden;
+  background:#070813;
+}
+
+body.screen-editor-portrait .screen-size-page,
+body.screen-editor-landscape .screen-size-page{
+  position:relative;
+  width:100%;
+  height:100%;
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  background:#070813;
+}
+
+/* The explanatory copy is useful in Settings, but the actual editor itself
+   matches the supplied reference: only Back and + sit over the preview. */
+body.screen-editor-portrait .screen-size-copy,
+body.screen-editor-landscape .screen-size-copy,
+body.screen-editor-portrait .screen-size-note,
+body.screen-editor-landscape .screen-size-note{
+  display:none !important;
+}
+
+body.screen-editor-portrait .screen-size-page > .sub-header,
+body.screen-editor-landscape .screen-size-page > .sub-header{
+  position:absolute !important;
+  z-index:30;
+  width:44px;
+  height:44px;
+  margin:0;
+  padding:0;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+  pointer-events:none;
+}
+body.screen-editor-portrait .screen-size-page > .sub-header h2,
+body.screen-editor-landscape .screen-size-page > .sub-header h2{
+  display:none !important;
+}
+body.screen-editor-portrait .screen-size-page > .sub-header .back-btn,
+body.screen-editor-landscape .screen-size-page > .sub-header .back-btn{
+  width:44px;
+  height:44px;
+  margin:0;
+  border-radius:15px;
+  background:rgba(55,60,73,.82);
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 7px 18px rgba(0,0,0,.24);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  pointer-events:auto;
+}
+
+body.screen-editor-portrait .screen-preview-shell,
+body.screen-editor-landscape .screen-preview-shell{
+  position:absolute !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:1px solid rgba(255,255,255,.13) !important;
+  background:#080a15 !important;
+  box-shadow:0 16px 42px rgba(0,0,0,.32) !important;
+  overflow:hidden !important;
+}
+body.screen-editor-portrait .emulator-preview,
+body.screen-editor-landscape .emulator-preview{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  background:#080a15 !important;
+  overflow:hidden !important;
+}
+
+body.screen-editor-portrait .preview-screen-frame,
+body.screen-editor-landscape .preview-screen-frame{
+  position:absolute !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  margin:0 !important;
+}
+
+/* Portrait reference: narrow phone frame, game screen across the top, large
+   open middle section, shoulder/menu row around two-thirds down. */
+body.screen-editor-portrait .screen-preview-shell{
+  top:10px !important;
+  bottom:10px !important;
+  left:50% !important;
+  right:auto !important;
+  width:min(420px, calc(100vw - 28px)) !important;
+  height:auto !important;
+  transform:translateX(-50%);
+  border-radius:42px !important;
+}
+body.screen-editor-portrait .screen-size-page > .sub-header{
+  top:30px !important;
+  left:calc(50% - min(210px, calc((100vw - 28px) / 2)) + 12px) !important;
+}
+body.screen-editor-portrait .preview-add-fab{
+  position:fixed !important;
+  z-index:31;
+  top:30px !important;
+  right:calc(50% - min(210px, calc((100vw - 28px) / 2)) + 12px) !important;
+  width:44px;
+  height:44px;
+  border-radius:15px;
+}
+body.screen-editor-portrait .preview-shoulder{
+  top:65.5% !important;
+  width:82px !important;
+  height:30px !important;
+  font-size:17px !important;
+}
+body.screen-editor-portrait .preview-shoulder.left{ left:10px !important; }
+body.screen-editor-portrait .preview-shoulder.right{ right:10px !important; left:auto !important; }
+body.screen-editor-portrait .preview-toolbar.top.landscape-only{
+  display:flex !important;
+  top:65.2% !important;
+  left:50% !important;
+  right:auto !important;
+  transform:translateX(-50%) !important;
+}
+body.screen-editor-portrait .preview-toolbar.top.landscape-only .toolbar-icon{
+  width:44px !important;
+  height:44px !important;
+}
+body.screen-editor-portrait .preview-dpad{
+  --portrait-dpad-button:44px;
+  --portrait-dpad-gap:7px;
+  left:12px !important;
+  bottom:14px !important;
+  width:calc(var(--portrait-dpad-button) * 3 + var(--portrait-dpad-gap) * 2) !important;
+  height:calc(var(--portrait-dpad-button) * 3 + var(--portrait-dpad-gap) * 2) !important;
+}
+body.screen-editor-portrait .preview-dpad .dpad{
+  width:var(--portrait-dpad-button) !important;
+  height:var(--portrait-dpad-button) !important;
+}
+body.screen-editor-portrait .preview-dpad .up{left:calc(var(--portrait-dpad-button) + var(--portrait-dpad-gap)) !important; top:0 !important;}
+body.screen-editor-portrait .preview-dpad .left{left:0 !important; top:calc(var(--portrait-dpad-button) + var(--portrait-dpad-gap)) !important;}
+body.screen-editor-portrait .preview-dpad .right{left:calc((var(--portrait-dpad-button) + var(--portrait-dpad-gap)) * 2) !important; right:auto !important; top:calc(var(--portrait-dpad-button) + var(--portrait-dpad-gap)) !important;}
+body.screen-editor-portrait .preview-dpad .down{left:calc(var(--portrait-dpad-button) + var(--portrait-dpad-gap)) !important; top:calc((var(--portrait-dpad-button) + var(--portrait-dpad-gap)) * 2) !important; bottom:auto !important;}
+body.screen-editor-portrait .preview-ab{
+  right:12px !important;
+  bottom:22px !important;
+  width:142px !important;
+  height:84px !important;
+}
+body.screen-editor-portrait .preview-ab span{
+  width:54px !important;
+  height:54px !important;
+  font-size:20px !important;
+}
+body.screen-editor-portrait .preview-start-select{
+  left:auto !important;
+  right:38px !important;
+  bottom:18.5% !important;
+  transform:none !important;
+  gap:14px !important;
+}
+body.screen-editor-portrait .preview-start-select span{
+  width:34px !important;
+  height:10px !important;
+}
+
+/* Landscape reference: wide rounded outer shell, 3:2 screen centered and
+   nearly full height, controllers sitting in the left/right side zones. */
+body.screen-editor-landscape .screen-preview-shell{
+  inset:18px 20px !important;
+  width:auto !important;
+  height:auto !important;
+  transform:none !important;
+  border-radius:42px !important;
+}
+body.screen-editor-landscape .screen-size-page > .sub-header{
+  top:30px !important;
+  left:32px !important;
+}
+body.screen-editor-landscape .preview-add-fab{
+  position:fixed !important;
+  z-index:31;
+  top:30px !important;
+  right:32px !important;
+  width:44px;
+  height:44px;
+  border-radius:15px;
+}
+body.screen-editor-landscape .preview-shoulder{
+  top:10px !important;
+  width:78px !important;
+  height:28px !important;
+  font-size:17px !important;
+}
+body.screen-editor-landscape .preview-shoulder.left{left:18px !important;}
+body.screen-editor-landscape .preview-shoulder.right{right:18px !important; left:auto !important;}
+body.screen-editor-landscape .preview-toolbar.top.landscape-only{
+  top:8px !important;
+  left:50% !important;
+  transform:translateX(-50%) !important;
+}
+body.screen-editor-landscape .preview-dpad{
+  left:36px !important;
+  bottom:18px !important;
+}
+body.screen-editor-landscape .preview-ab{
+  right:36px !important;
+  bottom:18px !important;
+}
+body.screen-editor-landscape .preview-start-select{
+  left:50% !important;
+  right:auto !important;
+  bottom:10px !important;
+  transform:translateX(-50%) !important;
+}
+
+/* Selection dragging writes inline left/top/transform. Keep those live values
+   authoritative after the first user edit, while the CSS above defines the
+   untouched 125% defaults captured by the editor. */
+body.screen-editor-portrait .layout-control.is-selected,
+body.screen-editor-landscape .layout-control.is-selected{
+  z-index:12;
+}
+
+/* v3.81 Android/WebView touch polish — remove the blue tap/focus flash that
+   could appear on Settings rows before a selection modal opens. The actual
+   selected option frame/radio styling is intentionally preserved. */
+html,
+body,
+body * {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+button,
+[role="button"],
+a,
+.tappable,
+.settings-item,
+.more-item,
+.detail-row,
+.selection-option,
+.text-action-btn {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none;
+}
+
+/* Touch taps should not leave Android WebView's transient focus rectangle. */
+button:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+.tappable:focus:not(:focus-visible),
+.settings-item:focus:not(:focus-visible),
+.more-item:focus:not(:focus-visible),
+.detail-row:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none;
+}
+
+/* Keep Settings row feedback soft and theme-neutral; never paint a blue bar. */
+.settings-detail-page button.detail-row.tappable:active,
+.settings-detail-page button.detail-row.tappable:focus:not(:focus-visible) {
+  background: var(--glass-bg) !important;
+}
+
+/* Preserve keyboard accessibility on devices that actually use a keyboard. */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+.tappable:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--cyan) 72%, transparent);
+  outline-offset: 2px;
+}
+
+/* v3.81.1 — Android/WebView settings press-flash fix.
+   The previous rule used var(--glass-bg) while a settings row had touch focus.
+   In the translucent theme that variable is blue/cyan, which caused the full-width
+   blue strip visible for a frame behind selection dialogs. Settings rows now remain
+   visually transparent for touch hover/press/focus; only the modal's selected option
+   keeps its cyan selection styling. */
+.settings-detail-page button.detail-row.tappable {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+  background: transparent !important;
+  outline: none !important;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .settings-detail-page button.detail-row.tappable,
+  .settings-detail-page button.detail-row.tappable:hover,
+  .settings-detail-page button.detail-row.tappable:active,
+  .settings-detail-page button.detail-row.tappable:focus,
+  .settings-detail-page button.detail-row.tappable:focus-visible,
+  .settings-detail-page button.detail-row.tappable:focus-within {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    filter: none !important;
+  }
+
+  .settings-detail-page button.detail-row.tappable::before,
+  .settings-detail-page button.detail-row.tappable::after {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
+
+/* v3.85 orientation/editor persistence + ROM detail popup/spacing fixes */
+.rom-hero{
+  min-height:0;
+  padding-bottom:12px;
+}
+
+.rom-detail-header{
+  margin-bottom:12px;
+}
+
+/* Keep the overflow card attached to the three-dot button, but reserve room
+   above the title only while it is open so it never covers the ROM name. */
+.rom-overflow-menu{
+  top:calc(100% + 6px);
+  right:0;
+  width:min(232px, calc(100vw - 32px));
+  min-width:0;
+  max-width:232px;
+  box-sizing:border-box;
+}
+
+.rom-hero.rom-menu-open .rom-top{
+  padding-top:116px;
+}
+
+.rom-detail-body{
+  padding-top:10px;
+  padding-bottom:76px;
+}
+
+@media (max-width:380px){
+  .rom-overflow-menu{
+    width:min(216px, calc(100vw - 24px));
+  }
+  .rom-hero.rom-menu-open .rom-top{
+    padding-top:112px;
+  }
+  .rom-detail-body{
+    padding-top:8px;
+    padding-bottom:64px;
+  }
+}
+
+
+/* ========================================================================== 
+   v3.86 remaining ROM screen + Screen Editor fixes
+   ========================================================================== */
+
+/* ROM detail stays compact: only a small breathing space at the bottom. */
+.rom-detail-body{
+  padding-bottom:max(20px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* The ROM overflow menu is a real overlay. It may cover the title while open,
+   but the title can never render above it. No slide/tween is used. */
+.rom-hero{
+  overflow:visible !important;
+  isolation:isolate;
+}
+.rom-hero::before,
+.rom-hero-overlay{
+  z-index:0;
+}
+.rom-detail-header{
+  position:relative !important;
+  z-index:5000 !important;
+}
+.rom-top{
+  position:relative !important;
+  z-index:1 !important;
+}
+.rom-overflow-menu{
+  z-index:6000 !important;
+  top:calc(100% + 6px) !important;
+  right:0 !important;
+  opacity:1 !important;
+  transform:none !important;
+  transition:none !important;
+  animation:none !important;
+  background:rgba(22,22,34,.985) !important;
+  backdrop-filter:blur(18px) !important;
+  -webkit-backdrop-filter:blur(18px) !important;
+}
+.rom-overflow-menu.open{
+  display:grid !important;
+  opacity:1 !important;
+  transform:none !important;
+  transition:none !important;
+  animation:none !important;
+}
+/* v3.85 moved the title down while the menu was open. Restore overlay behavior. */
+.rom-hero.rom-menu-open .rom-top{
+  padding-top:0 !important;
+}
+body[data-resolved-mode="light"] .rom-overflow-menu{
+  background:rgba(248,248,252,.985) !important;
+}
+
+/* Restore the older clean Screen Editor: the emulator image has no secondary
+   selection frame/border. The outer phone/emulator shell remains untouched. */
+body.screen-editor-portrait .preview-screen-frame,
+body.screen-editor-landscape .preview-screen-frame,
+#screenSizePage .preview-screen-frame{
+  border:0 !important;
+  outline:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+}
+.preview-screen-frame.is-selected::after{
+  content:none !important;
+  display:none !important;
+}
+
+/* Resize widgets never reserve an invisible strip at the bottom. Controllers
+   themselves can occupy the true 0..100% editor canvas, including the bottom
+   and side edges. */
+#screenSizePage .emulator-preview{
+  overflow:hidden !important;
+}
+#screenSizePage .preview-scale-value{
+  pointer-events:none !important;
+}
+#screenSizePage .preview-scale-handle{
+  margin:0 !important;
+}
+#screenSizePage .preview-scale-handle.screen-scale-mode{
+  width:36px !important;
+  height:36px !important;
+  border-radius:12px !important;
+  pointer-events:auto !important;
+}
+
+/* The user's saved inline editor coordinates are the source of truth after the
+   first edit. These rules only supply untouched defaults and must not create
+   hidden bottom padding or a drag exclusion zone. */
+body.screen-editor-portrait .emulator-preview,
+body.screen-editor-landscape .emulator-preview{
+  touch-action:none;
+}
+
+@media (max-width:380px){
+  .rom-detail-body{
+    padding-bottom:max(18px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .rom-hero.rom-menu-open .rom-top{
+    padding-top:0 !important;
+  }
+}
+
+/* Keep the screen resize handle below controller hit targets. It remains usable
+   on empty screen space but can never block a controller placed at the edge. */
+#screenSizePage .preview-scale-handle.screen-scale-mode{
+  z-index:2 !important;
+}
+#screenSizePage .layout-control{
+  z-index:3;
+}
+#screenSizePage .layout-control.is-selected{
+  z-index:12;
+}
+
+/* ========================================================================== 
+   v3.87 — true Retra landscape UI + hard-separated Screen Editor datasets
+   Normal Retra pages now use the full landscape viewport instead of keeping
+   the old 428px portrait shell centered on screen. Screen Editor portrait and
+   landscape remain completely independent canvases.
+   ========================================================================== */
+
+@media (orientation:landscape) and (pointer:coarse){
+  body.game-landscape-allowed:not(.landscape-preview-mode){
+    --header-height:68px;
+    --bottom-nav-height:68px;
+    width:100vw;
+    height:100dvh;
+    min-height:100dvh;
+    padding:0;
+    align-items:stretch;
+    justify-content:stretch;
+    overflow:hidden;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) .app-shell{
+    width:100vw !important;
+    max-width:none !important;
+    height:100dvh !important;
+    max-height:100dvh !important;
+    margin:0 !important;
+    border:0 !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) .main-header{
+    min-height:var(--header-height);
+    padding:
+      max(8px, env(safe-area-inset-top, 0px))
+      max(18px, calc(env(safe-area-inset-right, 0px) + 16px))
+      8px
+      max(18px, calc(env(safe-area-inset-left, 0px) + 16px));
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) .main-header h1{
+    font-size:26px;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) main{
+    width:100%;
+    height:calc(100dvh - var(--header-height) - var(--bottom-nav-total-height));
+    padding:10px max(18px, calc(env(safe-area-inset-left, 0px) + 16px)) 16px;
+    padding-right:max(18px, calc(env(safe-area-inset-right, 0px) + 16px));
+    overflow-y:auto;
+    overflow-x:hidden;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode).more-headerless main{
+    height:calc(100dvh - var(--bottom-nav-total-height));
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode).subpage-open main{
+    height:100dvh;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) .library-chips{
+    margin-bottom:10px;
+  }
+
+  /* 3 columns is the minimum landscape layout. Wider phones/tablets step up
+     below to 4/5/6 columns without stretching covers out of proportion. */
+  body.game-landscape-allowed:not(.landscape-preview-mode) #libraryPage .library-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:14px;
+    align-items:start;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) #libraryPage .cover-card{
+    width:100%;
+    max-width:180px;
+    justify-self:center;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) .bottom-nav{
+    width:100%;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    padding:
+      6px max(18px, calc(env(safe-area-inset-right, 0px) + 16px))
+      calc(8px + var(--device-safe-bottom))
+      max(18px, calc(env(safe-area-inset-left, 0px) + 16px));
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) .nav-item{
+    min-width:0;
+    border-radius:15px;
+    gap:4px;
+  }
+
+  body.game-landscape-allowed:not(.landscape-preview-mode) .add-rom-btn{
+    right:max(18px, calc(env(safe-area-inset-right, 0px) + 18px));
+    bottom:calc(var(--bottom-nav-total-height) + 12px);
+    width:52px;
+    height:52px;
+    border-radius:17px;
+  }
+}
+
+@media (orientation:landscape) and (pointer:coarse) and (min-width:650px){
+  body.game-landscape-allowed:not(.landscape-preview-mode) #libraryPage .library-grid{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
+
+@media (orientation:landscape) and (pointer:coarse) and (min-width:800px){
+  body.game-landscape-allowed:not(.landscape-preview-mode) #libraryPage .library-grid{
+    grid-template-columns:repeat(5,minmax(0,1fr));
+  }
+}
+
+@media (orientation:landscape) and (pointer:coarse) and (min-width:1040px){
+  body.game-landscape-allowed:not(.landscape-preview-mode) #libraryPage .library-grid{
+    grid-template-columns:repeat(6,minmax(0,1fr));
+  }
+}
+
+/* Desktop/device-emulation fallback so landscape responsiveness is visible
+   while testing Retra in a browser even when pointer:coarse is unavailable. */
+@media (orientation:landscape) and (max-height:700px) and (min-width:480px){
+  body:not(.landscape-preview-mode) .app-shell{
+    width:min(100vw, 1280px);
+    max-width:none;
+    height:100dvh;
+    max-height:100dvh;
+  }
+}
+
+/* During an orientation swap there must be no CSS motion between the outgoing
+   and incoming controller datasets. The new orientation appears directly at
+   its own saved coordinates. */
+body.screen-editor-portrait #screenSizePage .layout-control,
+body.screen-editor-landscape #screenSizePage .layout-control,
+body.screen-editor-portrait #screenSizePage .preview-screen-frame,
+body.screen-editor-landscape #screenSizePage .preview-screen-frame{
+  transition:none !important;
+  animation:none !important;
+}
+
+/* ==========================================================================
+   v4.30 — lightweight fallback artwork
+   Missing artwork uses a deterministic per-ROM gradient immediately. Retra
+   replaces it only when an exact automatic or manual cover is available.
+   ========================================================================== */
+.cover-card.no-cover{
+  /* Stable per-ROM fallback palette: it looks intentional immediately and
+     never changes between launches while accurate artwork is looked up. */
+  background:linear-gradient(155deg, var(--cover-fallback-a, rgba(68,70,91,.58)), var(--cover-fallback-b, rgba(11,12,22,.94)));
+}
+.cover-card.no-cover::after{
+  height:52%;
+  background:linear-gradient(180deg, transparent, rgba(0,0,0,.16) 20%, rgba(0,0,0,.78) 100%);
+}
+.cover-art-placeholder{
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at 72% 24%, rgba(255,255,255,.055) 0 12%, transparent 12.5%),
+    radial-gradient(circle at 28% 78%, rgba(255,255,255,.035) 0 16%, transparent 16.5%);
+  pointer-events:none;
+}
+.rom-cover.no-cover{
+  background:linear-gradient(155deg, var(--cover-fallback-a, rgba(68,70,91,.58)), var(--cover-fallback-b, rgba(11,12,22,.94)));
+}
+.rom-cover.no-cover img{ display:none !important; }
+.rom-card-actions-header img[hidden]{ display:none !important; }
+
+/* v3.90 uses deterministic orientation-specific controller defaults:
+   portrait = 100%, landscape = 100%. Keep transitions disabled so
+   orientation dataset swaps are immediate. */
+body.screen-editor-portrait #screenSizePage .layout-control,
+body.screen-editor-landscape #screenSizePage .layout-control{
+  transform-origin:top left !important;
+}
+
+
+/* v3.89 D-pad icon centering fix — replace the old border-rotated arrowheads
+   with a single centered chevron glyph per direction so every arrow sits
+   visually centered inside its button in both portrait and landscape. */
+.preview-dpad .dpad::before,
+body.landscape-preview-mode .preview-dpad .dpad::before,
+body.screen-editor-portrait .preview-dpad .dpad::before,
+body.screen-editor-landscape .preview-dpad .dpad::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:16px !important;
+  height:16px !important;
+  border:none !important;
+  border-radius:0 !important;
+  background-repeat:no-repeat !important;
+  background-position:center !important;
+  background-size:16px 16px !important;
+  transform-origin:center center !important;
+  box-shadow:none !important;
+}
+
+.preview-dpad .up::before,
+body.landscape-preview-mode .preview-dpad .up::before,
+body.screen-editor-portrait .preview-dpad .up::before,
+body.screen-editor-landscape .preview-dpad .up::before{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpolyline points='3,10 8,5 13,10' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  transform:translate(-50%,-50%) rotate(0deg) !important;
+}
+
+.preview-dpad .right::before,
+body.landscape-preview-mode .preview-dpad .right::before,
+body.screen-editor-portrait .preview-dpad .right::before,
+body.screen-editor-landscape .preview-dpad .right::before{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpolyline points='3,10 8,5 13,10' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  transform:translate(-50%,-50%) rotate(90deg) !important;
+}
+
+.preview-dpad .down::before,
+body.landscape-preview-mode .preview-dpad .down::before,
+body.screen-editor-portrait .preview-dpad .down::before,
+body.screen-editor-landscape .preview-dpad .down::before{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpolyline points='3,10 8,5 13,10' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  transform:translate(-50%,-50%) rotate(180deg) !important;
+}
+
+.preview-dpad .left::before,
+body.landscape-preview-mode .preview-dpad .left::before,
+body.screen-editor-portrait .preview-dpad .left::before,
+body.screen-editor-landscape .preview-dpad .left::before{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpolyline points='3,10 8,5 13,10' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  transform:translate(-50%,-50%) rotate(-90deg) !important;
+}
+
+/* v3.92 Controller Opacity — Video > Controller Opacity controls only the visible
+   gameplay buttons. Screen Editor chrome (Back, Add Controller, selection and
+   resize controls) intentionally stays fully opaque. */
+:root{
+  --retra-buttons-opacity:.7;
+}
+.screen-size-page .preview-shoulder,
+.screen-size-page .preview-dpad .dpad,
+.screen-size-page .preview-start-select span,
+.screen-size-page .preview-ab span,
+.screen-size-page .preview-toolbar .toolbar-icon,
+.screen-size-page .extra-control-face,
+.screen-size-page .extra-control-face > span{
+  opacity:var(--retra-buttons-opacity);
+}
+
+/* v4.47 hotfix — adaptive resize handle must never disable controller dragging.
+   Keep the resize target distinct and mostly outside the selected control. */
+#screenSizePage .preview-scale-handle:not(.screen-scale-mode){
+  width:38px !important;
+  height:38px !important;
+  border-radius:12px !important;
+  z-index:14 !important;
+  touch-action:none !important;
+  user-select:none !important;
+  -webkit-user-select:none !important;
+}
+#screenSizePage .preview-scale-handle:not(.screen-scale-mode) svg{
+  pointer-events:none !important;
+}
+body.screen-editor-portrait #screenSizePage .layout-control,
+body.screen-editor-landscape #screenSizePage .layout-control{
+  touch-action:none !important;
+}

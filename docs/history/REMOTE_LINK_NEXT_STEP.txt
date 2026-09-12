@@ -1,0 +1,15 @@
+Retra Remote Link - next phase
+==============================
+
+Do not treat Remote Link as a normal REST/API connection. Real GBA remote
+multiplayer must synchronize the GBA serial (SIO) link protocol and timing.
+
+Recommended order after Local Link passes device testing:
+1. Keep the proven Local Link lockstep implementation as the reference.
+2. Add a network SIO transport layer for Wi-Fi host/client.
+3. Add connection/version/game compatibility handshakes.
+4. Add latency buffering, disconnect handling, and link resynchronization.
+5. Reuse that transport abstraction for Bluetooth later.
+
+This is intentionally not faked in v4.07. A UI that says "connected" while
+only opening a TCP socket would not make Pokemon trading/battling work.

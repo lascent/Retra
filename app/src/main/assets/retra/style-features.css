@@ -1,0 +1,703 @@
+/* ==========================================================================
+   v3.93 — My Boy!-style real gameplay layout editor synchronization
+   The editor canvas is the actual full-screen gameplay coordinate canvas.
+   Editor-only Back/+ float above it and are never part of saved gameplay data.
+   ========================================================================== */
+body.screen-editor-portrait .screen-preview-shell,
+body.screen-editor-landscape .screen-preview-shell{
+  inset:0 !important;
+  top:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  left:0 !important;
+  width:100vw !important;
+  height:100dvh !important;
+  max-width:none !important;
+  max-height:none !important;
+  transform:none !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+}
+
+body.screen-editor-portrait .screen-size-page > .sub-header,
+body.screen-editor-landscape .screen-size-page > .sub-header{
+  top:12px !important;
+  left:12px !important;
+}
+body.screen-editor-portrait .preview-add-fab,
+body.screen-editor-landscape .preview-add-fab{
+  top:12px !important;
+  right:12px !important;
+}
+
+/* Match the native Android gameplay view dimensions 1:1 in CSS dp/px. This
+   makes saved normalized x/y + scale values produce the same visible result. */
+body.screen-editor-portrait .preview-shoulder,
+body.screen-editor-landscape .preview-shoulder{
+  width:72px !important;
+  height:30px !important;
+  font-size:17px !important;
+}
+
+body.screen-editor-portrait .preview-toolbar.top.landscape-only,
+body.screen-editor-landscape .preview-toolbar.top.landscape-only{
+  width:44px !important;
+  height:44px !important;
+  gap:0 !important;
+}
+body.screen-editor-portrait .preview-toolbar.top.landscape-only .toolbar-icon,
+body.screen-editor-landscape .preview-toolbar.top.landscape-only .toolbar-icon{
+  width:44px !important;
+  height:44px !important;
+}
+
+body.screen-editor-portrait .preview-dpad,
+body.screen-editor-landscape .preview-dpad{
+  width:150px !important;
+  height:150px !important;
+}
+body.screen-editor-portrait .preview-dpad .dpad,
+body.screen-editor-landscape .preview-dpad .dpad{
+  width:44px !important;
+  height:44px !important;
+}
+body.screen-editor-portrait .preview-dpad .up,
+body.screen-editor-landscape .preview-dpad .up{left:53px !important; top:0 !important;}
+body.screen-editor-portrait .preview-dpad .left,
+body.screen-editor-landscape .preview-dpad .left{left:0 !important; top:53px !important;}
+body.screen-editor-portrait .preview-dpad .right,
+body.screen-editor-landscape .preview-dpad .right{left:106px !important; right:auto !important; top:53px !important;}
+body.screen-editor-portrait .preview-dpad .down,
+body.screen-editor-landscape .preview-dpad .down{left:53px !important; top:106px !important; bottom:auto !important;}
+
+body.screen-editor-portrait .preview-start-select,
+body.screen-editor-landscape .preview-start-select{
+  width:116px !important;
+  height:38px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:8px !important;
+}
+body.screen-editor-portrait .preview-start-select span,
+body.screen-editor-landscape .preview-start-select span{
+  position:relative !important;
+  left:auto !important;
+  right:auto !important;
+  top:auto !important;
+  bottom:auto !important;
+  width:50px !important;
+  height:24px !important;
+}
+
+body.screen-editor-portrait .preview-ab,
+body.screen-editor-landscape .preview-ab{
+  width:150px !important;
+  height:94px !important;
+}
+body.screen-editor-portrait .preview-ab span,
+body.screen-editor-landscape .preview-ab span{
+  width:54px !important;
+  height:54px !important;
+  font-size:20px !important;
+}
+body.screen-editor-portrait .preview-ab .button-b,
+body.screen-editor-landscape .preview-ab .button-b{left:0 !important; top:0 !important;}
+body.screen-editor-portrait .preview-ab .button-a,
+body.screen-editor-landscape .preview-ab .button-a{left:auto !important; right:0 !important; top:auto !important; bottom:0 !important;}
+
+/* User-saved inline x/y remains authoritative after the deterministic base
+   dimensions above have been measured. */
+body.screen-editor-portrait #screenSizePage .layout-control,
+body.screen-editor-landscape #screenSizePage .layout-control{
+  transform-origin:top left !important;
+  transition:none !important;
+  animation:none !important;
+}
+
+
+/* v3.94 — utility controls added in Screen Size are real gameplay controls.
+   Keep their editor base box exactly aligned with the native 44dp buttons so
+   saved normalized x/y and scale values match gameplay 1:1. */
+body.screen-editor-portrait #screenSizePage .extra-control.menu-style-utility,
+body.screen-editor-landscape #screenSizePage .extra-control.menu-style-utility,
+body.screen-editor-portrait #screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button,
+body.screen-editor-landscape #screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button{
+  width:44px !important;
+  height:44px !important;
+}
+
+
+/* v3.95 ROM detail actions — remove the old floating Resume button and make
+   the inline Resume action beside In library follow the active appearance. */
+.resume-fab,
+#bigResumeBtn{
+  display:none !important;
+}
+
+.rom-detail-body{
+  padding-bottom:32px;
+}
+
+.rom-actions{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+
+#resumeAction{
+  color:var(--accent) !important;
+  background:var(--accent-soft) !important;
+  border-color:var(--accent) !important;
+  box-shadow:0 8px 22px rgba(0,0,0,.10), inset 0 0 0 1px rgba(255,255,255,.025);
+  transition:transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+#resumeAction svg{
+  color:var(--accent);
+  stroke:currentColor;
+  fill:currentColor;
+}
+
+#resumeAction:hover,
+#resumeAction:focus-visible{
+  background:var(--accent-soft) !important;
+  border-color:var(--accent) !important;
+  box-shadow:0 10px 26px rgba(0,0,0,.14), 0 0 0 1px var(--accent-soft);
+}
+
+#resumeAction:active{
+  transform:scale(.98);
+}
+
+/* Keep the library state quieter so Resume is the obvious primary action. */
+.rom-actions .rom-action.active:not(#resumeAction){
+  color:var(--accent);
+  background:transparent;
+  border-color:var(--accent-soft);
+}
+
+
+/* v4.00 — Categories Add button moved a little farther upward for easier reach. */
+#categoriesPage #addCategoryBtn{
+  bottom:38px;
+}
+
+/* v3.97 — persistent working History rows. */
+.history-item{
+  cursor:pointer;
+}
+.history-cover{
+  width:64px;
+  height:88px;
+  border-radius:12px;
+  overflow:hidden;
+  background:linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.055);
+  display:grid;
+  place-items:center;
+}
+.history-cover img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:inherit;
+}
+.history-cover-placeholder{
+  width:26px;
+  height:20px;
+  border:2px solid rgba(255,255,255,.16);
+  border-radius:5px;
+  transform:rotate(-8deg);
+}
+.history-item .continue-btn:disabled{
+  opacity:.42;
+  cursor:default;
+}
+
+/* v4.03 ROM detail recent saves: live native save states + hold-to-delete */
+.recent-save-item{
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:pan-y;
+  transition:transform .14s ease, background-color .14s ease, border-color .14s ease;
+}
+
+.recent-save-item.holding{
+  transform:scale(.992);
+  background:rgba(255,255,255,.055);
+}
+
+.recent-save-item.long-pressed{
+  transform:scale(.985);
+  border-color:rgba(255,255,255,.14);
+}
+
+.recent-saves-empty{
+  min-height:76px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:18px var(--settings-card-gutter);
+  border:1px dashed rgba(255,255,255,.09);
+  border-radius:18px;
+  color:rgba(233,239,255,.55);
+  font-size:14px;
+}
+
+body[data-resolved-mode="light"] .recent-save-item.holding{
+  background:rgba(26,40,76,.055);
+}
+
+body[data-resolved-mode="light"] .recent-save-item.long-pressed{
+  border-color:rgba(26,40,76,.16);
+}
+
+body[data-resolved-mode="light"] .recent-saves-empty{
+  border-color:rgba(26,40,76,.10);
+  color:rgba(26,40,76,.52);
+}
+
+/* v4.06 — Layout profiles + FAB positioning polish */
+.layout-profiles-list{
+  display:grid;
+  gap:10px;
+  padding-bottom:112px;
+}
+
+#layoutsSettingsPage .layout-card{
+  appearance:none;
+  -webkit-appearance:none;
+  color:inherit;
+  text-align:left;
+  font:inherit;
+  cursor:pointer;
+}
+
+#layoutsSettingsPage .layout-profile-card .radio-dot{
+  border-color:color-mix(in srgb, var(--accent) 62%, rgba(255,255,255,.28));
+}
+
+#layoutsSettingsPage .layout-profile-card .radio-dot::after{
+  background:var(--accent);
+  opacity:0;
+  transform:scale(.55);
+  transition:opacity .16s ease, transform .16s ease;
+}
+
+#layoutsSettingsPage .layout-profile-card.selected{
+  border-color:color-mix(in srgb, var(--accent) 52%, var(--line));
+  background:color-mix(in srgb, var(--accent-soft) 65%, var(--glass-bg));
+}
+
+#layoutsSettingsPage .layout-profile-card.selected .radio-dot{
+  border-color:var(--accent);
+}
+
+#layoutsSettingsPage .layout-profile-card.selected .radio-dot::after{
+  opacity:1;
+  transform:scale(1);
+}
+
+/* A little higher and a little farther from the right edge, like the My Boy!
+   layout profile screen while still respecting gesture/navigation safe areas. */
+#layoutsSettingsPage #addLayoutProfileBtn{
+  right:22px;
+  bottom:calc(54px + env(safe-area-inset-bottom, 0px));
+}
+
+/* User-requested Categories FAB adjustment: move it a little farther upward. */
+#categoriesPage #addCategoryBtn{
+  bottom:calc(58px + env(safe-area-inset-bottom, 0px));
+}
+
+.layout-profile-modal-card input{
+  width:100%;
+}
+
+@media (orientation:landscape) and (max-height:480px){
+  #layoutsSettingsPage #addLayoutProfileBtn{
+    right:18px;
+    bottom:calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+  #categoriesPage #addCategoryBtn{
+    bottom:calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+
+/* v4.16 — ROM category/filter sheet bottom-edge cleanup.
+   Keep the sheet flush with the app's bottom edge so rounded lower corners do
+   not expose dark triangular "holes" above Android navigation. The actions
+   keep their own safe padding instead of lifting the entire sheet. */
+@media (max-width: 600px) {
+  #romFilterSheetBackdrop {
+    padding-bottom: 0;
+    box-sizing: border-box;
+  }
+
+  #romFilterSheetBackdrop .rom-sheet {
+    max-height: 72%;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: 0;
+  }
+
+  #romFilterSheetBackdrop .sheet-content {
+    max-height: calc(72vh - 118px);
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  }
+
+  #romFilterSheetBackdrop .sheet-actions {
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+
+/* v4.17 — Functional three-dot menu for the ROM category/filter sheet. */
+#romFilterSheet .sheet-tabs{
+  position:relative;
+}
+
+#romFilterSheet .sheet-more{
+  position:relative;
+  z-index:3;
+}
+
+#romFilterSheet .sheet-options-menu{
+  position:absolute;
+  top:50px;
+  right:16px;
+  width:min(250px, calc(100vw - 42px));
+  padding:7px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:16px;
+  background:color-mix(in srgb, var(--surface, #2f314f) 96%, #000 4%);
+  box-shadow:0 14px 34px rgba(0,0,0,.34);
+  display:none;
+  z-index:30;
+}
+
+#romFilterSheet .sheet-options-menu.open{
+  display:grid;
+  gap:3px;
+}
+
+#romFilterSheet .sheet-options-item{
+  min-height:52px;
+  width:100%;
+  display:grid;
+  grid-template-columns:34px 1fr;
+  align-items:center;
+  gap:10px;
+  padding:7px 9px;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:var(--text, #f5f6fb);
+  text-align:left;
+  cursor:pointer;
+}
+
+#romFilterSheet .sheet-options-item:active{
+  background:rgba(255,255,255,.08);
+}
+
+#romFilterSheet .sheet-options-icon{
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background:color-mix(in srgb, var(--accent, #f1b76d) 16%, transparent);
+  color:var(--accent, #f1b76d);
+}
+
+#romFilterSheet .sheet-options-icon svg{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.9;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+#romFilterSheet .sheet-options-item strong,
+#romFilterSheet .sheet-options-item small{
+  display:block;
+}
+
+#romFilterSheet .sheet-options-item strong{
+  font-size:13px;
+  line-height:1.2;
+}
+
+#romFilterSheet .sheet-options-item small{
+  margin-top:3px;
+  font-size:10px;
+  line-height:1.3;
+  color:var(--muted);
+  font-weight:400;
+}
+
+
+/* v4.19 Recent Saves play icon fix — use a true right-facing play glyph. */
+#detailEntries .entry-download{
+  display:grid;
+  place-items:center;
+  padding:0;
+}
+#detailEntries .entry-download .recent-save-play-icon{
+  width:20px;
+  height:20px;
+  display:block;
+  fill:currentColor;
+  stroke:none;
+  transform:translateX(1px);
+}
+
+/* v4.22 Library Add ROM FAB pressed/focus color fix
+   Android WebView can keep a tapped button focused after the file picker opens.
+   Keep the appearance accent fill visible in normal, pressed, and touch-focus
+   states instead of letting the generic icon-button focus styling flatten it. */
+.add-rom-btn,
+.add-rom-btn:active,
+.add-rom-btn:focus,
+.add-rom-btn:focus:not(:focus-visible){
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 92%, white 8%) 0%,
+    color-mix(in srgb, var(--accent) 88%, black 12%) 100%) !important;
+  border-color:color-mix(in srgb, var(--accent) 72%, rgba(255,255,255,.24)) !important;
+  box-shadow:0 16px 34px rgba(0,0,0,.32),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.20) !important;
+}
+.add-rom-btn:active{
+  transform:scale(.965);
+}
+@media (hover:hover) and (pointer:fine){
+  .add-rom-btn:hover,
+  .add-rom-btn:hover:focus{
+    background:linear-gradient(180deg,
+      color-mix(in srgb, var(--accent) 84%, white 16%) 0%,
+      color-mix(in srgb, var(--accent) 94%, black 6%) 100%) !important;
+  }
+}
+
+
+/* v4.32 unified dialog system — keep confirm/category dialogs visually consistent
+   with the current Retra theme: rounded modal card, translucent dark backdrop,
+   polished spacing, shared button styling, and responsive sizing. */
+.modal-backdrop{
+  background:rgba(7,8,15,.76);
+  backdrop-filter:blur(14px) saturate(120%);
+  -webkit-backdrop-filter:blur(14px) saturate(120%);
+  padding:clamp(18px, 5vw, 28px);
+}
+
+.category-modal-card,
+.confirm-modal-card{
+  width:min(372px, calc(100vw - 36px));
+  max-width:372px;
+  padding:clamp(20px, 5vw, 24px);
+  border-radius:24px;
+  border:1px solid rgba(255,255,255,.09);
+  background:linear-gradient(180deg, rgba(24,26,40,.97) 0%, rgba(18,20,34,.97) 100%);
+  box-shadow:0 26px 64px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter:blur(calc(var(--glass-blur) + 8px)) saturate(118%);
+  -webkit-backdrop-filter:blur(calc(var(--glass-blur) + 8px)) saturate(118%);
+}
+
+.category-modal-card .modal-title,
+.confirm-modal-card .modal-title,
+.category-modal-card h3,
+.confirm-modal-card h3{
+  margin:0 0 8px;
+  font-size:clamp(20px, 4.6vw, 22px);
+  line-height:1.15;
+  font-weight:700;
+  letter-spacing:-.015em;
+  color:var(--text);
+}
+
+.category-modal-card .modal-copy,
+.confirm-modal-card .modal-copy,
+.category-modal-card p,
+.confirm-modal-card p{
+  margin:0 0 18px;
+  color:color-mix(in srgb, var(--muted) 88%, white 12%);
+  font-size:13px;
+  line-height:1.65;
+}
+
+.category-modal-card input{
+  width:100%;
+  min-height:50px;
+  padding:0 16px;
+  border-radius:15px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.04);
+  color:var(--text);
+  font-size:14px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+  transition:border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .18s ease;
+}
+
+.category-modal-card input::placeholder{
+  color:color-mix(in srgb, var(--muted) 90%, transparent);
+}
+
+.category-modal-card input:focus{
+  border-color:color-mix(in srgb, var(--accent) 58%, rgba(255,255,255,.12));
+  background:rgba(255,255,255,.05);
+  box-shadow:0 0 0 3px rgba(228,174,107,.14), inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.modal-actions,
+.confirm-actions{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+  margin-top:18px;
+}
+
+.confirm-actions{
+  justify-content:stretch;
+}
+
+.modal-btn{
+  min-height:46px;
+  height:46px;
+  border-radius:14px;
+  padding:0 18px;
+  border:1px solid transparent;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:-.01em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  transition:transform .18s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease, color .22s ease;
+}
+
+.modal-btn.secondary{
+  background:rgba(255,255,255,.08);
+  border-color:rgba(255,255,255,.06);
+  color:var(--text);
+}
+
+.modal-btn.primary{
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 90%, white 10%) 0%, color-mix(in srgb, var(--accent) 94%, black 6%) 100%);
+  border-color:rgba(235,176,109,.34);
+  color:#1a1b28;
+  box-shadow:0 10px 24px rgba(235,176,109,.18), inset 0 1px 0 rgba(255,255,255,.22);
+}
+
+.modal-btn:active{
+  transform:scale(.98);
+}
+
+@media (hover:hover) and (pointer:fine){
+  .modal-btn.secondary:hover{
+    background:rgba(255,255,255,.11);
+    border-color:rgba(255,255,255,.09);
+  }
+  .modal-btn.primary:hover{
+    background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 82%, white 18%) 0%, color-mix(in srgb, var(--accent) 90%, black 10%) 100%);
+  }
+}
+
+body[data-resolved-mode="light"] .modal-backdrop{
+  background:rgba(28,31,48,.42);
+}
+
+body[data-resolved-mode="light"] .category-modal-card,
+body[data-resolved-mode="light"] .confirm-modal-card{
+  border-color:rgba(15,18,34,.08);
+  background:linear-gradient(180deg, rgba(248,245,248,.96) 0%, rgba(241,236,240,.97) 100%);
+  box-shadow:0 24px 58px rgba(30,34,54,.18), inset 0 1px 0 rgba(255,255,255,.52);
+}
+
+body[data-resolved-mode="light"] .category-modal-card .modal-copy,
+body[data-resolved-mode="light"] .confirm-modal-card .modal-copy,
+body[data-resolved-mode="light"] .category-modal-card p,
+body[data-resolved-mode="light"] .confirm-modal-card p{
+  color:rgba(57,61,84,.72);
+}
+
+body[data-resolved-mode="light"] .category-modal-card input{
+  border-color:rgba(18,22,42,.10);
+  background:rgba(255,255,255,.74);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55);
+}
+
+body[data-resolved-mode="light"] .modal-btn.secondary{
+  background:rgba(31,35,58,.08);
+  border-color:rgba(31,35,58,.08);
+  color:#2b2f46;
+}
+
+body[data-translucent="true"] .category-modal-card,
+body[data-translucent="true"] .confirm-modal-card{
+  background:linear-gradient(180deg, rgba(28,30,46,.74) 0%, rgba(18,20,34,.72) 100%);
+  border-color:rgba(255,255,255,.11);
+}
+
+@media (max-width:420px){
+  .modal-backdrop{
+    padding:16px;
+  }
+  .category-modal-card,
+  .confirm-modal-card{
+    width:min(100%, calc(100vw - 24px));
+    border-radius:22px;
+    padding:18px;
+  }
+  .category-modal-card .modal-title,
+  .confirm-modal-card .modal-title,
+  .category-modal-card h3,
+  .confirm-modal-card h3{
+    font-size:19px;
+  }
+  .modal-actions,
+  .confirm-actions{
+    gap:10px;
+  }
+  .modal-btn{
+    min-height:44px;
+    height:44px;
+    font-size:14px;
+  }
+}
+
+/* ========================================================================== 
+   v4.36 Android navigation-bar safe Settings scrolling
+   ========================================================================== */
+/* Detail pages use the real Android navigation-bar inset forwarded by native
+   code (with the existing WebView fallback). The extra scroll tail ensures a
+   last row such as Open app folder or Reset advanced settings can be moved
+   completely above 3-button or gesture navigation controls. */
+body.subpage-open main{
+  padding-bottom:calc(42px + var(--device-safe-bottom));
+  scroll-padding-bottom:calc(42px + var(--device-safe-bottom));
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+}
+
+.settings-detail-page{
+  scroll-margin-bottom:calc(28px + var(--device-safe-bottom));
+}
+.settings-detail-page.active{
+  /* A real scroll tail is required on classic 3-button navigation devices;
+     padding on the outer main element alone can still leave the final row
+     visually trapped against the system navigation area. */
+  padding-bottom:calc(28px + var(--device-safe-bottom));
+  box-sizing:border-box;
+}

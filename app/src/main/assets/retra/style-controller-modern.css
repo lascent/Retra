@@ -1,0 +1,165 @@
+/* Retra v4.47 — unified modern controller visual system.
+   This stylesheet is intentionally loaded last so old editor-specific visual
+   patches keep their geometry while all controller faces share one language. */
+
+:root{
+  --controller-face-bg:linear-gradient(180deg, rgba(34,42,51,.72), rgba(12,17,23,.62));
+  --controller-face-border:rgba(255,255,255,.72);
+  --controller-face-highlight:rgba(255,255,255,.14);
+  --controller-face-shadow:0 7px 16px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.13), inset 0 -1px 0 rgba(0,0,0,.2);
+  --controller-glyph:#f7f9fc;
+}
+
+/* One surface treatment for D-pad, A/B, Menu and the utility controls. */
+#screenSizePage .preview-dpad .dpad,
+#screenSizePage .preview-ab span,
+#screenSizePage .preview-toolbar .myboy-menu-button,
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button,
+#screenSizePage .extra-control-face.circle-text,
+.add-control-icon.circle,
+.add-control-icon.square{
+  border:1.5px solid var(--controller-face-border) !important;
+  background:var(--controller-face-bg) !important;
+  box-shadow:var(--controller-face-shadow) !important;
+  color:var(--controller-glyph) !important;
+}
+
+/* D-pad: a connected cross silhouette with four distinct touch faces. */
+#screenSizePage .preview-dpad{
+  isolation:isolate;
+}
+#screenSizePage .preview-dpad::before{
+  content:"";
+  position:absolute;
+  left:44px;
+  top:44px;
+  width:62px;
+  height:62px;
+  border:1.5px solid rgba(255,255,255,.40);
+  border-radius:16px;
+  background:linear-gradient(180deg, rgba(30,38,46,.66), rgba(10,15,20,.58));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 5px 12px rgba(0,0,0,.22);
+  pointer-events:none;
+  z-index:0;
+}
+#screenSizePage .preview-dpad .dpad{
+  border-radius:13px !important;
+  z-index:1;
+}
+#screenSizePage .preview-dpad .dpad::before{
+  width:15px !important;
+  height:15px !important;
+  background-size:15px 15px !important;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.24));
+}
+
+/* A/B are clean neutral action keys with matching typography. */
+#screenSizePage .preview-ab span,
+#screenSizePage .extra-control-face.circle-text,
+.add-control-icon.circle{
+  font-family:Poppins,Inter,system-ui,sans-serif !important;
+  font-weight:700 !important;
+  letter-spacing:.02em !important;
+  text-shadow:0 1px 2px rgba(0,0,0,.30);
+}
+#screenSizePage .preview-ab span{
+  border-radius:50% !important;
+}
+
+/* Menu and quick actions all use the same rounded-square footprint. */
+#screenSizePage .preview-toolbar .myboy-menu-button,
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button,
+.add-control-icon.square{
+  border-radius:14px !important;
+}
+#screenSizePage .preview-toolbar .myboy-menu-button::before,
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button::before{
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  inset:4px !important;
+  border:1px solid rgba(255,255,255,.07) !important;
+  border-radius:10px !important;
+  background:transparent !important;
+  pointer-events:none !important;
+}
+#screenSizePage .myboy-menu-icon,
+#screenSizePage .control-svg,
+.add-control-icon .control-svg{
+  stroke:var(--controller-glyph) !important;
+  stroke-width:2.2 !important;
+  stroke-linecap:round !important;
+  stroke-linejoin:round !important;
+  filter:none !important;
+}
+#screenSizePage .fast-forward-reference-icon,
+.add-control-icon .fast-forward-reference-icon{
+  stroke-width:2.35 !important;
+}
+
+/* Modern add-controller rows and strict no-duplicate availability state. */
+.add-control-item{
+  border-radius:13px;
+  transition:background .14s ease, transform .14s ease;
+}
+.add-control-item:active{
+  transform:scale(.985);
+}
+.add-control-item[hidden],
+.add-control-item.is-already-added{
+  display:none !important;
+}
+.add-control-empty-state{
+  min-height:76px;
+  padding:18px 16px;
+  display:grid;
+  place-items:center;
+  text-align:center;
+  color:rgba(255,255,255,.62);
+  font-size:13px;
+  line-height:1.45;
+}
+
+/* Light appearance keeps the exact same geometry with a high-contrast face. */
+body[data-resolved-mode="light"]{
+  --controller-face-bg:linear-gradient(180deg, rgba(255,255,255,.94), rgba(231,237,246,.78));
+  --controller-face-border:rgba(28,43,65,.42);
+  --controller-face-highlight:rgba(255,255,255,.9);
+  --controller-face-shadow:0 6px 15px rgba(36,51,75,.14), inset 0 1px 0 rgba(255,255,255,.92), inset 0 -1px 0 rgba(32,46,68,.08);
+  --controller-glyph:#17243c;
+}
+body[data-resolved-mode="light"] #screenSizePage .preview-dpad::before{
+  border-color:rgba(30,44,68,.25);
+  background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(226,233,242,.72));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.92), 0 5px 12px rgba(36,51,75,.10);
+}
+body[data-resolved-mode="light"] .add-control-empty-state{
+  color:rgba(23,36,60,.62);
+}
+
+/* Keep the connected D-pad hub proportional on compact landscape editors. */
+@media (orientation:landscape) and (max-height:600px){
+  #screenSizePage .preview-dpad::before{
+    left:44px;
+    top:44px;
+    width:62px;
+    height:62px;
+  }
+}
+
+/* Direction glyphs follow the same 2.2px rounded-stroke icon system. */
+#screenSizePage .preview-dpad .dpad::before{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpolyline points='4,9.75 8,5.75 12,9.75' fill='none' stroke='%23f7f9fc' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+body[data-resolved-mode="light"] #screenSizePage .preview-dpad .dpad::before{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpolyline points='4,9.75 8,5.75 12,9.75' fill='none' stroke='%2317243c' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+#screenSizePage .preview-dpad .up::before{transform:translate(-50%,-50%) rotate(0deg) !important;}
+#screenSizePage .preview-dpad .right::before{transform:translate(-50%,-50%) rotate(90deg) !important;}
+#screenSizePage .preview-dpad .down::before{transform:translate(-50%,-50%) rotate(180deg) !important;}
+#screenSizePage .preview-dpad .left::before{transform:translate(-50%,-50%) rotate(-90deg) !important;}
+
+/* The D-pad center is part of the controller and follows Controller Opacity. */
+#screenSizePage .preview-dpad::before{
+  opacity:var(--retra-buttons-opacity, .7);
+}

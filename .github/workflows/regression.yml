@@ -1,0 +1,55 @@
+name: Retra regression checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retra-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-and-contract-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JavaScript syntax
+        run: |
+          for file in app/src/main/assets/retra/*.js; do node --check "$file"; done
+      - name: Regression tests
+        run: node --test tests/*.test.cjs
+      - name: Release structure validation
+        run: python3 tools/validate_release.py
+
+  android-kotlin-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+      - name: Compile Kotlin, run JVM tests and Android lint
+        run: ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug --stacktrace
+      - name: Assemble debug APK when mGBA source is available
+        shell: bash
+        run: |
+          if [ -f third_party/mgba/CMakeLists.txt ]; then
+            ./gradlew :app:assembleDebug --stacktrace
+          else
+            echo "mGBA source checkout is not bundled/submoduled; native APK assembly is intentionally skipped."
+            echo "Pin the validated mGBA revision under third_party/mgba to make this step mandatory."
+          fi

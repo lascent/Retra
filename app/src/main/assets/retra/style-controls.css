@@ -1,0 +1,1102 @@
+/* v3.32 responsive add-control modal scaling for Android */
+.add-control-modal{
+  padding:
+    max(10px, env(safe-area-inset-top))
+    max(10px, env(safe-area-inset-right))
+    max(10px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+}
+.add-control-dialog{
+  width:min(92vw, 440px);
+  max-width:440px;
+  max-height:min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px), 520px);
+  border-radius:clamp(18px, 3.6vw, 28px);
+}
+.add-control-header,
+.add-control-footer{
+  padding:clamp(14px, 3vw, 20px) clamp(16px, 3.5vw, 22px);
+}
+.add-control-header h3{
+  font-size:clamp(18px, 4.4vw, 24px);
+}
+.add-control-item{
+  gap:clamp(14px, 3vw, 20px);
+  padding:clamp(12px, 2.8vw, 18px) clamp(16px, 3.5vw, 22px);
+}
+.add-control-label{
+  font-size:clamp(15px, 3.8vw, 18px);
+}
+.add-control-footer-btn{
+  font-size:clamp(14px, 3.6vw, 16px);
+}
+.circle-text,
+.add-control-icon.circle,
+.square-icon,
+.add-control-icon.square{
+  width:clamp(46px, 12vw, 56px);
+  height:clamp(46px, 12vw, 56px);
+}
+.circle-text,
+.add-control-icon.circle{
+  font-size:clamp(18px, 4.5vw, 21px);
+}
+.turbo-face,
+.add-control-icon.duo{
+  width:clamp(100px, 27vw, 122px);
+  height:clamp(48px, 12vw, 58px);
+  gap:clamp(8px, 2vw, 12px);
+}
+.turbo-face span,
+.add-control-icon.duo span{
+  width:clamp(46px, 12vw, 56px);
+  height:clamp(46px, 12vw, 56px);
+  font-size:clamp(18px, 4.5vw, 21px);
+}
+
+@media (max-width: 540px), (max-height: 520px){
+  .add-control-dialog{
+    width:min(90vw, 380px);
+    max-height:min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px), 430px);
+  }
+  .add-control-header,
+  .add-control-footer{
+    padding:14px 16px;
+  }
+  .add-control-item{
+    gap:14px;
+    padding:12px 16px;
+  }
+  .add-control-label{
+    font-size:15px;
+  }
+}
+
+@media (max-height: 420px){
+  .add-control-dialog{
+    width:min(88vw, 340px);
+    max-height:min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px), 340px);
+    border-radius:18px;
+  }
+  .add-control-header h3{
+    font-size:18px;
+  }
+  .circle-text,
+  .add-control-icon.circle,
+  .square-icon,
+  .add-control-icon.square{
+    width:42px;
+    height:42px;
+  }
+  .circle-text,
+  .add-control-icon.circle,
+  .turbo-face span,
+  .add-control-icon.duo span{
+    font-size:16px;
+  }
+  .turbo-face,
+  .add-control-icon.duo{
+    width:92px;
+    height:44px;
+    gap:6px;
+  }
+  .turbo-face span,
+  .add-control-icon.duo span{
+    width:42px;
+    height:42px;
+  }
+  .add-control-item{
+    padding:10px 14px;
+  }
+}
+
+/* v3.33 modernized control icons and menu button */
+.toolbar-icon{
+  width:46px;
+  height:46px;
+  border-radius:14px;
+}
+.toolbar-icon.solo{
+  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.26);
+  box-shadow:
+    0 10px 22px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.20),
+    inset 0 -1px 0 rgba(0,0,0,.22);
+}
+.toolbar-icon.solo::before{
+  content:"";
+  position:absolute;
+  inset:5px;
+  border-radius:11px;
+  border:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+}
+.toolbar-icon.menu span,
+.toolbar-icon.menu-square span{
+  width:17px;
+  height:2.8px;
+  border-radius:999px;
+  background:#f8fbff;
+  box-shadow:0 -7px 0 #f8fbff, 0 7px 0 #f8fbff;
+}
+
+.extra-control-face,
+.add-control-icon{
+  border:1.8px solid rgba(255,255,255,.82);
+  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.018));
+  box-shadow:
+    0 8px 18px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.18);
+}
+.square-icon,
+.add-control-icon.square{
+  border-radius:14px;
+}
+.circle-text,
+.add-control-icon.circle{
+  letter-spacing:0;
+  text-shadow:0 1px 1px rgba(0,0,0,.22);
+}
+
+.icon-fastforward::before,
+.icon-fastforward::after,
+.add-control-icon.icon-fastforward::before,
+.add-control-icon.icon-fastforward::after{
+  width:11px;
+  height:11px;
+  top:50%;
+  left:auto;
+  border-top:0;
+  border-right:0;
+  border-bottom:3px solid #f8fbff;
+  border-left:3px solid #f8fbff;
+  transform:translateY(-50%) rotate(45deg);
+}
+.icon-fastforward::before,
+.add-control-icon.icon-fastforward::before{ left:16px; }
+.icon-fastforward::after,
+.add-control-icon.icon-fastforward::after{ left:26px; }
+
+.icon-quickload::before,
+.add-control-icon.icon-quickload::before{
+  width:20px;
+  height:20px;
+  top:15px;
+  left:14px;
+  border-left:3px solid #f8fbff;
+  border-top:3px solid #f8fbff;
+  border-right:none;
+  border-bottom:none;
+  border-radius:13px 0 0 0;
+  transform:rotate(28deg);
+}
+.icon-quickload::after,
+.add-control-icon.icon-quickload::after{
+  width:9px;
+  height:9px;
+  top:15px;
+  left:28px;
+  border:none;
+  border-top:3px solid #f8fbff;
+  border-right:3px solid #f8fbff;
+  transform:rotate(16deg);
+}
+
+.icon-quicksave::before,
+.add-control-icon.icon-quicksave::before{
+  inset:11px 12px 11px;
+  border:3px solid #f8fbff;
+  border-radius:4px;
+  background:
+    linear-gradient(180deg, transparent 0 58%, #f8fbff 58% 61%, transparent 61% 100%);
+}
+.icon-quicksave::after,
+.add-control-icon.icon-quicksave::after{
+  left:21px;
+  top:13px;
+  width:14px;
+  height:10px;
+  border:3px solid #f8fbff;
+  border-top:none;
+  border-radius:0 0 2px 2px;
+  background:rgba(255,255,255,.08);
+}
+
+.icon-screenshot::before,
+.add-control-icon.icon-screenshot::before{
+  width:28px;
+  height:18px;
+  top:18px;
+  border:3px solid #f8fbff;
+  border-radius:6px;
+}
+.icon-screenshot::after,
+.add-control-icon.icon-screenshot::after{
+  width:8px;
+  height:8px;
+  top:22px;
+  border:3px solid #f8fbff;
+}
+.add-control-icon.icon-screenshot,
+.extra-control-face.icon-screenshot{
+  overflow:visible;
+}
+.add-control-icon.icon-screenshot span,
+.extra-control-face.icon-screenshot span{
+  display:none;
+}
+
+body[data-resolved-mode="light"] .toolbar-icon.solo{
+  border-color:rgba(35,46,71,.18);
+  background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(242,246,252,.92));
+  box-shadow:
+    0 10px 22px rgba(40,56,84,.12),
+    inset 0 1px 0 rgba(255,255,255,.96),
+    inset 0 -1px 0 rgba(35,46,71,.08);
+}
+body[data-resolved-mode="light"] .toolbar-icon.solo::before{
+  border-color:rgba(35,46,71,.07);
+  background:linear-gradient(180deg, rgba(255,255,255,.8), rgba(245,248,252,.65));
+}
+body[data-resolved-mode="light"] .toolbar-icon.menu span,
+body[data-resolved-mode="light"] .toolbar-icon.menu-square span,
+body[data-resolved-mode="light"] .icon-fastforward::before,
+body[data-resolved-mode="light"] .icon-fastforward::after,
+body[data-resolved-mode="light"] .add-control-icon.icon-fastforward::before,
+body[data-resolved-mode="light"] .add-control-icon.icon-fastforward::after,
+body[data-resolved-mode="light"] .icon-quickload::before,
+body[data-resolved-mode="light"] .add-control-icon.icon-quickload::before,
+body[data-resolved-mode="light"] .icon-quickload::after,
+body[data-resolved-mode="light"] .add-control-icon.icon-quickload::after,
+body[data-resolved-mode="light"] .icon-quicksave::before,
+body[data-resolved-mode="light"] .add-control-icon.icon-quicksave::before,
+body[data-resolved-mode="light"] .icon-quicksave::after,
+body[data-resolved-mode="light"] .add-control-icon.icon-quicksave::after,
+body[data-resolved-mode="light"] .icon-screenshot::before,
+body[data-resolved-mode="light"] .add-control-icon.icon-screenshot::before,
+body[data-resolved-mode="light"] .icon-screenshot::after,
+body[data-resolved-mode="light"] .add-control-icon.icon-screenshot::after{
+  color:#16233c;
+  border-color:#16233c;
+  background-color:#16233c;
+  box-shadow:none;
+}
+body[data-resolved-mode="light"] .extra-control-face,
+body[data-resolved-mode="light"] .add-control-icon{
+  border-color:rgba(35,46,71,.26);
+  background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(242,246,252,.92));
+  box-shadow:
+    0 8px 18px rgba(40,56,84,.10),
+    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 -1px 0 rgba(35,46,71,.08);
+  color:#16233c;
+}
+body[data-resolved-mode="light"] .turbo-face span,
+body[data-resolved-mode="light"] .add-control-icon.duo span{
+  background:rgba(255,255,255,.95);
+}
+
+/* v3.34 My Boy-like settings dialogs */
+.myboy-dialog-card,
+.import-saves-card{
+  width:min(100%, 344px);
+  border-radius:4px;
+  border:0;
+  padding:18px 20px 14px;
+  background:#55565b;
+  box-shadow:0 18px 40px rgba(0,0,0,.40);
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+.myboy-dialog-card.tall{
+  width:min(100%, 356px);
+}
+.myboy-dialog-card h3,
+.import-saves-card h3{
+  margin:0 0 14px;
+  font-size:17px;
+  font-weight:700;
+  color:#fff;
+  letter-spacing:0;
+}
+.myboy-dialog-card .selection-options{
+  gap:0;
+}
+.myboy-dialog-card .selection-option{
+  min-height:52px;
+  padding:8px 0;
+  font-size:14px;
+  font-weight:500;
+  border-radius:0;
+}
+.myboy-dialog-card .selection-option:hover{
+  background:transparent;
+}
+.myboy-dialog-card .selection-radio{
+  width:22px;
+  height:22px;
+  flex:0 0 22px;
+  border:2px solid rgba(255,255,255,.86);
+}
+.myboy-dialog-card .selection-option.active .selection-radio{
+  border-color:#73e0d8;
+}
+.myboy-dialog-card .selection-option.active .selection-radio::after{
+  inset:4px;
+  background:#73e0d8;
+}
+.myboy-dialog-card .text-action-btn,
+.import-saves-card .text-action-btn{
+  padding:12px 0 0;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.01em;
+  color:#73e0d8;
+}
+.selection-modal#fastForwardButtonModal,
+.selection-modal#cpuCoreModal,
+.selection-modal#cartridgeSaveTypeModal,
+.selection-modal#importSavesModal{
+  z-index:235;
+}
+.selection-modal#fastForwardButtonModal .selection-actions,
+.selection-modal#cpuCoreModal .selection-actions,
+.selection-modal#cartridgeSaveTypeModal .selection-actions{
+  margin-top:8px;
+}
+.import-saves-card{
+  width:min(100%, 362px);
+  padding:18px 20px 14px;
+}
+.import-saves-head{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+}
+.import-saves-warning{
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  margin-top:1px;
+}
+.import-saves-warning svg{
+  width:100%;
+  height:100%;
+  fill:#fff;
+  stroke:#55565b;
+  stroke-width:1.6;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.import-saves-head h3{
+  margin:4px 0 0;
+}
+.import-saves-copy{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  margin-top:8px;
+}
+.import-saves-copy p{
+  margin:0;
+  color:#fff;
+  font-size:13px;
+  line-height:1.35;
+}
+.import-saves-copy strong{
+  font-weight:700;
+}
+.import-saves-actions{
+  margin-top:14px;
+}
+
+@media (max-width: 420px){
+  .myboy-dialog-card,
+  .myboy-dialog-card.tall,
+  .import-saves-card{
+    width:min(100%, 336px);
+    padding:16px 18px 12px;
+  }
+  .myboy-dialog-card .selection-option{
+    min-height:48px;
+    font-size:13.5px;
+  }
+  .import-saves-copy p{
+    font-size:12.5px;
+  }
+}
+
+
+/* v3.35 compact Android add-control dialog + modern vector icons */
+.modern-menu-svg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  padding:7px;
+  fill:none;
+  stroke:#f7fbff;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.toolbar-icon.menu > span{display:none !important;}
+.toolbar-icon.solo::before{display:none !important;}
+.toolbar-icon.solo{
+  border-radius:13px;
+  overflow:hidden;
+}
+
+.control-svg{
+  width:26px;
+  height:26px;
+  fill:none;
+  stroke:#f8fbff;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.control-svg-fast{
+  stroke-width:2.2;
+}
+
+/* disable legacy pseudo-icons now that clean inline SVGs are used */
+.add-control-icon.square::before,
+.add-control-icon.square::after,
+.extra-control-face.square-icon::before,
+.extra-control-face.square-icon::after{
+  content:none !important;
+  display:none !important;
+}
+
+/* More compact frame, designed to fit Android portrait and landscape screens */
+.add-control-modal{
+  padding:
+    max(8px, env(safe-area-inset-top))
+    max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+}
+.add-control-dialog{
+  width:min(82vw, 338px);
+  max-width:338px;
+  max-height:min(
+    calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px),
+    420px
+  );
+  border-radius:20px;
+}
+.add-control-header,
+.add-control-footer{
+  padding:12px 14px;
+}
+.add-control-header h3{
+  font-size:17px;
+}
+.add-control-item{
+  min-height:46px;
+  gap:12px;
+  padding:8px 14px;
+}
+.add-control-label{
+  font-size:14px;
+}
+.add-control-footer-btn{
+  font-size:13px;
+  padding:6px 2px;
+}
+.circle-text,
+.add-control-icon.circle,
+.square-icon,
+.add-control-icon.square{
+  width:42px;
+  height:42px;
+}
+.circle-text,
+.add-control-icon.circle{
+  font-size:16px;
+}
+.turbo-face,
+.add-control-icon.duo{
+  width:92px;
+  height:44px;
+  gap:6px;
+}
+.turbo-face span,
+.add-control-icon.duo span{
+  width:42px;
+  height:42px;
+  font-size:16px;
+}
+
+/* Landscape Android: make it notably smaller so the whole frame remains visible */
+@media (orientation: landscape) and (max-height: 600px){
+  .add-control-dialog{
+    width:min(70vw, 318px);
+    max-width:318px;
+    max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 14px);
+    border-radius:16px;
+  }
+  .add-control-header,
+  .add-control-footer{
+    padding:9px 12px;
+  }
+  .add-control-header h3{
+    font-size:15px;
+  }
+  .add-control-item{
+    min-height:38px;
+    gap:10px;
+    padding:6px 12px;
+  }
+  .add-control-label{
+    font-size:12.5px;
+  }
+  .circle-text,
+  .add-control-icon.circle,
+  .square-icon,
+  .add-control-icon.square{
+    width:34px;
+    height:34px;
+  }
+  .circle-text,
+  .add-control-icon.circle{
+    font-size:13px;
+  }
+  .control-svg{
+    width:21px;
+    height:21px;
+  }
+  .turbo-face,
+  .add-control-icon.duo{
+    width:74px;
+    height:36px;
+    gap:4px;
+  }
+  .turbo-face span,
+  .add-control-icon.duo span{
+    width:34px;
+    height:34px;
+    font-size:13px;
+  }
+  .add-control-footer-btn{
+    font-size:12px;
+    padding:4px 2px;
+  }
+}
+
+/* Very short landscape phones */
+@media (orientation: landscape) and (max-height: 420px){
+  .add-control-dialog{
+    width:min(66vw, 292px);
+    max-width:292px;
+    border-radius:14px;
+  }
+  .add-control-header,
+  .add-control-footer{
+    padding:7px 10px;
+  }
+  .add-control-header h3{
+    font-size:14px;
+  }
+  .add-control-item{
+    min-height:34px;
+    gap:9px;
+    padding:5px 10px;
+  }
+  .add-control-label{
+    font-size:11.5px;
+  }
+  .circle-text,
+  .add-control-icon.circle,
+  .square-icon,
+  .add-control-icon.square{
+    width:30px;
+    height:30px;
+  }
+  .control-svg{
+    width:20px;
+    height:20px;
+  }
+  .turbo-face,
+  .add-control-icon.duo{
+    width:66px;
+    height:32px;
+  }
+  .turbo-face span,
+  .add-control-icon.duo span{
+    width:30px;
+    height:30px;
+    font-size:11.5px;
+  }
+}
+
+/* Light mode */
+body[data-resolved-mode="light"] .modern-menu-svg,
+body[data-resolved-mode="light"] .control-svg{
+  stroke:#17243c;
+}
+
+/* v3.37 My Boy-like menu button */
+.myboy-menu-button{
+  display:grid;
+  place-items:center;
+  width:46px;
+  height:46px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.22);
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+  box-shadow:
+    0 8px 18px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -1px 0 rgba(0,0,0,.18);
+}
+.myboy-menu-button::before{
+  content:"";
+  position:absolute;
+  inset:3px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.08);
+  pointer-events:none;
+}
+.myboy-menu-core{
+  position:relative;
+  width:25px;
+  height:25px;
+  border-radius:8px;
+  border:2px solid rgba(255,255,255,.92);
+  background:linear-gradient(180deg, rgba(28,46,78,.90), rgba(9,23,45,.92));
+  box-shadow:
+    0 3px 8px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.22);
+}
+.myboy-menu-core::before{
+  content:"";
+  position:absolute;
+  top:1px;
+  left:1px;
+  width:9px;
+  height:9px;
+  border-top-left-radius:6px;
+  border:1px solid rgba(255,255,255,.18);
+  border-right:none;
+  border-bottom:none;
+  opacity:.7;
+}
+.myboy-menu-bars,
+.myboy-menu-bars::before,
+.myboy-menu-bars::after{
+  position:absolute;
+  left:50%;
+  width:11px;
+  height:2.6px;
+  border-radius:999px;
+  background:#ffffff;
+  transform:translateX(-50%);
+  box-shadow:0 0 6px rgba(255,255,255,.12);
+  content:"";
+}
+.myboy-menu-bars{ top:6px; }
+.myboy-menu-bars::before{ top:6px; }
+.myboy-menu-bars::after{ top:12px; }
+
+/* replace old svg rules for menu icon */
+.modern-menu-svg{ display:none !important; }
+.toolbar-icon.menu > span{ display:block !important; }
+.toolbar-icon.menu.solo{
+  background:transparent;
+}
+
+body[data-resolved-mode="light"] .myboy-menu-button{
+  border-color:rgba(28,42,68,.18);
+  background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(245,248,252,.94));
+  box-shadow:
+    0 8px 18px rgba(40,56,84,.12),
+    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 -1px 0 rgba(30,44,70,.08);
+}
+body[data-resolved-mode="light"] .myboy-menu-button::before{
+  border-color:rgba(30,44,70,.07);
+}
+body[data-resolved-mode="light"] .myboy-menu-core{
+  border-color:#eaf0f8;
+  background:linear-gradient(180deg, rgba(67,96,139,.94), rgba(32,56,92,.96));
+}
+body[data-resolved-mode="light"] .myboy-menu-core::before{
+  border-color:rgba(255,255,255,.22);
+}
+
+
+/* v3.40 hold-menu persistence + aligned back / add buttons */
+.preview-add-fab{
+  top:10px;
+  right:10px;
+}
+@media (max-width:680px), (max-height:480px){
+  .preview-add-fab{
+    top:8px;
+    right:8px;
+    width:36px;
+    height:36px;
+    border-radius:12px;
+  }
+  .preview-add-fab svg{
+    width:20px;
+    height:20px;
+  }
+}
+
+
+/* v3.43 single outer frame layout */
+/* Remove the extra inner rounded frame and let the emulator area use the freed space. */
+body.landscape-preview-mode .screen-size-page > .screen-preview-shell{
+  inset:8px;
+  padding:0;
+  border-radius:28px;
+  overflow:hidden;
+}
+body.landscape-preview-mode .screen-preview-shell{
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 16px 30px rgba(0,0,0,.16);
+}
+body.landscape-preview-mode .emulator-preview{
+  position:absolute;
+  inset:0;
+  width:auto;
+  height:auto;
+  min-width:0;
+  min-height:0;
+  margin:0;
+  border-radius:0;
+  background:transparent;
+  overflow:hidden;
+}
+body.landscape-preview-mode .preview-screen-frame{
+  max-width:calc(100% - 8px);
+  max-height:calc(100% - 8px);
+}
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="fullscreen"] .preview-screen-frame,
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="stretch"] .preview-screen-frame{
+  width:100%;
+  height:88%;
+  top:8px;
+}
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="centered"] .preview-screen-frame{
+  width:76%;
+  height:80%;
+  top:12px;
+}
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="best"] .preview-screen-frame{
+  width:90%;
+  height:86%;
+  top:10px;
+}
+
+/* Keep controls inside the single outer frame after removing the inner bezel. */
+body.landscape-preview-mode .preview-toolbar.top.landscape-only,
+body.landscape-preview-mode .preview-shoulder{
+  top:12px;
+}
+body.landscape-preview-mode .preview-shoulder.left{ left:12px; }
+body.landscape-preview-mode .preview-shoulder.right{ right:12px; }
+body.landscape-preview-mode .preview-dpad{
+  left:14px;
+  bottom:16px;
+}
+body.landscape-preview-mode .preview-ab{
+  right:14px;
+  bottom:16px;
+}
+body.landscape-preview-mode .preview-start-select{
+  bottom:12px;
+}
+body.landscape-preview-mode .screen-help-text{
+  bottom:12px;
+}
+body.landscape-preview-mode .preview-add-fab{
+  top:12px;
+  right:12px;
+}
+
+@media (max-width: 760px){
+  body.landscape-preview-mode .screen-size-page > .screen-preview-shell{
+    inset:6px;
+    border-radius:24px;
+  }
+  body.landscape-preview-mode .screen-preview-shell[data-size-mode="fullscreen"] .preview-screen-frame,
+  body.landscape-preview-mode .screen-preview-shell[data-size-mode="stretch"] .preview-screen-frame{
+    height:90%;
+    top:6px;
+  }
+  body.landscape-preview-mode .screen-preview-shell[data-size-mode="best"] .preview-screen-frame{
+    width:92%;
+    height:88%;
+    top:8px;
+  }
+  body.landscape-preview-mode .preview-toolbar.top.landscape-only,
+  body.landscape-preview-mode .preview-shoulder,
+  body.landscape-preview-mode .preview-add-fab{
+    top:10px;
+  }
+  body.landscape-preview-mode .preview-shoulder.left{ left:10px; }
+  body.landscape-preview-mode .preview-shoulder.right,
+  body.landscape-preview-mode .preview-add-fab{ right:10px; }
+  body.landscape-preview-mode .preview-dpad{ left:10px; bottom:12px; }
+  body.landscape-preview-mode .preview-ab{ right:10px; bottom:12px; }
+  body.landscape-preview-mode .preview-start-select,
+  body.landscape-preview-mode .screen-help-text{ bottom:10px; }
+}
+
+
+/* v3.44 unified menu control size + modern hamburger icon
+   The menu now uses the same visual footprint as the square controller buttons. */
+#screenSizePage .preview-toolbar.top.landscape-only{
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  gap:0;
+  border:0;
+  border-radius:14px;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+#screenSizePage .myboy-menu-button{
+  position:relative;
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  border-radius:14px;
+  border:1.8px solid rgba(255,255,255,.82);
+  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.018));
+  box-shadow:
+    0 8px 18px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.18);
+  overflow:hidden;
+}
+#screenSizePage .myboy-menu-button::before{
+  content:none !important;
+  display:none !important;
+}
+#screenSizePage .myboy-menu-button > span{
+  display:none !important;
+}
+#screenSizePage .myboy-menu-icon{
+  width:70%;
+  height:70%;
+  display:block;
+  fill:none;
+  stroke:#f8fbff;
+  stroke-width:2.45;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.18));
+  pointer-events:none;
+}
+/* Keep the selected glow/outline aligned to the actual button edge. */
+#screenSizePage .preview-toolbar.top.landscape-only.is-selected{
+  outline:2px solid #4de66d;
+  outline-offset:2px;
+}
+#screenSizePage .preview-toolbar.top.landscape-only.is-selected .myboy-menu-button{
+  box-shadow:
+    0 0 0 2px rgba(77,230,109,.72),
+    0 0 14px rgba(77,230,109,.25),
+    0 8px 18px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.18);
+}
+body[data-resolved-mode="light"] #screenSizePage .myboy-menu-button{
+  border-color:rgba(23,36,60,.34);
+  background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(230,237,248,.24));
+}
+body[data-resolved-mode="light"] #screenSizePage .myboy-menu-icon{
+  stroke:#17243c;
+}
+
+/* Match the same responsive size used by Quick Save / Fast Forward. */
+@media (orientation: landscape) and (max-height:600px){
+  #screenSizePage .preview-toolbar.top.landscape-only,
+  #screenSizePage .myboy-menu-button{
+    width:34px;
+    height:34px;
+    border-radius:12px;
+  }
+  #screenSizePage .myboy-menu-icon{
+    width:70%;
+    height:70%;
+    stroke-width:2.2;
+  }
+}
+@media (orientation: landscape) and (max-height:420px){
+  #screenSizePage .preview-toolbar.top.landscape-only,
+  #screenSizePage .myboy-menu-button{
+    width:30px;
+    height:30px;
+    border-radius:10px;
+  }
+  #screenSizePage .myboy-menu-icon{
+    width:70%;
+    height:70%;
+    stroke-width:2.15;
+  }
+}
+
+
+/* v3.47 hold-to-remove controller controls */
+.control-remove-menu{
+  position:absolute;
+  z-index:12;
+  opacity:0;
+  pointer-events:none;
+  transform:translateY(3px) scale(.96);
+  transition:opacity .14s ease, transform .14s ease;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.control-remove-menu.open{
+  opacity:1;
+  pointer-events:auto;
+  transform:translateY(0) scale(1);
+}
+.control-remove-button{
+  min-height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:0 12px;
+  border:1px solid rgba(255,116,116,.35);
+  border-radius:12px;
+  background:rgba(35,10,14,.94);
+  color:#ffb0b0;
+  box-shadow:0 9px 22px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  font:700 11px/1 Poppins,system-ui,sans-serif;
+  white-space:nowrap;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.control-remove-button svg{
+  width:15px;
+  height:15px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.9;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.control-remove-button:active{
+  transform:scale(.97);
+}
+body[data-resolved-mode="light"] .control-remove-button{
+  background:rgba(255,244,245,.97);
+  color:#b42332;
+  border-color:rgba(180,35,50,.22);
+}
+@media (orientation: landscape) and (max-height:420px){
+  .control-remove-button{
+    min-height:32px;
+    padding:0 10px;
+    border-radius:10px;
+    font-size:10px;
+  }
+  .control-remove-button svg{
+    width:13px;
+    height:13px;
+  }
+}
+
+/* v3.48 Settings card edge padding
+   Keep every Settings card/list inside the normal phone content gutter so
+   backgrounds never touch the left or right screen edges. */
+#settingsHomePage .settings-menu,
+.settings-detail-page > .detail-list,
+.settings-detail-page .appearance-detail-list,
+#layoutsSettingsPage .layout-card{
+  width:100%;
+  max-width:100%;
+  margin-left:0;
+  margin-right:0;
+}
+
+/* Restore the visible card edges that the old edge-to-edge rule removed. */
+.settings-detail-page > .detail-list,
+.settings-detail-page .appearance-detail-list{
+  border-left:1px solid var(--line);
+  border-right:1px solid var(--line);
+  border-radius:18px;
+  overflow:hidden;
+}
+
+#layoutsSettingsPage .layout-card{
+  border-left:1px solid var(--line);
+  border-right:1px solid var(--line);
+  border-radius:16px;
+  padding-left:14px;
+  padding-right:14px;
+}
+
+/* Rows can use their normal internal padding now that the list itself is inset. */
+.settings-detail-page .detail-row,
+.settings-detail-page .detail-range-row,
+.settings-detail-page .frequency-option{
+  padding-left:14px;
+  padding-right:14px;
+}
+
+/* Prevent any old negative-margin edge-to-edge behavior from leaking outside. */
+.settings-detail-page,
+#settingsHomePage{
+  overflow-x:hidden;
+}
+
+@media (max-width:359px){
+  .settings-detail-page .detail-row,
+  .settings-detail-page .detail-range-row,
+  .settings-detail-page .frequency-option{
+    padding-left:12px;
+    padding-right:12px;
+  }
+}
+
+
+/* v3.49 restore default controls section */
+.restore-default-controls{
+  display:grid;
+  gap:12px;
+  margin-bottom:14px;
+  padding-bottom:14px;
+  border-bottom:1px solid rgba(190, 211, 255, 0.16);
+}
+
+.restore-default-controls-title{
+  font-size:12px;
+  line-height:1.2;
+  font-weight:700;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  color:rgba(222, 232, 255, 0.72);
+  padding:0 2px;
+}
+
+.restore-default-control-item{
+  width:100%;
+}
+
+body[data-resolved-mode="light"] .restore-default-controls{
+  border-bottom-color: rgba(26, 46, 86, 0.10);
+}
+
+body[data-resolved-mode="light"] .restore-default-controls-title{
+  color: rgba(42, 66, 116, 0.72);
+}
+
+

@@ -1,0 +1,1843 @@
+/* v3.50 responsive side gutters / content insets final fix
+   Keep settings-style cards and ROM recent save cards comfortably inset from
+   the left/right edges on all device widths. */
+:root{
+  --settings-card-gutter: clamp(14px, 4.2vw, 20px);
+  --rom-detail-gutter: clamp(14px, 4.2vw, 20px);
+}
+
+/* Use true responsive gutters for all settings areas. */
+#settingsHomePage .settings-menu,
+.settings-detail-page > .detail-list,
+.settings-detail-page .appearance-detail-list,
+#layoutsSettingsPage .layout-card{
+  width:100%;
+  max-width:100%;
+  margin-left:0;
+  margin-right:0;
+}
+
+#settingsHomePage .settings-menu{
+  margin-left:0;
+  margin-right:0;
+}
+
+#settingsHomePage .settings-item,
+.settings-detail-page .detail-row,
+.settings-detail-page .detail-range-row,
+.settings-detail-page .frequency-option,
+#layoutsSettingsPage .layout-card{
+  padding-left:var(--settings-card-gutter);
+  padding-right:var(--settings-card-gutter);
+}
+
+/* ROM detail page: keep the whole lower content area aligned to the same
+   responsive gutter, then render the recent saves as real inset cards. */
+.rom-detail-body{
+  padding-left:var(--rom-detail-gutter);
+  padding-right:var(--rom-detail-gutter);
+}
+
+.entry-list{
+  display:grid;
+  gap:12px;
+}
+
+.entry-item{
+  padding:16px var(--settings-card-gutter);
+  border:1px solid rgba(255,255,255,.075);
+  border-radius:18px;
+  border-bottom:1px solid rgba(255,255,255,.075);
+  background:rgba(255,255,255,.035);
+}
+
+.entry-copy{
+  min-width:0;
+}
+
+.entry-copy strong,
+.entry-copy span{
+  max-width:100%;
+}
+
+body[data-resolved-mode="light"] .entry-item{
+  border-color:rgba(26,40,76,.08);
+  background:rgba(255,255,255,.94);
+}
+
+/* Narrow phones: slightly reduce insets while preserving visible side gutters. */
+@media (max-width:359px){
+  :root{
+    --settings-card-gutter: 12px;
+    --rom-detail-gutter: 12px;
+  }
+}
+
+/* Wider phones/tablets: give a bit more room so card edges remain clearly visible. */
+@media (min-width:400px){
+  :root{
+    --settings-card-gutter: clamp(16px, 4vw, 22px);
+    --rom-detail-gutter: clamp(16px, 4vw, 22px);
+  }
+}
+
+
+/* v3.51 ROM detail gutters + Support link polish
+   Keep ROM detail content away from both phone edges while preserving the
+   full-width hero/section backgrounds. Safe-area insets are respected too. */
+.rom-hero,
+.rom-detail-body{
+  padding-left:max(var(--rom-detail-gutter), env(safe-area-inset-left));
+  padding-right:max(var(--rom-detail-gutter), env(safe-area-inset-right));
+}
+
+.rom-actions,
+.rom-description,
+.chip-row,
+.section-title-row,
+.entry-list{
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
+.entry-item{
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
+/* External Support Us button */
+.support-link{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+
+
+/* v3.53 selectable interface fonts */
+:root{
+  --app-font:Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+
+.font-settings-list .font-option{
+  width:100%;
+  text-align:left;
+}
+
+.font-settings-list .font-option > div{
+  min-width:0;
+}
+
+.font-check{
+  width:19px;
+  height:19px;
+  flex:0 0 auto;
+  fill:none;
+  stroke:var(--accent);
+  stroke-width:2.4;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  opacity:0;
+  transform:scale(.82);
+  transition:opacity .16s ease, transform .16s ease;
+}
+
+.font-option.active .font-check{
+  opacity:1;
+  transform:scale(1);
+}
+
+.font-option.active{
+  background:var(--accent-soft);
+}
+
+
+/* v3.54 restore edge-to-edge Settings detail rows
+   Detail-page list/card backgrounds once again reach both sides of the phone
+   content area, while text, toggles and sliders retain comfortable insets. */
+.settings-detail-page > .detail-list,
+.settings-detail-page .appearance-detail-list{
+  width:calc(100% + (var(--content-gutter) * 2));
+  max-width:none;
+  margin-left:calc(-1 * var(--content-gutter));
+  margin-right:calc(-1 * var(--content-gutter));
+  border-left:0;
+  border-right:0;
+  border-radius:0;
+  overflow:hidden;
+}
+
+.settings-detail-page .detail-row,
+.settings-detail-page .detail-range-row,
+.settings-detail-page .frequency-option{
+  padding-left:var(--content-gutter);
+  padding-right:var(--content-gutter);
+}
+
+/* Keep Appearance's theme picker inset, but make its lower setting rows flush. */
+#appearanceSettingsPage .appearance-section{
+  width:100%;
+  max-width:100%;
+  margin-left:0;
+  margin-right:0;
+}
+
+/* Layout option cards follow the same full-width detail-page treatment. */
+#layoutsSettingsPage .layout-card{
+  width:calc(100% + (var(--content-gutter) * 2));
+  max-width:none;
+  margin-left:calc(-1 * var(--content-gutter));
+  margin-right:calc(-1 * var(--content-gutter));
+  border-left:0;
+  border-right:0;
+  border-radius:0;
+  padding-left:var(--content-gutter);
+  padding-right:var(--content-gutter);
+}
+
+.settings-detail-page{
+  overflow-x:visible;
+}
+
+/* v3.55 edge-to-edge Recent Saves
+   Keep the Recent saves heading aligned with the ROM detail content, but let
+   the save-state rows span the full phone content width just like Settings
+   detail rows. The text and menu buttons stay comfortably inset. */
+.rom-detail-body{
+  --rom-edge-left:max(var(--rom-detail-gutter), env(safe-area-inset-left));
+  --rom-edge-right:max(var(--rom-detail-gutter), env(safe-area-inset-right));
+  padding-left:var(--rom-edge-left);
+  padding-right:var(--rom-edge-right);
+}
+
+#detailEntries.entry-list{
+  width:calc(100% + var(--rom-edge-left) + var(--rom-edge-right));
+  max-width:none;
+  margin-left:calc(-1 * var(--rom-edge-left));
+  margin-right:calc(-1 * var(--rom-edge-right));
+  gap:0;
+}
+
+#detailEntries .entry-item{
+  width:100%;
+  max-width:none;
+  box-sizing:border-box;
+  margin:0;
+  padding-left:var(--rom-edge-left);
+  padding-right:var(--rom-edge-right);
+  border-left:0;
+  border-right:0;
+  border-top:0;
+  border-radius:0;
+  background:rgba(255,255,255,.035);
+}
+
+#detailEntries .entry-item:first-child{
+  border-top:1px solid rgba(255,255,255,.075);
+}
+
+#detailEntries .entry-item:last-child{
+  border-bottom:1px solid rgba(255,255,255,.075);
+}
+
+body[data-resolved-mode="light"] #detailEntries .entry-item{
+  border-color:rgba(26,40,76,.08);
+  background:rgba(255,255,255,.94);
+}
+
+
+/* v3.57 rounded My Boy reference controller utility icons
+   Quick Load, Quick Save, and Fast Forward keep the supplied reference glyphs,
+   but use the same soft rounded UI corners as the other controller buttons. */
+#screenSizePage .extra-control-face.square-icon,
+.add-control-icon.square:has(.myboy-reference-icon){
+  border-radius:12px;
+  border:2px solid rgba(246,248,252,.78);
+  background:rgba(2,4,8,.36);
+  box-shadow:
+    0 2px 5px rgba(0,0,0,.34),
+    inset 0 0 0 1px rgba(255,255,255,.035);
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+
+.myboy-reference-icon{
+  width:70%;
+  height:70%;
+  fill:none;
+  stroke:#f4f5f7;
+  stroke-width:2.35;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.45));
+}
+.quick-load-reference-icon{
+  width:80%;
+  height:80%;
+  stroke-width:2.45;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.quick-save-reference-icon{
+  width:80%;
+  height:80%;
+  stroke-width:2.25;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.fast-forward-reference-icon{
+  width:70%;
+  height:70%;
+  stroke-width:2.75;
+}
+
+/* Keep the reference icons crisp at smaller landscape controller sizes. */
+@media (orientation: landscape) and (max-height:600px){
+  .myboy-reference-icon{ width:70%; height:70%; }
+  .quick-load-reference-icon{ stroke-width:2.55; }
+  .quick-save-reference-icon{ stroke-width:2.3; }
+  .fast-forward-reference-icon{ stroke-width:2.9; }
+}
+@media (orientation: landscape) and (max-height:420px){
+  #screenSizePage .extra-control-face.square-icon,
+  .add-control-icon.square:has(.myboy-reference-icon){
+    border-radius:10px;
+    border-width:1.8px;
+  }
+}
+
+/* Light theme uses the same reference geometry with a dark stroke. */
+body[data-resolved-mode="light"] .myboy-reference-icon{
+  stroke:#17243c;
+  filter:none;
+}
+body[data-resolved-mode="light"] #screenSizePage .extra-control-face.square-icon,
+body[data-resolved-mode="light"] .add-control-icon.square:has(.myboy-reference-icon){
+  border-color:rgba(23,36,60,.58);
+  background:rgba(255,255,255,.5);
+  box-shadow:0 2px 5px rgba(40,56,84,.10), inset 0 0 0 1px rgba(255,255,255,.55);
+}
+
+
+/* v3.58 exact Menu-style glass for Quick Load / Quick Save / Fast Forward
+   These three controller utilities now reuse .myboy-menu-button, the same
+   component/class as Menu. This final override neutralizes the older
+   utility-only dark/transparency styling so all four buttons match exactly. */
+#screenSizePage .extra-control.menu-style-utility{
+  width:42px;
+  height:42px;
+}
+
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button{
+  position:relative;
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  border-radius:14px;
+  border:1.8px solid rgba(255,255,255,.82);
+  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.018));
+  box-shadow:
+    0 8px 18px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.18);
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  overflow:hidden;
+}
+
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button::before{
+  content:none !important;
+  display:none !important;
+}
+
+/* Keep selected-state feedback identical to the Menu control. */
+#screenSizePage .extra-control.menu-style-utility.is-selected .utility-menu-button{
+  box-shadow:
+    0 0 0 2px rgba(77,230,109,.72),
+    0 0 14px rgba(77,230,109,.25),
+    0 8px 18px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.18);
+}
+
+body[data-resolved-mode="light"] #screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button{
+  border-color:rgba(23,36,60,.34);
+  background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(230,237,248,.24));
+  box-shadow:
+    0 8px 18px rgba(40,56,84,.12),
+    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 -1px 0 rgba(30,44,70,.08);
+}
+
+@media (orientation: landscape) and (max-height:600px){
+  #screenSizePage .extra-control.menu-style-utility,
+  #screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button{
+    width:34px;
+    height:34px;
+    border-radius:12px;
+  }
+}
+
+@media (orientation: landscape) and (max-height:420px){
+  #screenSizePage .extra-control.menu-style-utility,
+  #screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button{
+    width:30px;
+    height:30px;
+    border-radius:10px;
+    border-width:1.8px;
+  }
+}
+
+
+/* v4.07 dynamic ROM library — Add ROM FAB follows Appearance accent */
+.add-rom-btn{
+  color:#0d1018;
+  position:absolute;
+  right:calc(var(--content-gutter) + 2px);
+  bottom:calc(var(--bottom-nav-total-height) + 18px);
+  width:56px;
+  height:56px;
+  border-radius:18px;
+  border:1px solid color-mix(in srgb, var(--accent) 72%, rgba(255,255,255,.24));
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 92%, white 8%) 0%,
+    color-mix(in srgb, var(--accent) 88%, black 12%) 100%);
+  box-shadow:0 16px 34px rgba(0,0,0,.32),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.20);
+  z-index:35;
+  transition:background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .12s ease;
+}
+.add-rom-btn svg{
+  width:24px;
+  height:24px;
+  stroke:currentColor;
+  stroke-width:2.15;
+}
+@media (hover:hover) and (pointer:fine){
+  .add-rom-btn:hover{
+    background:linear-gradient(180deg,
+      color-mix(in srgb, var(--accent) 84%, white 16%) 0%,
+      color-mix(in srgb, var(--accent) 94%, black 6%) 100%);
+  }
+}
+.add-rom-btn:active{
+  transform:scale(.965);
+}
+body[data-theme="monochrome"] .add-rom-btn,
+body[data-theme="yin-yang"] .add-rom-btn{
+  color:#111;
+}
+body[data-theme="default"] .add-rom-btn,
+body[data-theme="dynamic"] .add-rom-btn,
+body[data-theme="catppuccin"] .add-rom-btn,
+body[data-theme="yotsuba"] .add-rom-btn,
+body[data-theme="tokyo-night"] .add-rom-btn,
+body[data-theme="teal-turquoise"] .add-rom-btn,
+body[data-theme="tidal-wave"] .add-rom-btn,
+body[data-theme="nord"] .add-rom-btn,
+body[data-theme="strawberry-daiquiri"] .add-rom-btn,
+body[data-theme="tako"] .add-rom-btn,
+body[data-theme="green-apple"] .add-rom-btn,
+body[data-theme="lavender"] .add-rom-btn,
+body[data-theme="midnight-dusk"] .add-rom-btn,
+body[data-theme="aurora-mint"] .add-rom-btn{
+  color:#10131b;
+}
+#libraryPage{
+  padding-bottom:96px;
+}
+.stats-empty-message{padding:22px 14px;text-align:center;color:var(--muted);font-size:12px;}
+
+
+/* v3.65 Appearance carousel interaction
+   Phones use native momentum scrolling; mouse/pen users can click-drag the
+   theme row. Both paths snap cleanly to cards without fighting page scrolling. */
+#appearanceSettingsPage .theme-preview-strip{
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x pan-y pinch-zoom;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 14px;
+  scrollbar-width: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  will-change: scroll-position;
+}
+
+#appearanceSettingsPage .theme-preview-strip::-webkit-scrollbar{
+  display: none;
+}
+
+#appearanceSettingsPage .theme-preview-strip.dragging{
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+  cursor: grabbing;
+}
+
+#appearanceSettingsPage .theme-preview-card{
+  scroll-snap-align: center;
+  scroll-snap-stop: normal;
+  -webkit-user-drag: none;
+  touch-action: manipulation;
+}
+
+#appearanceSettingsPage .theme-preview-card:active{
+  transform: scale(.985);
+}
+
+#appearanceSettingsPage .theme-preview-card,
+#appearanceSettingsPage .theme-preview-card *{
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (pointer: coarse){
+  #appearanceSettingsPage .theme-preview-strip{
+    cursor: default;
+  }
+}
+
+
+/* v3.66 Library long-press ROM actions + favourites */
+.cover-card{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  touch-action:pan-y;
+  transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.cover-card.holding{
+  transform:scale(.985);
+}
+.cover-card.long-pressed{
+  transform:scale(.975);
+}
+.favourite-heart{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:4;
+  width:27px;
+  height:27px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(15,16,27,.50);
+  box-shadow:0 5px 14px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.12);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  pointer-events:none;
+}
+.favourite-heart svg{
+  width:15px;
+  height:15px;
+  fill:#ff7d9f;
+  stroke:#ffd0dc;
+  stroke-width:1.5;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.rom-card-actions-backdrop{
+  z-index:240;
+  align-items:flex-end;
+  justify-content:center;
+  padding:14px 14px max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px));
+  background:rgba(5,6,12,.56);
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+}
+.rom-card-actions-sheet{
+  width:min(100%, 390px);
+  padding:8px 10px 10px;
+  border-radius:24px;
+  border:1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow:0 22px 56px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.045);
+  transform:translateY(18px);
+  opacity:0;
+  transition:transform .2s cubic-bezier(.2,.78,.26,1), opacity .18s ease;
+}
+.rom-card-actions-backdrop.open .rom-card-actions-sheet{
+  transform:translateY(0);
+  opacity:1;
+}
+.rom-card-actions-handle{
+  width:38px;
+  height:4px;
+  margin:2px auto 10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.19);
+}
+.rom-card-actions-header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+  padding:2px 4px 12px;
+}
+.rom-card-actions-header img{
+  width:42px;
+  height:58px;
+  flex:0 0 auto;
+  object-fit:cover;
+  border-radius:9px;
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 8px 16px rgba(0,0,0,.24);
+}
+.rom-card-actions-copy{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.rom-card-actions-copy > span{
+  color:var(--accent);
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+.rom-card-actions-copy > strong{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:14px;
+  line-height:1.3;
+}
+.rom-card-actions-list{
+  overflow:hidden;
+  border-radius:17px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.025);
+}
+.rom-card-action-row{
+  width:100%;
+  min-height:64px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 12px;
+  border:0;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+}
+.rom-card-action-row:last-child{border-bottom:0;}
+.rom-card-action-row:active{background:rgba(255,255,255,.045);}
+.rom-card-action-icon{
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  background:rgba(255,255,255,.055);
+  color:var(--text);
+}
+.rom-card-action-icon svg{
+  width:19px;
+  height:19px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.rom-card-action-row.active .rom-card-action-icon{
+  color:#ff8ca8;
+  background:rgba(255,111,151,.11);
+}
+.rom-card-action-row.active .rom-card-action-icon svg{fill:rgba(255,111,151,.28);}
+.rom-card-action-row.danger{color:var(--danger);}
+.rom-card-action-row.danger .rom-card-action-icon{background:rgba(255,120,120,.08);}
+.rom-card-action-copy{
+  min-width:0;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.rom-card-action-copy strong{
+  font-size:13px;
+  font-weight:650;
+  line-height:1.25;
+}
+.rom-card-action-copy small{
+  color:var(--muted);
+  font-size:9.5px;
+  line-height:1.35;
+}
+.rom-card-actions-cancel{
+  width:100%;
+  height:44px;
+  margin-top:8px;
+  border:0;
+  border-radius:14px;
+  background:rgba(255,255,255,.045);
+  color:var(--text);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.rom-card-actions-cancel:active{transform:scale(.99);}
+
+body[data-resolved-mode="light"] .favourite-heart{
+  border-color:rgba(31,43,72,.10);
+  background:rgba(255,255,255,.84);
+  box-shadow:0 5px 14px rgba(30,44,70,.10), inset 0 1px 0 rgba(255,255,255,.9);
+}
+body[data-resolved-mode="light"] .rom-card-actions-sheet{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.80)),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow:0 20px 48px rgba(33,42,68,.18), inset 0 1px 0 rgba(255,255,255,.84);
+}
+body[data-resolved-mode="light"] .rom-card-actions-list,
+body[data-resolved-mode="light"] .rom-card-actions-cancel{
+  background:rgba(42,60,100,.035);
+}
+body[data-translucent="true"] .rom-card-actions-sheet{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04)),
+    linear-gradient(180deg, var(--glass-bg-2), var(--glass-bg)),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  backdrop-filter:blur(calc(var(--glass-blur) * .9));
+  -webkit-backdrop-filter:blur(calc(var(--glass-blur) * .9));
+}
+
+
+/* v3.68 ROM detail spacing + floating Add ROM button */
+body.library-add-rom-visible .add-rom-btn{
+  opacity:1;
+  pointer-events:auto;
+  transform:none;
+}
+body:not(.library-add-rom-visible) .add-rom-btn{
+  opacity:0;
+  pointer-events:none;
+  transform:translateY(10px) scale(.96);
+}
+body.subpage-open .add-rom-btn,
+body.more-headerless .add-rom-btn{
+  opacity:0 !important;
+  pointer-events:none !important;
+}
+
+.add-rom-btn{
+  position:absolute;
+  right:max(14px, calc(env(safe-area-inset-right, 0px) + 14px));
+  bottom:calc(var(--bottom-nav-total-height) + 14px);
+  width:56px;
+  height:56px;
+  border-radius:18px;
+  z-index:70;
+  transition:opacity .18s ease, transform .18s ease, background .2s ease;
+}
+
+body.rom-detail-open main{
+  padding-top:0;
+}
+body.rom-detail-open .rom-detail-page{
+  margin-top:0;
+}
+body.rom-detail-open .rom-hero{
+  /* Keep the detail hero controls/title comfortably below the status bar.
+     The extra clamp makes the inset scale naturally across compact phones,
+     tall phones and larger devices instead of sitting too close to the top. */
+  padding-top:calc(env(safe-area-inset-top, 0px) + clamp(18px, 4.8vw, 30px));
+}
+
+.resume-fab{
+  right:max(14px, calc((100vw - 428px)/2 + 14px));
+  bottom:max(24px, calc(env(safe-area-inset-bottom, 0px) + 24px));
+  min-width:148px;
+  height:60px;
+  padding:0 18px;
+  border-radius:20px;
+  gap:10px;
+  font-size:17px;
+}
+.resume-fab svg{
+  width:22px;
+  height:22px;
+}
+
+@media (max-width:470px){
+  .add-rom-btn{
+    right:max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
+    bottom:calc(var(--bottom-nav-total-height) + 10px);
+    width:54px;
+    height:54px;
+  }
+  body.rom-detail-open .rom-hero{
+    padding-top:calc(env(safe-area-inset-top, 0px) + clamp(16px, 5.2vw, 24px));
+  }
+  .resume-fab{
+    right:max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
+    bottom:max(26px, calc(env(safe-area-inset-bottom, 0px) + 26px));
+    min-width:142px;
+    height:56px;
+    padding:0 16px;
+    border-radius:18px;
+    font-size:16px;
+  }
+  .resume-fab svg{
+    width:20px;
+    height:20px;
+  }
+}
+
+
+/* v3.69 orientation policy
+   Keep Retra's normal UI portrait-style on phones. Landscape is reserved for
+   the in-game/controller preview. The JS also requests portrait orientation
+   where the browser / Android WebView permits it. */
+@media (orientation: landscape) and (pointer: coarse){
+  body:not(.game-landscape-allowed){
+    width:100vw;
+    height:100dvh;
+    min-height:100dvh;
+    padding:0;
+    align-items:stretch;
+    justify-content:center;
+    overflow:hidden;
+  }
+
+  body:not(.game-landscape-allowed) .app-shell{
+    width:min(428px, 100vw);
+    max-width:428px;
+    height:100dvh;
+    max-height:100dvh;
+    margin:0 auto;
+    border-radius:0;
+    border-top:0;
+    border-bottom:0;
+    box-shadow:0 0 0 1px var(--shell-border), 0 0 60px rgba(0,0,0,.34);
+  }
+
+  body:not(.game-landscape-allowed) main{
+    height:calc(100dvh - var(--header-height) - var(--bottom-nav-total-height));
+  }
+
+  body:not(.game-landscape-allowed).subpage-open main{
+    height:100dvh;
+  }
+
+  body:not(.game-landscape-allowed).more-headerless main{
+    height:calc(100dvh - var(--bottom-nav-total-height));
+  }
+}
+
+/* Only the game/controller screen is allowed to become a true landscape shell. */
+body.game-landscape-allowed.landscape-preview-mode{
+  width:100vw;
+  min-height:100dvh;
+}
+
+
+/* v3.70 Screen size preview cleanup
+   Remove the visible inner preview frame and keep every controller fully inside
+   the single outer phone/game preview area. */
+body.landscape-preview-mode .screen-size-page > .screen-preview-shell{
+  position:absolute;
+  inset:0;
+  width:auto;
+  height:auto;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  overflow:hidden;
+}
+
+body.landscape-preview-mode .emulator-preview,
+#screenSizePage .emulator-preview{
+  position:absolute;
+  inset:0;
+  width:auto;
+  height:auto;
+  min-width:0;
+  min-height:0;
+  margin:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  overflow:hidden;
+}
+
+/* Keep the game display free of any extra bezel/border. */
+body.landscape-preview-mode .preview-screen-frame{
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+  overflow:visible;
+}
+body.landscape-preview-mode .preview-screen-surface{
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+
+/* Compact default controller sizing so the whole overlay remains visible on
+   real Android landscape screens, including shorter displays. */
+body.landscape-preview-mode .preview-shoulder{
+  top:clamp(9px, 2.8dvh, 14px);
+  width:clamp(62px, 9.5dvw, 80px);
+  height:clamp(24px, 6.2dvh, 29px);
+  font-size:clamp(15px, 4dvh, 19px);
+}
+body.landscape-preview-mode .preview-shoulder.left{left:clamp(8px, 1.8dvw, 14px)}
+body.landscape-preview-mode .preview-shoulder.right{right:clamp(8px, 1.8dvw, 14px)}
+
+body.landscape-preview-mode .preview-toolbar.top.landscape-only{
+  top:clamp(9px, 2.8dvh, 14px);
+}
+body.landscape-preview-mode .toolbar-icon,
+body.landscape-preview-mode .myboy-menu-button{
+  width:clamp(34px, 9dvh, 42px);
+  height:clamp(34px, 9dvh, 42px);
+}
+
+body.landscape-preview-mode .preview-dpad{
+  --dpad-button:clamp(32px, 8.8dvh, 42px);
+  --dpad-gap:clamp(5px, 1.4dvh, 7px);
+  left:clamp(9px, 2dvw, 16px);
+  bottom:clamp(9px, 2.6dvh, 16px);
+  width:calc(var(--dpad-button) * 3 + var(--dpad-gap) * 2);
+  height:calc(var(--dpad-button) * 3 + var(--dpad-gap) * 2);
+}
+body.landscape-preview-mode .preview-dpad .dpad{
+  width:var(--dpad-button);
+  height:var(--dpad-button);
+  border-radius:clamp(7px, 1.8dvh, 9px);
+}
+body.landscape-preview-mode .preview-dpad .up{
+  left:calc(var(--dpad-button) + var(--dpad-gap));
+  top:0;
+}
+body.landscape-preview-mode .preview-dpad .left{
+  left:0;
+  top:calc(var(--dpad-button) + var(--dpad-gap));
+}
+body.landscape-preview-mode .preview-dpad .right{
+  left:calc((var(--dpad-button) + var(--dpad-gap)) * 2);
+  right:auto;
+  top:calc(var(--dpad-button) + var(--dpad-gap));
+}
+body.landscape-preview-mode .preview-dpad .down{
+  left:calc(var(--dpad-button) + var(--dpad-gap));
+  top:calc((var(--dpad-button) + var(--dpad-gap)) * 2);
+  bottom:auto;
+}
+
+body.landscape-preview-mode .preview-ab{
+  --ab-button:clamp(38px, 10.5dvh, 50px);
+  right:clamp(9px, 2dvw, 16px);
+  bottom:clamp(9px, 2.6dvh, 16px);
+  width:calc(var(--ab-button) * 2.65);
+  height:calc(var(--ab-button) * 1.45);
+}
+body.landscape-preview-mode .preview-ab span{
+  width:var(--ab-button);
+  height:var(--ab-button);
+  font-size:clamp(17px, 4.5dvh, 22px);
+}
+
+body.landscape-preview-mode .preview-start-select{
+  bottom:clamp(9px, 2.5dvh, 15px);
+  gap:clamp(8px, 2.2dvw, 14px);
+}
+body.landscape-preview-mode .preview-start-select span{
+  width:clamp(26px, 6.8dvh, 34px);
+  height:clamp(8px, 2.1dvh, 10px);
+}
+
+/* Keep add/back/scale controls clear of the outer edge. */
+body.landscape-preview-mode .preview-add-fab{
+  top:max(10px, env(safe-area-inset-top, 0px));
+  right:max(10px, env(safe-area-inset-right, 0px));
+}
+body.landscape-preview-mode .screen-size-page > .sub-header{
+  top:max(10px, env(safe-area-inset-top, 0px));
+  left:max(10px, env(safe-area-inset-left, 0px));
+}
+
+/* Very short Android landscape screens: tighten one more step so nothing is cut. */
+@media (orientation:landscape) and (max-height:390px){
+  body.landscape-preview-mode .preview-dpad{
+    --dpad-button:clamp(29px, 8.2dvh, 36px);
+    --dpad-gap:5px;
+    left:8px;
+    bottom:8px;
+  }
+  body.landscape-preview-mode .preview-ab{
+    --ab-button:clamp(34px, 9.5dvh, 42px);
+    right:8px;
+    bottom:8px;
+  }
+  body.landscape-preview-mode .toolbar-icon,
+  body.landscape-preview-mode .myboy-menu-button{
+    width:34px;
+    height:34px;
+  }
+  body.landscape-preview-mode .preview-shoulder{
+    width:64px;
+    height:24px;
+    font-size:15px;
+  }
+}
+
+/* v3.72 responsive Screen Size modes
+   Restore different emulator display sizes for Centered / Best scaling while
+   making Fullscreen genuinely edge-to-edge. The game/controller editor itself
+   also uses the entire landscape viewport with no 10px outer gap. */
+body.landscape-preview-mode.subpage-open main{
+  width:100%;
+  height:100%;
+  min-height:0;
+  margin:0;
+  padding:0 !important;
+  overflow:hidden;
+}
+
+body.landscape-preview-mode .screen-size-page{
+  position:relative;
+  width:100%;
+  height:100%;
+  margin:0;
+  padding:0;
+  overflow:hidden;
+}
+
+body.landscape-preview-mode .screen-size-page > .screen-preview-shell{
+  position:absolute;
+  inset:0 !important;
+  width:auto;
+  height:auto;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  overflow:hidden;
+}
+
+body.landscape-preview-mode .emulator-preview,
+#screenSizePage .emulator-preview{
+  position:absolute;
+  inset:0 !important;
+  width:auto;
+  height:auto;
+  min-width:0;
+  min-height:0;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  overflow:hidden;
+}
+
+/* The JS now calculates each mode from the actual available emulator area. */
+body.landscape-preview-mode .preview-screen-frame{
+  position:absolute;
+  max-width:100%;
+  max-height:100%;
+  margin:0;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+  overflow:hidden;
+}
+
+body.landscape-preview-mode .preview-screen-surface{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+
+/* Fullscreen and Break aspect ratio must have zero visible outer spacing. */
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="fullscreen"] .preview-screen-frame,
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="stretch"] .preview-screen-frame{
+  left:0 !important;
+  top:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  width:100% !important;
+  height:100% !important;
+  transform:none !important;
+}
+
+/* Best / Centered are intentionally smaller and remain centered. Their exact
+   pixel dimensions are written by updateResponsiveScreenFrame(). */
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="best"] .preview-screen-frame,
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="centered"] .preview-screen-frame{
+  right:auto !important;
+  bottom:auto !important;
+  transform:translate(-50%, -50%) !important;
+}
+
+/* Keep controller controls close to the actual outer emulator viewport. */
+body.landscape-preview-mode .preview-shoulder{top:6px;}
+body.landscape-preview-mode .preview-shoulder.left{left:6px;}
+body.landscape-preview-mode .preview-shoulder.right{right:6px;}
+body.landscape-preview-mode .preview-toolbar.top.landscape-only{top:6px;}
+body.landscape-preview-mode .preview-dpad{left:6px; bottom:6px;}
+body.landscape-preview-mode .preview-ab{right:6px; bottom:6px;}
+body.landscape-preview-mode .preview-start-select{bottom:6px;}
+body.landscape-preview-mode .preview-add-fab{
+  top:max(6px, env(safe-area-inset-top, 0px));
+  right:max(6px, env(safe-area-inset-right, 0px));
+}
+body.landscape-preview-mode .screen-size-page > .sub-header{
+  top:max(6px, env(safe-area-inset-top, 0px));
+  left:max(6px, env(safe-area-inset-left, 0px));
+}
+
+@media (orientation:landscape) and (max-height:390px){
+  body.landscape-preview-mode .preview-dpad,
+  body.landscape-preview-mode .preview-ab{bottom:4px;}
+  body.landscape-preview-mode .preview-dpad{left:4px;}
+  body.landscape-preview-mode .preview-ab{right:4px;}
+  body.landscape-preview-mode .preview-shoulder{top:4px;}
+  body.landscape-preview-mode .preview-shoulder.left{left:4px;}
+  body.landscape-preview-mode .preview-shoulder.right{right:4px;}
+  body.landscape-preview-mode .preview-toolbar.top.landscape-only{top:4px;}
+  body.landscape-preview-mode .preview-start-select{bottom:4px;}
+}
+
+
+/* v3.74 emulator-screen expand/minimize handle
+   The screen now resizes with the same single scale handle used by controls. */
+.preview-screen-frame.is-selected::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border:2px solid rgba(83,255,149,.95);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.20), 0 0 18px rgba(83,255,149,.12);
+  pointer-events:none;
+  z-index:7;
+}
+
+.preview-scale-handle.screen-scale-mode{
+  background:rgba(24,50,39,.90);
+  box-shadow:0 12px 26px rgba(0,0,0,.34), 0 0 0 1px rgba(83,255,149,.28), inset 0 1px 0 rgba(255,255,255,.10);
+  touch-action:none;
+  cursor:nwse-resize;
+}
+
+.preview-scale-handle.screen-scale-mode svg{
+  stroke:#6dffa5;
+}
+
+body[data-resolved-mode="light"] .preview-scale-handle.screen-scale-mode{
+  background:rgba(255,255,255,.94);
+  box-shadow:0 10px 22px rgba(30,45,72,.20), 0 0 0 1px rgba(38,164,91,.24);
+}
+
+body[data-resolved-mode="light"] .preview-scale-handle.screen-scale-mode svg{
+  stroke:#15924b;
+}
+
+/* v3.75 unified Settings selection dialogs + faster mobile response
+   Keeps Screen orientation, Fast-forward speed/button, CPU core, save type,
+   shader selection, and other radio-style settings visually in sync. */
+.selection-modal{
+  display:flex;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  background:rgba(5,6,12,.58);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  transition:
+    opacity 150ms cubic-bezier(.2,.75,.25,1),
+    visibility 0s linear 150ms;
+  overscroll-behavior:contain;
+}
+.selection-modal.open{
+  display:flex;
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transition-delay:0s;
+}
+
+/* One shared frame style for all settings selection dialogs. */
+.selection-modal .selection-modal-card:not(.import-saves-card){
+  width:min(338px, calc(100vw - 32px));
+  max-width:338px;
+  max-height:min(82dvh, 620px);
+  overflow:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:18px 18px 14px;
+  border-radius:20px;
+  border:1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 18px 46px rgba(0,0,0,.34);
+  backdrop-filter:blur(calc(var(--glass-blur) * .7));
+  -webkit-backdrop-filter:blur(calc(var(--glass-blur) * .7));
+  opacity:0;
+  transform:translate3d(0, 8px, 0) scale(.985);
+  transform-origin:center;
+  transition:
+    transform 175ms cubic-bezier(.2,.82,.25,1),
+    opacity 140ms ease-out;
+  will-change:transform, opacity;
+  scrollbar-width:none;
+}
+.selection-modal .selection-modal-card:not(.import-saves-card)::-webkit-scrollbar{
+  display:none;
+}
+.selection-modal.open .selection-modal-card:not(.import-saves-card){
+  opacity:1;
+  transform:translate3d(0,0,0) scale(1);
+}
+
+/* Normalize old My Boy-specific cards so they match orientation/speed dialogs. */
+.selection-modal .myboy-dialog-card:not(.import-saves-card),
+.selection-modal .myboy-dialog-card.tall:not(.import-saves-card),
+.selection-modal .selection-modal-card.compact:not(.import-saves-card){
+  width:min(338px, calc(100vw - 32px));
+  max-width:338px;
+  border-radius:20px;
+  border:1px solid var(--line);
+  padding:18px 18px 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 18px 46px rgba(0,0,0,.34);
+  backdrop-filter:blur(calc(var(--glass-blur) * .7));
+  -webkit-backdrop-filter:blur(calc(var(--glass-blur) * .7));
+}
+
+.selection-modal .selection-modal-card:not(.import-saves-card) h3,
+.selection-modal .myboy-dialog-card:not(.import-saves-card) h3{
+  margin:0 0 10px;
+  color:var(--text);
+  font-size:17px;
+  font-weight:700;
+  line-height:1.25;
+  letter-spacing:-.01em;
+}
+.selection-modal .selection-options{
+  gap:3px;
+}
+.selection-modal .selection-option,
+.selection-modal .myboy-dialog-card .selection-option{
+  min-height:48px;
+  padding:7px 9px;
+  margin:0;
+  gap:12px;
+  border:1px solid transparent;
+  border-radius:13px;
+  background:transparent;
+  color:var(--text);
+  font-size:14px;
+  font-weight:500;
+  line-height:1.25;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  transition:
+    background-color 110ms ease,
+    border-color 110ms ease,
+    transform 85ms ease,
+    opacity 85ms ease;
+}
+.selection-modal .selection-option:hover,
+.selection-modal .myboy-dialog-card .selection-option:hover{
+  background:rgba(255,255,255,.035);
+}
+.selection-modal .selection-option:active,
+.selection-modal .myboy-dialog-card .selection-option:active{
+  transform:scale(.988);
+  background:rgba(255,255,255,.055);
+}
+.selection-modal .selection-option.active,
+.selection-modal .myboy-dialog-card .selection-option.active{
+  background:rgba(115,224,216,.075);
+  border-color:rgba(115,224,216,.16);
+}
+.selection-modal .selection-radio,
+.selection-modal .myboy-dialog-card .selection-radio{
+  width:20px;
+  height:20px;
+  flex:0 0 20px;
+  border:2px solid rgba(255,255,255,.58);
+  transition:border-color 110ms ease, background-color 110ms ease;
+}
+.selection-modal .selection-option.active .selection-radio,
+.selection-modal .myboy-dialog-card .selection-option.active .selection-radio{
+  border-color:var(--cyan);
+}
+.selection-modal .selection-option.active .selection-radio::after,
+.selection-modal .myboy-dialog-card .selection-option.active .selection-radio::after{
+  inset:3px;
+  background:var(--cyan);
+  transform:scale(1);
+  transition:transform 120ms cubic-bezier(.2,.8,.25,1);
+}
+.selection-modal .selection-actions,
+.selection-modal .myboy-dialog-card .selection-actions{
+  margin-top:8px;
+}
+.selection-modal .text-action-btn,
+.selection-modal .myboy-dialog-card .text-action-btn{
+  min-height:40px;
+  padding:8px 4px 0;
+  color:var(--accent);
+  font-size:13px;
+  font-weight:700;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  transition:opacity 90ms ease, transform 90ms ease;
+}
+.selection-modal .text-action-btn:active,
+.selection-modal .myboy-dialog-card .text-action-btn:active{
+  transform:scale(.97);
+  opacity:.84;
+}
+
+body[data-resolved-mode="light"] .selection-modal .selection-modal-card:not(.import-saves-card),
+body[data-resolved-mode="light"] .selection-modal .myboy-dialog-card:not(.import-saves-card){
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.82)),
+    linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 18px 42px rgba(33,42,68,.17);
+}
+body[data-resolved-mode="light"] .selection-modal .selection-option:hover,
+body[data-resolved-mode="light"] .selection-modal .myboy-dialog-card .selection-option:hover{
+  background:rgba(50,70,122,.05);
+}
+body[data-resolved-mode="light"] .selection-modal .selection-option.active,
+body[data-resolved-mode="light"] .selection-modal .myboy-dialog-card .selection-option.active{
+  background:rgba(44,174,166,.085);
+  border-color:rgba(44,174,166,.18);
+}
+body[data-resolved-mode="light"] .selection-modal .selection-radio,
+body[data-resolved-mode="light"] .selection-modal .myboy-dialog-card .selection-radio{
+  border-color:rgba(23,25,39,.30);
+}
+
+body[data-translucent="true"] .selection-modal .selection-modal-card:not(.import-saves-card),
+body[data-translucent="true"] .selection-modal .myboy-dialog-card:not(.import-saves-card){
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.035)),
+    linear-gradient(180deg, var(--glass-bg-2) 0%, var(--glass-bg) 100%),
+    linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+}
+
+/* Mobile: remove expensive full-screen blur and keep taps immediate. */
+@media (pointer:coarse), (max-width:600px){
+  .selection-modal{
+    backdrop-filter:none;
+    -webkit-backdrop-filter:none;
+    background:rgba(5,6,12,.64);
+  }
+  .selection-modal .selection-modal-card:not(.import-saves-card){
+    width:min(330px, calc(100vw - 28px));
+    max-width:330px;
+    max-height:calc(100dvh - max(28px, env(safe-area-inset-top)) - max(28px, env(safe-area-inset-bottom)));
+    padding:16px 16px 12px;
+    backdrop-filter:none;
+    -webkit-backdrop-filter:none;
+  }
+  .selection-modal .selection-modal-card:not(.import-saves-card) h3{
+    font-size:16px;
+  }
+  .selection-modal .selection-option,
+  .selection-modal .myboy-dialog-card .selection-option{
+    min-height:46px;
+    padding:7px 8px;
+    font-size:13px;
+  }
+}
+
+@media (orientation:landscape) and (max-height:500px){
+  .selection-modal .selection-modal-card:not(.import-saves-card){
+    max-height:calc(100dvh - 20px);
+    padding:12px 14px 10px;
+  }
+  .selection-modal .selection-modal-card:not(.import-saves-card) h3{
+    margin-bottom:6px;
+  }
+  .selection-modal .selection-option,
+  .selection-modal .myboy-dialog-card .selection-option{
+    min-height:40px;
+    padding:5px 7px;
+  }
+  .selection-modal .selection-actions,
+  .selection-modal .myboy-dialog-card .selection-actions{
+    margin-top:4px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .selection-modal,
+  .selection-modal .selection-modal-card:not(.import-saves-card),
+  .selection-modal .selection-option,
+  .selection-modal .text-action-btn{
+    transition-duration:.01ms !important;
+  }
+}
+
+/* v3.78 — Restore the main Settings category cards exactly to the v3.75 size.
+   Only controls INSIDE Settings pages stay larger/easier to tap. */
+.settings-detail-page .detail-row{
+  min-height:90px;
+  padding-top:19px;
+  padding-bottom:19px;
+}
+.settings-detail-page .detail-range-row{
+  min-height:94px;
+  padding-top:19px;
+  padding-bottom:22px;
+}
+.settings-detail-page .detail-row strong,
+.settings-detail-page .range-copy strong{
+  font-size:15.5px;
+  line-height:1.25;
+}
+.settings-detail-page .detail-row span:not(.slider),
+.settings-detail-page .range-copy span{
+  margin-top:6px;
+  font-size:12.25px;
+  line-height:1.45;
+}
+.settings-detail-page .switch{
+  width:50px;
+  height:28px;
+}
+.settings-detail-page .switch .slider::before{
+  width:20px;
+  height:20px;
+  left:4px;
+  top:4px;
+}
+.settings-detail-page .switch input:checked + .slider::before{
+  transform:translateX(22px);
+}
+.settings-detail-page .chevron{
+  width:19px;
+  height:19px;
+}
+
+/* Keep Screen orientation, Fast-forward and the other synced selection frames
+   comfortably large on phones while leaving the Settings home cards untouched. */
+@media (pointer:coarse), (max-width:600px){
+  .selection-modal .selection-modal-card:not(.import-saves-card){
+    width:min(348px, calc(100vw - 24px));
+    max-width:348px;
+    padding:18px 17px 13px;
+  }
+  .selection-modal .selection-modal-card:not(.import-saves-card) h3{
+    font-size:17px;
+    margin-bottom:9px;
+  }
+  .selection-modal .selection-option,
+  .selection-modal .myboy-dialog-card .selection-option{
+    min-height:52px;
+    padding:9px 10px;
+    font-size:14px;
+  }
+  .selection-modal .selection-radio,
+  .selection-modal .myboy-dialog-card .selection-radio{
+    width:22px;
+    height:22px;
+    flex-basis:22px;
+  }
+}
+
+@media (max-width:359px){
+  .settings-detail-page .detail-row{
+    min-height:86px;
+  }
+  .settings-detail-page .detail-row strong,
+  .settings-detail-page .range-copy strong{
+    font-size:15px;
+  }
+  .settings-detail-page .detail-row span:not(.slider),
+  .settings-detail-page .range-copy span{
+    font-size:11.75px;
+  }
+}
+
+@media (orientation:landscape) and (max-height:500px){
+  .selection-modal .selection-option,
+  .selection-modal .myboy-dialog-card .selection-option{
+    min-height:42px;
+    padding:6px 8px;
+    font-size:13px;
+  }
+}
+
+/* v3.79 — Slightly reduce controls INSIDE Settings pages only.
+   Main Settings category cards stay at the restored v3.75 size. */
+.settings-detail-page .detail-row{
+  min-height:84px;
+  padding-top:16px;
+  padding-bottom:16px;
+}
+.settings-detail-page .detail-range-row{
+  min-height:88px;
+  padding-top:16px;
+  padding-bottom:19px;
+}
+.settings-detail-page .detail-row strong,
+.settings-detail-page .range-copy strong{
+  font-size:15px;
+  line-height:1.25;
+}
+.settings-detail-page .detail-row span:not(.slider),
+.settings-detail-page .range-copy span{
+  margin-top:5px;
+  font-size:12px;
+  line-height:1.4;
+}
+.settings-detail-page .switch{
+  width:48px;
+  height:27px;
+}
+.settings-detail-page .switch .slider::before{
+  width:19px;
+  height:19px;
+  left:4px;
+  top:4px;
+}
+.settings-detail-page .switch input:checked + .slider::before{
+  transform:translateX(21px);
+}
+.settings-detail-page .chevron{
+  width:18px;
+  height:18px;
+}
+
+/* Keep selection dialogs roomy, but make each option just a little more compact
+   than v3.78 on phones. */
+@media (pointer:coarse), (max-width:600px){
+  .selection-modal .selection-modal-card:not(.import-saves-card){
+    width:min(340px, calc(100vw - 26px));
+    max-width:340px;
+    padding:17px 16px 12px;
+  }
+  .selection-modal .selection-modal-card:not(.import-saves-card) h3{
+    font-size:16.5px;
+    margin-bottom:8px;
+  }
+  .selection-modal .selection-option,
+  .selection-modal .myboy-dialog-card .selection-option{
+    min-height:49px;
+    padding:8px 9px;
+    font-size:13.5px;
+  }
+  .selection-modal .selection-radio,
+  .selection-modal .myboy-dialog-card .selection-radio{
+    width:21px;
+    height:21px;
+    flex-basis:21px;
+  }
+}
+
+@media (max-width:359px){
+  .settings-detail-page .detail-row{
+    min-height:81px;
+  }
+  .settings-detail-page .detail-range-row{
+    min-height:85px;
+  }
+  .settings-detail-page .detail-row strong,
+  .settings-detail-page .range-copy strong{
+    font-size:14.75px;
+  }
+  .settings-detail-page .detail-row span:not(.slider),
+  .settings-detail-page .range-copy span{
+    font-size:11.5px;
+  }
+}
+
+/* v3.80 — One more very small size reduction for controls INSIDE Settings only.
+   The main Settings category cards remain at the v3.75 size. */
+.settings-detail-page .detail-row{
+  min-height:81px;
+  padding-top:15px;
+  padding-bottom:15px;
+}
+.settings-detail-page .detail-range-row{
+  min-height:85px;
+  padding-top:15px;
+  padding-bottom:18px;
+}
+.settings-detail-page .detail-row strong,
+.settings-detail-page .range-copy strong{
+  font-size:14.75px;
+}
+.settings-detail-page .detail-row span:not(.slider),
+.settings-detail-page .range-copy span{
+  margin-top:5px;
+  font-size:11.75px;
+}
+.settings-detail-page .switch{
+  width:47px;
+  height:26px;
+}
+.settings-detail-page .switch .slider::before{
+  width:18px;
+  height:18px;
+  left:4px;
+  top:4px;
+}
+.settings-detail-page .switch input:checked + .slider::before{
+  transform:translateX(21px);
+}
+.settings-detail-page .chevron{
+  width:17px;
+  height:17px;
+}
+
+@media (pointer:coarse), (max-width:600px){
+  .selection-modal .selection-modal-card:not(.import-saves-card){
+    width:min(336px, calc(100vw - 28px));
+    max-width:336px;
+    padding:16px 15px 11px;
+  }
+  .selection-modal .selection-modal-card:not(.import-saves-card) h3{
+    font-size:16px;
+    margin-bottom:8px;
+  }
+  .selection-modal .selection-option,
+  .selection-modal .myboy-dialog-card .selection-option{
+    min-height:47px;
+    padding:7px 9px;
+    font-size:13.25px;
+  }
+  .selection-modal .selection-radio,
+  .selection-modal .myboy-dialog-card .selection-radio{
+    width:20px;
+    height:20px;
+    flex-basis:20px;
+  }
+}
+
+@media (max-width:359px){
+  .settings-detail-page .detail-row{
+    min-height:79px;
+  }
+  .settings-detail-page .detail-range-row{
+    min-height:83px;
+  }
+  .settings-detail-page .detail-row strong,
+  .settings-detail-page .range-copy strong{
+    font-size:14.5px;
+  }
+  .settings-detail-page .detail-row span:not(.slider),
+  .settings-detail-page .range-copy span{
+    font-size:11.35px;
+  }
+}
+
+/* v3.81 — Make every slider row visually consistent while keeping it only
+   slightly taller than the regular inside-Settings rows. */
+.settings-detail-page .detail-range-row{
+  box-sizing:border-box;
+  min-height:84px;
+  padding-top:10px;
+  padding-bottom:10px;
+}
+.settings-detail-page .detail-range-row .range-copy span{
+  max-width:none;
+}
+.settings-detail-page .detail-range-row .range-line{
+  margin-top:6px;
+  min-height:20px;
+}
+
+@media (max-width:359px){
+  .settings-detail-page .detail-range-row{
+    min-height:82px;
+    padding-top:9px;
+    padding-bottom:9px;
+  }
+  .settings-detail-page .detail-range-row .range-line{
+    margin-top:5px;
+  }
+}
+
+
+/* v4.44 shader picker helper copy */
+.selection-modal-copy{
+  margin:-2px 0 10px;
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.45;
+}
+#glslShaderOptions{
+  max-height:min(48dvh, 360px);
+  overflow:auto;
+}
+
+/* v4.47 — Screen Editor/native gameplay exact control-size parity.
+   At 100% scale the WebView editor now uses the same logical dimensions as
+   activity_main.xml / GameplayLayoutController. Saved scale then multiplies
+   the same base size in both editor and gameplay. */
+#screenSizePage .preview-shoulder{
+  width:72px !important;
+  height:30px !important;
+  font-size:17px !important;
+}
+
+#screenSizePage .preview-toolbar.top.landscape-only,
+#screenSizePage .preview-toolbar.top.landscape-only .toolbar-icon,
+#screenSizePage .preview-toolbar.top.landscape-only .myboy-menu-button{
+  width:42px !important;
+  height:42px !important;
+}
+
+#screenSizePage .preview-dpad{
+  width:150px !important;
+  height:150px !important;
+}
+#screenSizePage .preview-dpad .dpad{
+  width:44px !important;
+  height:44px !important;
+}
+#screenSizePage .preview-dpad .up{
+  left:53px !important;
+  top:0 !important;
+  right:auto !important;
+  bottom:auto !important;
+}
+#screenSizePage .preview-dpad .left{
+  left:0 !important;
+  top:53px !important;
+  right:auto !important;
+  bottom:auto !important;
+}
+#screenSizePage .preview-dpad .right{
+  left:106px !important;
+  top:53px !important;
+  right:auto !important;
+  bottom:auto !important;
+}
+#screenSizePage .preview-dpad .down{
+  left:53px !important;
+  top:106px !important;
+  right:auto !important;
+  bottom:auto !important;
+}
+
+#screenSizePage .preview-start-select{
+  width:116px !important;
+  height:38px !important;
+  gap:8px !important;
+  align-items:center !important;
+  justify-content:center !important;
+}
+#screenSizePage .preview-start-select span{
+  width:50px !important;
+  height:24px !important;
+}
+
+#screenSizePage .preview-ab{
+  width:150px !important;
+  height:94px !important;
+}
+#screenSizePage .preview-ab span{
+  width:54px !important;
+  height:54px !important;
+  font-size:20px !important;
+}
+#screenSizePage .preview-ab .button-b{
+  left:0 !important;
+  top:0 !important;
+  right:auto !important;
+  bottom:auto !important;
+}
+#screenSizePage .preview-ab .button-a{
+  left:auto !important;
+  top:auto !important;
+  right:0 !important;
+  bottom:0 !important;
+}
+
+/* Native optional utilities are 44dp square. */
+#screenSizePage .extra-control.menu-style-utility,
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button{
+  width:44px !important;
+  height:44px !important;
+}
+
+/* Native separated A/B are 48dp square. */
+#screenSizePage .extra-control[data-control-type="buttonA"],
+#screenSizePage .extra-control[data-control-type="buttonB"]{
+  width:48px !important;
+  height:48px !important;
+}
+#screenSizePage .extra-control[data-control-type="buttonA"] .circle-text,
+#screenSizePage .extra-control[data-control-type="buttonB"] .circle-text{
+  width:48px !important;
+  height:48px !important;
+  font-size:20px !important;
+}
+
+
+/* Keep optional extra-circle controls visually consistent at 100% in the editor. */
+#screenSizePage .extra-control[data-control-type="comboAB"],
+#screenSizePage .extra-control[data-control-type="comboLR"],
+#screenSizePage .extra-control[data-control-type="comboLA"],
+#screenSizePage .extra-control[data-control-type="comboLB"],
+#screenSizePage .extra-control[data-control-type="comboRA"],
+#screenSizePage .extra-control[data-control-type="comboRB"],
+#screenSizePage .extra-control[data-control-type="screenshot"]{
+  width:56px !important;
+  height:56px !important;
+}
+#screenSizePage .extra-control[data-control-type="comboAB"] .circle-text,
+#screenSizePage .extra-control[data-control-type="comboLR"] .circle-text,
+#screenSizePage .extra-control[data-control-type="comboLA"] .circle-text,
+#screenSizePage .extra-control[data-control-type="comboLB"] .circle-text,
+#screenSizePage .extra-control[data-control-type="comboRA"] .circle-text,
+#screenSizePage .extra-control[data-control-type="comboRB"] .circle-text{
+  width:56px !important;
+  height:56px !important;
+  font-size:20px !important;
+}
+#screenSizePage .extra-control[data-control-type="turboAB"],
+#screenSizePage .extra-control[data-control-type="turboAB"] .turbo-face{
+  width:122px !important;
+  height:58px !important;
+}

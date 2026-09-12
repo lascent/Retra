@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Preserve settings, ROM identity metadata, saves and WebView library UI. -->
+    <!-- Managed ROM binaries and transient working saves are intentionally excluded. -->
+    <exclude domain="file" path="library_content/" />
+    <exclude domain="file" path="save_work/" />
+</full-backup-content>

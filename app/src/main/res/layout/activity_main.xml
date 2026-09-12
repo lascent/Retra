@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#07110B">
+
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0B0C14" />
+
+    <!-- Native mGBA gameplay screen. The placement mirrors the v3.72
+         Screen Size preview: game area in the center, controls overlaid
+         around it, all inside one landscape viewport. -->
+    <FrameLayout
+        android:id="@+id/emulatorOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#07110B"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:id="@+id/emulatorViewport"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <!-- Dark translucent side zones like the v3.72 emulator preview. -->
+            <View
+                android:id="@+id/leftSideShade"
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="start"
+                android:background="@drawable/bg_emulator_side" />
+
+            <View
+                android:id="@+id/rightSideShade"
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:background="@drawable/bg_emulator_side" />
+
+            <!-- Real mGBA video is drawn here. Kotlin resizes/repositions this
+                 frame using the values saved by the HTML Screen Size editor. -->
+            <FrameLayout
+                android:id="@+id/gameScreenFrame"
+                android:layout_width="640dp"
+                android:layout_height="426dp"
+                android:layout_gravity="center"
+                android:background="#000000"
+                android:clipChildren="true">
+
+                <ImageView
+                    android:id="@+id/gameScreen"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="Game screen"
+                    android:keepScreenOn="true"
+                    android:scaleType="fitCenter" />
+
+                <com.retra.emulator.ShaderGameView
+                    android:id="@+id/shaderGameScreen"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="Shader game screen"
+                    android:keepScreenOn="true"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Hidden labels retained for ViewBinding/native status updates. -->
+            <TextView
+                android:id="@+id/gameTitle"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/systemLabel"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:visibility="gone" />
+
+            <!-- Back -->
+            <TextView
+                android:id="@+id/emulatorBackButton"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_controller_circle"
+                android:gravity="center"
+                android:text="‹"
+                android:textColor="#FFFFFF"
+                android:textSize="30sp"
+                android:visibility="gone" />
+
+            <!-- Shoulder buttons -->
+            <TextView
+                android:id="@+id/buttonL"
+                android:layout_width="72dp"
+                android:layout_height="30dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="54dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_controller_pill"
+                android:gravity="center"
+                android:text="L"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/buttonR"
+                android:layout_width="72dp"
+                android:layout_height="30dp"
+                android:layout_gravity="top|end"
+                android:layout_marginEnd="54dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_controller_pill"
+                android:gravity="center"
+                android:text="R"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <!-- Actual gameplay uses one Menu button centered at the top.
+                 Quick load/save/fast-forward remain hidden native views and
+                 are available from the Menu popup. -->
+            <FrameLayout
+                android:id="@+id/utilityBar"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|center_horizontal"
+                android:layout_marginTop="8dp">
+
+                <ImageButton
+                    android:id="@+id/menuButton"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_controller_round_rect"
+                    android:contentDescription="Menu"
+                    android:padding="6dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_controller_menu" />
+
+            </FrameLayout>
+
+            <!-- Optional utility controls added from Settings > Video > Screen size.
+                 These are direct emulatorViewport children so their saved x/y values
+                 use the exact same full-screen coordinate system as the editor. -->
+            <ImageButton
+                android:id="@+id/quickLoadButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_controller_round_rect"
+                android:contentDescription="Quick load"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_controller_quick_load"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/quickSaveButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_controller_round_rect"
+                android:contentDescription="Quick save"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_controller_quick_save"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/speedButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_controller_round_rect"
+                android:contentDescription="Fast forward"
+                android:padding="7dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_controller_fast_forward"
+                android:visibility="gone" />
+
+            <!-- Add-control affordance from v3.72. Gameplay uses Settings > Video
+                 > Screen size for the full editor. -->
+            <TextView
+                android:id="@+id/addControlButton"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_gravity="top|end"
+                android:layout_marginEnd="8dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_controller_add"
+                android:gravity="center"
+                android:text="+"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:visibility="gone" />
+
+            <!-- D-pad group. Its whole group position/scale follows the HTML editor. -->
+            <FrameLayout
+                android:id="@+id/dpadContainer"
+                android:layout_width="150dp"
+                android:layout_height="150dp"
+                android:layout_gravity="bottom|start"
+                android:layout_marginStart="18dp"
+                android:layout_marginBottom="18dp">
+
+                <ImageButton
+                    android:id="@+id/buttonUp"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="top|center_horizontal"
+                    android:background="@drawable/bg_controller_square"
+                    android:contentDescription="Up"
+                    android:padding="14dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_controller_dpad_up" />
+
+                <ImageButton
+                    android:id="@+id/buttonLeft"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center_vertical|start"
+                    android:background="@drawable/bg_controller_square"
+                    android:contentDescription="Left"
+                    android:padding="14dp"
+                    android:rotation="-90"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_controller_dpad_up" />
+
+                <ImageButton
+                    android:id="@+id/buttonRight"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center_vertical|end"
+                    android:background="@drawable/bg_controller_square"
+                    android:contentDescription="Right"
+                    android:padding="14dp"
+                    android:rotation="90"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_controller_dpad_up" />
+
+                <ImageButton
+                    android:id="@+id/buttonDown"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:background="@drawable/bg_controller_square"
+                    android:contentDescription="Down"
+                    android:padding="14dp"
+                    android:rotation="180"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_controller_dpad_up" />
+            </FrameLayout>
+
+            <!-- Start / Select are intentionally subtle and centered along the bottom. -->
+            <LinearLayout
+                android:id="@+id/startSelectContainer"
+                android:layout_width="116dp"
+                android:layout_height="38dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="14dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/buttonSelect"
+                    android:layout_width="50dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/bg_controller_pill"
+                    android:gravity="center"
+                    android:contentDescription="Select"
+                    android:text="" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <TextView
+                    android:id="@+id/buttonStart"
+                    android:layout_width="50dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/bg_controller_pill"
+                    android:gravity="center"
+                    android:contentDescription="Start"
+                    android:text="" />
+            </LinearLayout>
+
+            <!-- A/B group with B slightly left/up and A right/down, matching v3.72. -->
+            <FrameLayout
+                android:id="@+id/abContainer"
+                android:layout_width="150dp"
+                android:layout_height="94dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="18dp"
+                android:layout_marginBottom="20dp">
+
+                <TextView
+                    android:id="@+id/buttonB"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:layout_gravity="top|start"
+                    android:background="@drawable/bg_controller_circle"
+                    android:gravity="center"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="B"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/buttonA"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:layout_gravity="bottom|end"
+                    android:background="@drawable/bg_controller_circle"
+                    android:gravity="center"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="A"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+        </FrameLayout>
+    </FrameLayout>
+</FrameLayout>

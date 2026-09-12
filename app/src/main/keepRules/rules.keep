@@ -1,0 +1,12 @@
+# Retra release keep rules.
+# JavaScript calls methods by their source names through AndroidBridge.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# Retra's native core currently uses name-based JNI exports such as
+# Java_com_retra_emulator_MainActivity_loadRom. Preserve native method names if
+# R8/minification is enabled in a future release build.
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}

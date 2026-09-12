@@ -1,0 +1,615 @@
+/* Shared interaction polish. Keep gameplay/editor dimensions independent. */
+:root {
+  --interaction-duration: 140ms;
+  --interaction-easing: cubic-bezier(.2, .8, .25, 1);
+}
+button, input, select, textarea { font-family: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+.chip, .text-action-btn, .sheet-options-item, .category-delete {
+  touch-action: manipulation;
+}
+.chip, .text-action-btn, .category-delete {
+  min-height: 44px;
+}
+.category-delete { min-width: 44px; }
+.chip, .text-action-btn, .sheet-options-item {
+  transition: background-color var(--interaction-duration) var(--interaction-easing),
+              color var(--interaction-duration) var(--interaction-easing);
+}
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+#categoriesList strong, .sheet-category-name strong { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* v4.26 centered, larger and low-latency Library multi-select. */
+.cover-card { position: relative; }
+.library-selection-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.35);
+  background: rgba(15,16,27,.58);
+  box-shadow: 0 5px 14px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  transform: scale(.8);
+  pointer-events: none;
+  transition: opacity var(--interaction-duration) var(--interaction-easing),
+              transform var(--interaction-duration) var(--interaction-easing),
+              background-color var(--interaction-duration) var(--interaction-easing),
+              border-color var(--interaction-duration) var(--interaction-easing);
+}
+.library-selection-check svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+body.library-selection-mode .cover-card .library-selection-check {
+  opacity: 1;
+  transform: scale(1);
+}
+body.library-selection-mode .cover-card.library-selected,
+body.library-selection-mode .cover-card[data-selected="true"] {
+  outline: 3px solid color-mix(in srgb, var(--accent) 86%, white 14%);
+  outline-offset: -3px;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--accent) 58%, white 42%),
+    0 10px 28px rgba(0,0,0,.22);
+  transform: none;
+}
+body.library-selection-mode .cover-card.library-selected .library-selection-check,
+body.library-selection-mode .cover-card[data-selected="true"] .library-selection-check {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 78%, white 22%);
+  box-shadow: 0 5px 14px rgba(0,0,0,.24), 0 0 0 2px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+body.library-selection-mode .cover-card.library-selected .library-selection-check svg,
+body.library-selection-mode .cover-card[data-selected="true"] .library-selection-check svg { opacity: 1; }
+
+.library-selection-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  height: calc(112px + var(--device-safe-bottom));
+  padding: 9px max(10px, env(safe-area-inset-right, 0px)) calc(9px + var(--device-safe-bottom)) max(10px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--nav-bg) 94%, transparent);
+  box-shadow: 0 -14px 34px rgba(0,0,0,.20);
+  backdrop-filter: blur(18px) saturate(1.18);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  opacity: 0;
+  transform: translateY(110%);
+  pointer-events: none;
+  transition: opacity .18s var(--interaction-easing), transform .2s var(--interaction-easing);
+}
+.library-selection-bar.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.library-selection-close {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left, 0px));
+  top: 9px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--text);
+}
+.library-selection-close:active { background: var(--accent-soft); }
+.library-selection-close svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; }
+.library-selection-summary {
+  position: absolute;
+  z-index: 2;
+  left: max(56px, calc(env(safe-area-inset-left, 0px) + 56px));
+  right: 12px;
+  top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.library-selection-summary strong { color: var(--text); font-size: 14px; white-space: nowrap; }
+.library-selection-summary span { color: var(--muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-selection-actions {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  right: auto;
+  bottom: calc(8px + var(--device-safe-bottom));
+  width: min(372px, calc(100% - 20px));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.library-selection-action {
+  min-width: 0;
+  height: 56px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--nav-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 750;
+}
+.library-selection-action:active,
+.library-selection-action.active { background: var(--nav-active-bg); color: var(--nav-active-text); }
+.library-selection-action svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+#librarySelectionFavorite svg { fill: color-mix(in srgb, currentColor 22%, transparent); }
+.library-selection-more-menu {
+  position: absolute;
+  /* Anchor the popup closer to the More action: lower and slightly more to
+     the RIGHT, even if it overlaps the selected-count helper copy. Keep a
+     small responsive inset so the full popup remains visible on narrow phones. */
+  right: max(calc(env(safe-area-inset-right, 0px) + 12px), clamp(16px, 7vw, 28px));
+  bottom: calc(86px + var(--device-safe-bottom));
+  z-index: 180;
+  width: min(184px, calc(100vw - 38px));
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, rgba(255,255,255,.08));
+  border-radius: 15px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--header-1) 96%, var(--accent) 4%) 0%,
+    color-mix(in srgb, var(--header-2) 98%, black 2%) 100%);
+  box-shadow: 0 14px 34px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
+  opacity: 0;
+  transform: translateY(6px) scale(.985);
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.library-selection-more-menu.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.library-selection-more-menu button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 11px;
+  padding: 7px 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.library-selection-more-menu button:active { background: var(--accent-soft); }
+.library-selection-more-menu button.danger { color: var(--danger); }
+.library-selection-more-menu svg { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.library-selection-more-menu button span { display: grid; gap: 2px; }
+.library-selection-more-menu strong { font-size: 11px; }
+.library-selection-more-menu small { color: var(--muted); font-size: 8.5px; line-height: 1.3; }
+body.library-selection-mode .bottom-nav { opacity: 0; pointer-events: none; }
+body.library-selection-mode .add-rom-btn { opacity: 0; transform: scale(.85); pointer-events: none; }
+body.library-selection-mode .toast { bottom: calc(122px + var(--device-safe-bottom)); }
+
+.multi-category-card { max-height: min(76dvh, 560px); }
+.multi-category-copy { margin: -4px 0 10px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.multi-category-list { overflow: auto; max-height: min(52dvh, 390px); margin: 0 -4px; padding: 2px 4px; }
+.multi-category-item {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.multi-category-item:last-child { border-bottom: 0; }
+.multi-category-check { position: relative; width: 24px; height: 24px; flex: 0 0 24px; }
+.multi-category-check input { position: absolute; opacity: 0; pointer-events: none; }
+.multi-category-box {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  border: 1.5px solid color-mix(in srgb, var(--muted) 70%, transparent);
+  background: transparent;
+}
+.multi-category-check input:checked + .multi-category-box { background: var(--accent); border-color: var(--accent); }
+.multi-category-check input:checked + .multi-category-box::after {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: translateY(-1px) rotate(-45deg);
+}
+.multi-category-item.mixed .multi-category-box { border-color: var(--accent); background: var(--accent-soft); }
+.multi-category-item.mixed .multi-category-box::after { content: ''; width: 9px; height: 2px; border-radius: 2px; background: var(--accent); }
+.multi-category-name { min-width: 0; display: grid; gap: 3px; }
+.multi-category-name strong { color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
+.multi-category-name small { color: var(--muted); font-size: 9px; line-height: 1.35; }
+
+@media (max-width: 380px) {
+  .library-selection-summary span { display: none; }
+  .library-selection-actions { width: calc(100% - 16px); gap: 5px; }
+  .library-selection-action { height: 54px; font-size: 9.5px; }
+  .library-selection-action svg { width: 22px; height: 22px; }
+}
+
+/* Keep multi-select taps visually immediate on Android WebView. */
+body.library-selection-mode .cover-card {
+  touch-action: manipulation;
+  transition: outline-color 45ms var(--interaction-easing), opacity 45ms var(--interaction-easing);
+}
+@media (pointer: coarse), (max-width: 600px) {
+  .library-selection-bar,
+  .library-selection-more-menu,
+  .library-selection-check {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+body.library-selection-mode #libraryPage { padding-bottom: calc(132px + var(--device-safe-bottom)); }
+.cover-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* v4.33 responsiveness / high-refresh rendering polish. */
+main {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: auto;
+}
+
+/* Isolate card painting so rapid scroll/selection does not invalidate the
+   surrounding grid. Do not promote every card to its own GPU layer. */
+.cover-card {
+  contain: layout paint style;
+}
+
+/* Large libraries can skip rasterizing off-screen card contents while keeping
+   their aspect-ratio-based layout footprint. Supported Android WebView builds
+   use this as a paint optimization; older builds simply ignore it. */
+.library-grid.large-library .cover-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 250px;
+}
+
+/* Blur on every visible cover badge is expensive during finger scrolling.
+   Keep the translucent appearance on touch devices without per-card blur. */
+@media (pointer: coarse), (max-width: 600px) {
+  .favourite-heart {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(15,16,27,.72);
+  }
+}
+
+
+/* v4.47 — Solid Library refresh popup.
+   Keep the menu readable even when it overlaps the category chips. */
+.library-overflow-menu {
+  background: var(--panel-2) !important;
+  border-color: color-mix(in srgb, var(--line) 82%, var(--text) 18%);
+  box-shadow: 0 16px 34px rgba(0,0,0,.34);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  isolation: isolate;
+}
+.library-overflow-item {
+  background: var(--panel) !important;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+}
+.library-overflow-item:hover,
+.library-overflow-item:active {
+  background: var(--panel-2) !important;
+}
+
+/* v4.47 Color Style — game-only color vibe presets with visual previews. */
+.color-style-page{
+  min-height:100%;
+}
+.color-style-content{
+  display:grid;
+  gap:14px;
+  padding-bottom:calc(18px + var(--device-safe-bottom));
+}
+.color-style-intro,
+.color-style-note{
+  margin:0;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.55;
+}
+.color-style-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.color-style-card{
+  position:relative;
+  min-width:0;
+  padding:8px 8px 11px;
+  border:1px solid var(--line);
+  border-radius:17px;
+  background:rgba(255,255,255,.03);
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  transition:border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.color-style-card:active{
+  transform:scale(.985);
+}
+.color-style-card.active{
+  border-color:var(--accent);
+  background:var(--accent-soft);
+  box-shadow:0 8px 24px rgba(0,0,0,.16);
+}
+.color-style-preview{
+  width:100%;
+  aspect-ratio:3/2;
+  overflow:hidden;
+  border-radius:11px;
+  background:#000;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+}
+.color-style-preview img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  image-rendering:pixelated;
+}
+.color-style-card-copy{
+  display:grid;
+  gap:3px;
+  padding:9px 3px 0;
+}
+.color-style-card-copy strong{
+  font-size:13px;
+  font-weight:650;
+}
+.color-style-card-copy span{
+  min-height:31px;
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.45;
+}
+.color-style-check{
+  position:absolute;
+  top:14px;
+  right:14px;
+  width:24px;
+  height:24px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:rgba(12,13,22,.80);
+  border:1px solid rgba(255,255,255,.15);
+  opacity:0;
+  transform:scale(.82);
+  transition:opacity .15s ease, transform .15s ease;
+}
+.color-style-card.active .color-style-check{
+  opacity:1;
+  transform:scale(1);
+  background:var(--accent);
+  color:#16120d;
+}
+.color-style-check svg{
+  width:15px;
+  height:15px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.3;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+@media (max-width:360px){
+  .color-style-grid{grid-template-columns:1fr;}
+  .color-style-card{display:grid;grid-template-columns:132px 1fr;gap:9px;align-items:center;padding:8px;}
+  .color-style-card-copy{padding:0 3px;}
+  .color-style-card-copy span{min-height:0;}
+}
+
+
+/* v1.0.0 final interaction / accessibility polish.
+   These rules intentionally avoid changing gameplay control geometry. */
+:root{
+  --retra-tap-target:44px;
+  --retra-focus-ring:color-mix(in srgb, var(--accent) 78%, white 22%);
+  --retra-press-scale:.985;
+}
+html{
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+body{
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+button,
+[role="button"],
+a,
+input,
+select,
+textarea{
+  -webkit-tap-highlight-color:transparent;
+}
+button,
+[role="button"],
+.settings-item,
+.more-item,
+.detail-row,
+.frequency-option,
+.sheet-options-item,
+.bottom-nav button{
+  touch-action:manipulation;
+}
+.icon-btn,
+.back-btn,
+.small-icon-btn,
+.library-selection-close,
+.text-action-btn,
+.modal-btn,
+.bottom-nav button{
+  min-width:var(--retra-tap-target);
+  min-height:var(--retra-tap-target);
+}
+button:disabled,
+[aria-disabled="true"]{
+  cursor:default;
+  opacity:.5;
+  pointer-events:none;
+}
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible{
+  outline:2px solid var(--retra-focus-ring);
+  outline-offset:3px;
+}
+.settings-item,
+.more-item,
+.detail-row,
+.frequency-option,
+.modal-btn,
+.text-action-btn,
+.icon-btn,
+.back-btn,
+.small-icon-btn{
+  transition:
+    background-color var(--interaction-duration) var(--interaction-easing),
+    border-color var(--interaction-duration) var(--interaction-easing),
+    color var(--interaction-duration) var(--interaction-easing),
+    opacity var(--interaction-duration) var(--interaction-easing),
+    transform var(--interaction-duration) var(--interaction-easing);
+}
+@media (hover:hover) and (pointer:fine){
+  .settings-item:hover,
+  .more-item:hover,
+  .detail-row:hover,
+  .frequency-option:hover{
+    background-color:color-mix(in srgb, var(--accent-soft) 42%, transparent);
+  }
+  .modal-btn:hover,
+  .text-action-btn:hover,
+  .icon-btn:hover,
+  .back-btn:hover,
+  .small-icon-btn:hover{
+    filter:brightness(1.06);
+  }
+}
+@media (pointer:coarse){
+  button:active,
+  [role="button"]:active,
+  .settings-item:active,
+  .more-item:active,
+  .detail-row:active{
+    transform:scale(var(--retra-press-scale));
+  }
+  /* Avoid expensive blur while a finger is interacting with dense menus. */
+  .settings-menu,
+  .detail-list,
+  .selection-modal-card{
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+}
+.modal-backdrop.open{
+  overscroll-behavior:contain;
+}
+.selection-modal-card,
+.category-modal-card,
+.confirm-modal-card,
+.rom-card-actions-sheet{
+  max-width:min(94vw, 520px);
+}
+.toast{
+  width:max-content;
+  min-width:0;
+  max-width:min(calc(100vw - 36px), 420px);
+  text-align:center;
+  padding:10px 16px;
+  overflow-wrap:anywhere;
+}
+@media (max-width:380px){
+  .modal-btn,
+  .text-action-btn{
+    min-height:46px;
+  }
+}
+@media (prefers-contrast:more){
+  .settings-item,
+  .more-item,
+  .detail-row,
+  .frequency-option,
+  .selection-modal-card,
+  .category-modal-card{
+    border-color:color-mix(in srgb, var(--text) 34%, var(--line));
+  }
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a:focus-visible{
+    outline-width:3px;
+  }
+}
+
+/* v1.0.0 final Settings/About alignment polish */
+.section-label{
+  color:#78e8ee;
+  text-align:center;
+}
+
+/* Let the About frame background reach the full page edges while preserving
+   the existing inner content alignment. */
+#aboutSettingsPage .about-panel,
+#aboutPage .about-panel{
+  width:calc(100% + (var(--content-gutter) * 2));
+  max-width:none;
+  margin-left:calc(var(--content-gutter) * -1);
+  margin-right:calc(var(--content-gutter) * -1);
+  padding-left:calc(var(--content-gutter) + 8px);
+  padding-right:calc(var(--content-gutter) + 8px);
+  box-sizing:border-box;
+}
+
+/* v1.0.0 branding vertical alignment polish
+   Give the Retra mark a little more breathing room from the top edge on More
+   and both About entry points without changing the logo size. */
+#morePage .more-logo-wrap{
+  padding-top:16px;
+}
+
+#aboutSettingsPage .about-panel,
+#aboutPage .about-panel{
+  padding-top:34px;
+}
