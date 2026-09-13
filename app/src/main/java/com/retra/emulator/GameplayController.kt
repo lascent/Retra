@@ -336,7 +336,7 @@ internal fun MainActivity.renderStateScreen(dialog: Dialog, saveMode: Boolean) {
 
         val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val name = TextView(this).apply {
-            text = saveStates.slotLabel(slot)
+            text = saveStates.displayLabel(slot, currentRomId)
             textSize = 19f
             setTextColor(Color.WHITE)
             setTypeface(typeface, Typeface.BOLD)
@@ -356,7 +356,7 @@ internal fun MainActivity.renderStateScreen(dialog: Dialog, saveMode: Boolean) {
             if (saveMode) {
                 if (state.exists()) {
                     AlertDialog.Builder(this)
-                        .setTitle("Overwrite ${saveStates.slotLabel(slot)}?")
+                        .setTitle("Overwrite ${saveStates.displayLabel(slot, currentRomId)}?")
                         .setMessage("The existing save state in this slot will be replaced.")
                         .setNegativeButton("Cancel", null)
                         .setPositiveButton("Overwrite") { _, _ ->
@@ -370,7 +370,7 @@ internal fun MainActivity.renderStateScreen(dialog: Dialog, saveMode: Boolean) {
                 }
             } else {
                 if (!state.exists()) {
-                    RetraNotice.makeText(this, "${saveStates.slotLabel(slot)} is empty", RetraNotice.LENGTH_SHORT).show()
+                    RetraNotice.makeText(this, "${saveStates.displayLabel(slot, currentRomId)} is empty", RetraNotice.LENGTH_SHORT).show()
                 } else if (loadStateFromSlot(slot)) {
                     dialog.dismiss()
                 }
@@ -379,20 +379,20 @@ internal fun MainActivity.renderStateScreen(dialog: Dialog, saveMode: Boolean) {
 
         row.setOnLongClickListener {
             if (!state.exists()) {
-                RetraNotice.makeText(this, "${saveStates.slotLabel(slot)} is empty", RetraNotice.LENGTH_SHORT).show()
+                RetraNotice.makeText(this, "${saveStates.displayLabel(slot, currentRomId)} is empty", RetraNotice.LENGTH_SHORT).show()
                 return@setOnLongClickListener true
             }
 
             AlertDialog.Builder(this)
-                .setTitle("Delete ${saveStates.slotLabel(slot)}?")
+                .setTitle("Delete ${saveStates.displayLabel(slot, currentRomId)}?")
                 .setMessage("This save state will be permanently deleted.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Delete") { _, _ ->
                     if (deleteRomSaveStateInternal(currentRomId, slot)) {
-                        RetraNotice.makeText(this, "${saveStates.slotLabel(slot)} deleted", RetraNotice.LENGTH_SHORT).show()
+                        RetraNotice.makeText(this, "${saveStates.displayLabel(slot, currentRomId)} deleted", RetraNotice.LENGTH_SHORT).show()
                         renderStateScreen(dialog, saveMode)
                     } else {
-                        RetraNotice.makeText(this, "Could not delete ${saveStates.slotLabel(slot)}", RetraNotice.LENGTH_SHORT).show()
+                        RetraNotice.makeText(this, "Could not delete ${saveStates.displayLabel(slot, currentRomId)}", RetraNotice.LENGTH_SHORT).show()
                     }
                 }
                 .show()
@@ -461,8 +461,8 @@ internal fun MainActivity.saveStateToSlot(
     if (showNotice) {
         RetraNotice.makeText(
             this,
-            if (ok) (successMessage ?: "${saveStates.slotLabel(slot)} saved")
-            else (failureMessage ?: "Could not save ${saveStates.slotLabel(slot)}"),
+            if (ok) (successMessage ?: "${saveStates.displayLabel(slot, currentRomId)} saved")
+            else (failureMessage ?: "Could not save ${saveStates.displayLabel(slot, currentRomId)}"),
             RetraNotice.LENGTH_SHORT
         ).show()
     }
@@ -490,8 +490,8 @@ internal fun MainActivity.loadStateFromSlot(
     if (showNotice) {
         RetraNotice.makeText(
             this,
-            if (ok) (successMessage ?: "${saveStates.slotLabel(slot)} loaded")
-            else (failureMessage ?: "Could not load ${saveStates.slotLabel(slot)}"),
+            if (ok) (successMessage ?: "${saveStates.displayLabel(slot, currentRomId)} loaded")
+            else (failureMessage ?: "Could not load ${saveStates.displayLabel(slot, currentRomId)}"),
             RetraNotice.LENGTH_SHORT
         ).show()
     }
@@ -521,6 +521,25 @@ internal fun MainActivity.saveStateThumbnail(slot: Int) {
         if (scaled !== source) scaled.recycle()
         source.recycle()
     }
+}
+
+/**
+ * Persist the current single-player session into the real Quick slot before the
+ * app leaves the foreground. This is intentionally silent: Home/Recents/device
+ * lifecycle events must not create a toast while Retra is disappearing.
+ *
+ * The existing Auto save & load toggle owns this automatic behavior. A manual
+ * Quick Save remains available regardless of that preference. Local/Remote Link
+ * sessions are excluded because a single-core state is not a valid paired state.
+ */
+internal fun MainActivity.saveLifecycleQuickStateIfEnabled(): Boolean {
+    if (!romLoaded || lifecycleQuickSaveCompletedForForeground) return lifecycleQuickSaveCompletedForForeground
+    if (!prefs.getBoolean(MainActivity.AUTO_SAVE_LOAD_PREF, true)) return false
+    if (localLinkActive || remoteTransport.isActive) return false
+
+    val saved = saveStateToSlot(0, showNotice = false)
+    if (saved) lifecycleQuickSaveCompletedForForeground = true
+    return saved
 }
 
 internal fun MainActivity.quickSave() {

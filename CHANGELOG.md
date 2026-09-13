@@ -2,6 +2,12 @@
 
 ## v1.0.1 — 2026-09-13 — Backup, restore, storage, and audio polish
 
+### Appearance — reference-driven Light mode
+- Updated every Appearance palette with a dedicated Light variant based on the supplied Mihon light-theme references while preserving Retra's own layout and branding.
+- Light/System mode now carries the selected palette through the app background, surfaces, navigation, Settings cards, accents, switches, and selected-mode segment instead of using one generic light scheme.
+- Theme preview cards now switch to light previews whenever Light mode (or System resolving to light) is active.
+- Added a matching Light variant for Retra's Aurora Mint palette and regression coverage for all light themes.
+
 ### Controller responsiveness and input latency
 - Added pointer-owned, drift-tolerant low-latency touch handling for A/B and other native gameplay buttons.
 - Added native rising-edge input latching so sub-frame taps cannot disappear between mGBA input polls.

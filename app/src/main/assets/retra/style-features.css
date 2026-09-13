@@ -445,19 +445,22 @@ body[data-resolved-mode="light"] .recent-saves-empty{
 }
 
 
-/* v4.19 Recent Saves play icon fix — use a true right-facing play glyph. */
+/* v4.19 Recent Saves play icon polish — keep button size, enlarge only the glyph. */
 #detailEntries .entry-download{
+  width:42px;
+  height:42px;
+  border-radius:50%;
   display:grid;
   place-items:center;
   padding:0;
 }
 #detailEntries .entry-download .recent-save-play-icon{
-  width:20px;
-  height:20px;
+  width:27px;
+  height:27px;
   display:block;
   fill:currentColor;
   stroke:none;
-  transform:translateX(1px);
+  transform:translateX(-0.8px);
 }
 
 /* v4.22 Library Add ROM FAB pressed/focus color fix
@@ -700,4 +703,44 @@ body.subpage-open main{
      visually trapped against the system navigation area. */
   padding-bottom:calc(28px + var(--device-safe-bottom));
   box-sizing:border-box;
+}
+
+
+/* v4.47 Light-mode dialog readability fix — keep confirm/category dialogs bright
+   and high-contrast even when the translucent appearance flag is enabled. */
+body[data-resolved-mode="light"] .category-modal-card .modal-title,
+body[data-resolved-mode="light"] .confirm-modal-card .modal-title,
+body[data-resolved-mode="light"] .category-modal-card h3,
+body[data-resolved-mode="light"] .confirm-modal-card h3{
+  color:#1f2538;
+  text-shadow:none;
+}
+
+body[data-resolved-mode="light"] .category-modal-card .modal-copy,
+body[data-resolved-mode="light"] .confirm-modal-card .modal-copy,
+body[data-resolved-mode="light"] .category-modal-card p,
+body[data-resolved-mode="light"] .confirm-modal-card p{
+  color:rgba(44,50,73,.84);
+}
+
+body[data-resolved-mode="light"] .modal-btn.secondary{
+  background:rgba(255,255,255,.92);
+  border-color:rgba(31,35,58,.14);
+  color:#20263a;
+  box-shadow:0 10px 24px rgba(28,34,54,.08), inset 0 1px 0 rgba(255,255,255,.82);
+}
+
+body[data-resolved-mode="light"] .modal-btn.secondary:active{
+  background:rgba(247,248,252,.96);
+}
+
+body[data-resolved-mode="light"][data-translucent="true"] .category-modal-card,
+body[data-resolved-mode="light"][data-translucent="true"] .confirm-modal-card,
+body[data-resolved-mode="light"] body[data-translucent="true"] .category-modal-card,
+body[data-resolved-mode="light"] body[data-translucent="true"] .confirm-modal-card{
+  background:linear-gradient(180deg, rgba(248,245,248,.98) 0%, rgba(241,236,240,.99) 100%);
+  border-color:rgba(15,18,34,.08);
+  box-shadow:0 24px 58px rgba(30,34,54,.18), inset 0 1px 0 rgba(255,255,255,.52);
+  backdrop-filter:blur(calc(var(--glass-blur) + 4px)) saturate(110%);
+  -webkit-backdrop-filter:blur(calc(var(--glass-blur) + 4px)) saturate(110%);
 }

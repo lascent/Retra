@@ -165,6 +165,9 @@ class MainActivity : AppCompatActivity() {
     internal var gameplayMenuBackHandler: (() -> Unit)? = null
     internal var gameplayModalPauseActive = false
     internal var inGameSettingsActive = false
+    // One lifecycle Quick Save per foreground gameplay session. Reset on resume;
+    // if a save attempt fails, onStop/onDestroy may retry before the process exits.
+    internal var lifecycleQuickSaveCompletedForForeground = false
     internal var currentPlatform = PLATFORM_GBA
     internal var preferredOrientationValue = "Auto rotate"
     internal var preferredButtonsOpacity = 1f
@@ -840,6 +843,19 @@ class MainActivity : AppCompatActivity() {
 
     internal fun jsQuote(value: String): String = JSONObject.quote(value)
 
+    override fun onUserLeaveHint() {
+        // Home/Recents can be followed by an aggressive process kill. Capture
+        // Quick while the core is still fully alive, before onPause stops it.
+        if (::binding.isInitialized &&
+            romLoaded &&
+            binding.emulatorOverlay.visibility == View.VISIBLE &&
+            !isChangingConfigurations
+        ) {
+            saveLifecycleQuickStateIfEnabled()
+        }
+        super.onUserLeaveHint()
+    }
+
     override fun onPause() {
         if (::binding.isInitialized) shaderController.onPause()
         if (::binding.isInitialized && binding.emulatorOverlay.visibility == View.VISIBLE) {
@@ -851,7 +867,12 @@ class MainActivity : AppCompatActivity() {
             // RemoteLinkTransport owns the pause packet and paired-core suspension.
             remoteTransport.pauseForLifecycle()
         }
-        if (binding.emulatorOverlay.visibility == View.VISIBLE) {
+        if (::binding.isInitialized && binding.emulatorOverlay.visibility == View.VISIBLE) {
+            if (romLoaded && !isChangingConfigurations) {
+                // Safety Quick Save is silent and shares the existing Auto save & load
+                // preference. The dedicated auto-resume state is still written below.
+                saveLifecycleQuickStateIfEnabled()
+            }
             if (romLoaded && gameplayMenuDialog?.isShowing != true && !inGameSettingsActive && !remoteTransport.isActive) {
                 saveAutoStateIfEnabled()
             }
@@ -863,8 +884,22 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    override fun onStop() {
+        // Fallback for Recents removal / normal shutdown paths. Usually onPause
+        // already saved Quick, so this is a no-op unless that attempt failed.
+        if (::binding.isInitialized &&
+            romLoaded &&
+            binding.emulatorOverlay.visibility == View.VISIBLE &&
+            !isChangingConfigurations
+        ) {
+            saveLifecycleQuickStateIfEnabled()
+        }
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
+        lifecycleQuickSaveCompletedForForeground = false
         if (::binding.isInitialized) shaderController.onResume()
         if (::displayPerformanceManager.isInitialized) displayPerformanceManager.applyPreferredMode()
         if (!romLoaded) artworkRepository.resumeDeferred()
@@ -886,6 +921,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         try { remoteAttemptCloser?.invoke() } catch (_: Exception) {}
+        if (!isChangingConfigurations && romLoaded) {
+            // Last lifecycle fallback before the native core is torn down. This
+            // helps normal task removal and orderly shutdown/restart.
+            saveLifecycleQuickStateIfEnabled()
+        }
         if (::remoteTransport.isInitialized) remoteTransport.close(sendDisconnect = false)
         gameplayMenuDialog?.setOnDismissListener(null)
         gameplayMenuDialog?.dismiss()
@@ -1049,6 +1089,13 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun deleteRomSaveState(romId: String, slot: Int): Boolean =
             deleteRomSaveStateInternal(romId, slot)
+
+        @JavascriptInterface
+        fun renameRomSaveState(romId: String, slot: Int, label: String): Boolean {
+            val renamed = saveStates.rename(romId, slot, label)
+            if (renamed) notifySaveStatesChanged(romId)
+            return renamed
+        }
 
         @JavascriptInterface
         fun importRom() {

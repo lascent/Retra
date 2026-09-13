@@ -14,6 +14,49 @@ class SaveStateRepository(
 ) {
     fun slotLabel(slot: Int): String = if (slot == 0) "Quick" else "Slot $slot"
 
+    private fun readMetadata(slot: Int, romId: String): JSONObject? {
+        val file = metadataFile(slot, romId)
+        if (!file.exists() || file.length() <= 0L) return null
+        return runCatching { JSONObject(file.readText()) }.getOrNull()
+    }
+
+    fun displayLabel(slot: Int, romId: String): String {
+        if (slot == 0) return "Quick"
+        val custom = readMetadata(slot, romId)?.optString("label", "")?.trim().orEmpty()
+        return custom.ifBlank { slotLabel(slot) }
+    }
+
+    fun rename(romId: String, slot: Int, requestedLabel: String): Boolean {
+        if (romId.isBlank() || slot !in 1..10) return false
+        val state = stateFile(slot, romId)
+        if (!state.exists() || state.length() <= 0L) return false
+
+        val normalized = requestedLabel.trim().replace(Regex("\\s+"), " ").take(32)
+        if (normalized.isBlank()) return false
+
+        val previous = readMetadata(slot, romId)
+        val metadata = JSONObject()
+            .put("schemaVersion", 2)
+            .put("romId", romId)
+            .put("contentHash", previous?.optString("contentHash", "")
+                ?.takeIf { it.isNotBlank() }
+                ?: (prefs.getString("content_hash_$romId", "") ?: ""))
+            .put("platform", previous?.optString("platform", "")
+                ?.takeIf { it.isNotBlank() }
+                ?: (prefs.getString("system_$romId", "") ?: ""))
+            .put("coreVersion", previous?.optString("coreVersion", "")
+                ?.takeIf { it.isNotBlank() }
+                ?: runCatching { coreVersion() }.getOrDefault("mGBA"))
+            .put("slot", slot)
+            .put("createdAt", previous?.optLong("createdAt", 0L)?.takeIf { it > 0L } ?: state.lastModified())
+            .put("label", normalized)
+
+        return runCatching {
+            fileOps.atomicWriteText(metadataFile(slot, romId), metadata.toString())
+            true
+        }.getOrDefault(false)
+    }
+
     fun stateFile(slot: Int, romId: String): File {
         val name = if (slot == 0) "quick.ss" else "slot_${slot.toString().padStart(2, '0')}.ss"
         return File(directory(romId), name)
@@ -31,14 +74,17 @@ class SaveStateRepository(
 
     fun writeMetadata(slot: Int, romId: String) {
         if (romId.isBlank()) return
+        val previous = readMetadata(slot, romId)
+        val preservedLabel = if (slot == 0) "" else previous?.optString("label", "")?.trim().orEmpty()
         val metadata = JSONObject()
-            .put("schemaVersion", 1)
+            .put("schemaVersion", 2)
             .put("romId", romId)
             .put("contentHash", prefs.getString("content_hash_$romId", "") ?: "")
             .put("platform", prefs.getString("system_$romId", "") ?: "")
             .put("coreVersion", runCatching { coreVersion() }.getOrDefault("mGBA"))
             .put("slot", slot)
             .put("createdAt", System.currentTimeMillis())
+        if (preservedLabel.isNotBlank()) metadata.put("label", preservedLabel)
         fileOps.atomicWriteText(metadataFile(slot, romId), metadata.toString())
     }
 
@@ -72,7 +118,7 @@ class SaveStateRepository(
             val modifiedAt = state.lastModified()
             val item = JSONObject()
                 .put("slot", slot)
-                .put("label", slotLabel(slot))
+                .put("label", displayLabel(slot, romId))
                 .put("modifiedAt", modifiedAt)
                 .put("size", state.length())
                 .put("hasThumbnail", thumbnailFile(slot, romId).exists())

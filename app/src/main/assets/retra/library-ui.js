@@ -619,6 +619,17 @@ function openSubPage(pageId){
 let suppressRecentSaveClickUntil = 0;
 const recentSaveLongPressMs = 560;
 const recentSaveMoveTolerance = 12;
+const recentSaveActionsModal = document.getElementById('recentSaveActionsModal');
+const recentSaveActionsTitle = document.getElementById('recentSaveActionsTitle');
+const recentSaveRenameAction = document.getElementById('recentSaveRenameAction');
+const recentSaveDeleteAction = document.getElementById('recentSaveDeleteAction');
+const closeRecentSaveActions = document.getElementById('closeRecentSaveActions');
+const recentSaveRenameModal = document.getElementById('recentSaveRenameModal');
+const recentSaveNameInput = document.getElementById('recentSaveNameInput');
+const cancelRecentSaveRename = document.getElementById('cancelRecentSaveRename');
+const saveRecentSaveRename = document.getElementById('saveRecentSaveRename');
+let pendingRecentSaveCard = null;
+let pendingRecentSave = null;
 
 function getNativeRomSaveStates(romId){
   if (!(window.AndroidBridge && typeof window.AndroidBridge.getRomSaveStates === 'function')) return null;
@@ -648,6 +659,104 @@ function formatRecentSaveTimestamp(timestamp){
     return date.toLocaleString();
   }
 }
+
+function closeRecentSaveActionsModal(){
+  recentSaveActionsModal?.classList.remove('open');
+  recentSaveActionsModal?.setAttribute('aria-hidden', 'true');
+}
+
+function openRecentSaveActions(card, save){
+  const slot = Number(save?.slot);
+  if (!Number.isInteger(slot) || slot < 0 || slot > 10) return;
+  pendingRecentSaveCard = card;
+  pendingRecentSave = save;
+  const label = String(save?.label || (slot === 0 ? 'Quick' : `Slot ${slot}`));
+  if (recentSaveActionsTitle) recentSaveActionsTitle.textContent = label;
+  if (recentSaveRenameAction) recentSaveRenameAction.hidden = slot === 0;
+  recentSaveActionsModal?.setAttribute('aria-hidden', 'false');
+  recentSaveActionsModal?.classList.add('open');
+}
+
+function closeRecentSaveRenameModal(){
+  recentSaveRenameModal?.classList.remove('open');
+}
+
+function openRecentSaveRenameModal(){
+  const card = pendingRecentSaveCard;
+  const save = pendingRecentSave;
+  const slot = Number(save?.slot);
+  if (!card || !save || !Number.isInteger(slot)) return;
+  if (slot === 0) {
+    closeRecentSaveActionsModal();
+    showToast('Quick Save cannot be renamed');
+    return;
+  }
+  const currentLabel = String(save?.label || `Slot ${slot}`);
+  closeRecentSaveActionsModal();
+  if (recentSaveNameInput) {
+    recentSaveNameInput.value = currentLabel;
+    setTimeout(() => {
+      recentSaveNameInput.focus();
+      recentSaveNameInput.select();
+    }, 80);
+  }
+  recentSaveRenameModal?.classList.add('open');
+}
+
+function commitRecentSaveRename(){
+  const card = pendingRecentSaveCard;
+  const save = pendingRecentSave;
+  const romId = String(card?.dataset?.romId || '');
+  const slot = Number(save?.slot);
+  const name = String(recentSaveNameInput?.value || '').trim().replace(/\s+/g, ' ').slice(0, 32);
+
+  if (!romId || !Number.isInteger(slot) || slot < 1 || slot > 10) {
+    showToast(slot === 0 ? 'Quick Save cannot be renamed' : 'Save state is unavailable');
+    return;
+  }
+  if (!name) {
+    showToast('Enter a save state name');
+    recentSaveNameInput?.focus();
+    return;
+  }
+  if (!(window.AndroidBridge && typeof window.AndroidBridge.renameRomSaveState === 'function')) {
+    showToast('Save-state renaming is only available in the Android build');
+    return;
+  }
+
+  let renamed = false;
+  try { renamed = Boolean(window.AndroidBridge.renameRomSaveState(romId, slot, name)); } catch (error) {}
+  if (!renamed) {
+    showToast('Could not rename save state');
+    return;
+  }
+
+  save.label = name;
+  closeRecentSaveRenameModal();
+  refreshRomRecentSaves(card);
+  showToast(`Renamed to ${name}`);
+}
+
+recentSaveRenameAction?.addEventListener('click', openRecentSaveRenameModal);
+recentSaveDeleteAction?.addEventListener('click', () => {
+  const card = pendingRecentSaveCard;
+  const save = pendingRecentSave;
+  closeRecentSaveActionsModal();
+  if (card && save) deleteRecentSave(card, save);
+});
+closeRecentSaveActions?.addEventListener('click', closeRecentSaveActionsModal);
+recentSaveActionsModal?.addEventListener('click', event => {
+  if (event.target === recentSaveActionsModal) closeRecentSaveActionsModal();
+});
+cancelRecentSaveRename?.addEventListener('click', closeRecentSaveRenameModal);
+saveRecentSaveRename?.addEventListener('click', commitRecentSaveRename);
+recentSaveRenameModal?.addEventListener('click', event => {
+  if (event.target === recentSaveRenameModal) closeRecentSaveRenameModal();
+});
+recentSaveNameInput?.addEventListener('keydown', event => {
+  if (event.key === 'Enter') commitRecentSaveRename();
+  if (event.key === 'Escape') closeRecentSaveRenameModal();
+});
 
 function deleteRecentSave(card, save){
   const romId = String(card?.dataset?.romId || '');
@@ -706,7 +815,7 @@ function bindRecentSaveLongPress(item, card, save){
       item.classList.remove('holding');
       item.classList.add('long-pressed');
       if (navigator.vibrate) navigator.vibrate(12);
-      deleteRecentSave(card, save);
+      openRecentSaveActions(card, save);
     }, recentSaveLongPressMs);
   });
 
@@ -735,7 +844,7 @@ function bindRecentSaveLongPress(item, card, save){
     event.preventDefault();
     clear();
     suppressRecentSaveClickUntil = Date.now() + 750;
-    deleteRecentSave(card, save);
+    openRecentSaveActions(card, save);
   });
 }
 
@@ -802,7 +911,7 @@ function refreshRomRecentSaves(card = currentRomCard){
       button.className = 'entry-download';
       button.type = 'button';
       button.setAttribute('aria-label', `Load ${title.textContent}`);
-      button.innerHTML = '<svg class="recent-save-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.6v10.8L17.8 12 8.5 6.6Z"/></svg>';
+      button.innerHTML = '<svg class="recent-save-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.7 6.8c0-1.02 1.12-1.64 1.98-1.1l6.75 4.22c.82.51.82 1.65 0 2.16l-6.75 4.22c-.86.54-1.98-.08-1.98-1.1V6.8Z"/></svg>';
       button.addEventListener('click', event => {
         event.stopPropagation();
         loadRecentSave(card, save);
@@ -830,7 +939,8 @@ function openRomDetail(card){
   detailStatus.textContent = data.status || 'Ready to Play';
   detailSource.textContent = data.source || 'Local Library';
   detailSystem.textContent = data.system || 'GBA';
-  detailDescription.textContent = data.description || '';
+  detailDescription.textContent = '';
+  detailDescription.hidden = true;
 
   detailCover.src = coverSrc;
   detailCover.alt = coverSrc ? `${data.title || 'ROM'} cover` : '';

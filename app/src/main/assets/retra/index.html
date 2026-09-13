@@ -20,6 +20,7 @@
 <link href="style-safe-insets.css" rel="stylesheet"/>
 <link href="style-motion-performance.css" rel="stylesheet"/>
 <link href="style-appearance-accent.css" rel="stylesheet"/>
+<link href="style-appearance-light.css" rel="stylesheet"/>
 <link href="style-scroll-performance.css" rel="stylesheet"/>
 </head>
 <body>
@@ -922,7 +923,7 @@
 <div class="detail-row"><div><strong>Automatic game artwork</strong><span>Find and cache matching covers in the background</span></div><label class="switch"><input checked="" id="automaticArtworkToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-row"><div><strong>Artwork on Wi-Fi only</strong><span>Reduce mobile-data use for automatic cover downloads</span></div><label class="switch"><input id="artworkWifiOnlyToggle" type="checkbox"/><span class="slider"></span></label></div>
 <button class="detail-row tappable" id="retryArtworkBtn"><div><strong>Retry missing artwork</strong><span>Search again for ROMs that still use fallback colors</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
-<div class="detail-row"><div><strong>Auto save &amp; load</strong><span>Auto-save on exit/background and restore it on next launch</span></div><label class="switch"><input checked="" id="autoSaveLoadToggle" type="checkbox"/><span class="slider"></span></label></div>
+<div class="detail-row"><div><strong>Auto save &amp; load</strong><span>Quick-save on background/exit and keep automatic resume available on next launch</span></div><label class="switch"><input checked="" id="autoSaveLoadToggle" type="checkbox"/><span class="slider"></span></label></div>
 <button class="detail-row tappable" id="fastForwardSpeedBtn">
 <div>
 <strong>Emulation speed</strong>
@@ -1220,6 +1221,45 @@
 </button>
 </div>
 <button class="rom-card-actions-cancel" id="closeRomCardActions" type="button">Cancel</button>
+</div>
+</div>
+<!-- RECENT SAVE ACTIONS -->
+<div class="modal-backdrop rom-card-actions-backdrop" id="recentSaveActionsModal" aria-hidden="true">
+<div class="rom-card-actions-sheet" role="dialog" aria-modal="true" aria-labelledby="recentSaveActionsTitle">
+<div class="rom-card-actions-handle" aria-hidden="true"></div>
+<div class="rom-card-actions-header">
+<div class="rom-card-actions-copy">
+<span>SAVE STATE</span>
+<strong id="recentSaveActionsTitle">Save state</strong>
+</div>
+</div>
+<div class="rom-card-actions-list">
+<button class="rom-card-action-row" id="recentSaveRenameAction" type="button">
+<span class="rom-card-action-icon" aria-hidden="true">
+<svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"></path></svg>
+</span>
+<span class="rom-card-action-copy"><strong>Rename</strong><small>Change this save state's display name</small></span>
+</button>
+<button class="rom-card-action-row danger" id="recentSaveDeleteAction" type="button">
+<span class="rom-card-action-icon" aria-hidden="true">
+<svg viewBox="0 0 24 24"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg>
+</span>
+<span class="rom-card-action-copy"><strong>Delete</strong><small>Permanently remove this save state</small></span>
+</button>
+</div>
+<button class="rom-card-actions-cancel" id="closeRecentSaveActions" type="button">Cancel</button>
+</div>
+</div>
+<!-- RECENT SAVE RENAME MODAL -->
+<div class="modal-backdrop" id="recentSaveRenameModal">
+<div class="category-modal-card">
+<h3 class="modal-title">Rename save state</h3>
+<p class="modal-copy">This name is shown in Recent saves and Menu → Load state.</p>
+<input aria-label="Save state name" autocomplete="off" id="recentSaveNameInput" maxlength="32" placeholder="Save state name" type="text"/>
+<div class="modal-actions">
+<button class="modal-btn secondary" id="cancelRecentSaveRename" type="button">Cancel</button>
+<button class="modal-btn primary" id="saveRecentSaveRename" type="button">Rename</button>
+</div>
 </div>
 </div>
 <!-- CONFIRM MODAL -->

@@ -1,0 +1,371 @@
+/* Retra v1.0.1 — reference-driven Light appearance pass
+   Light mode is not a generic white wash: every Appearance palette owns its
+   page surface, accent, selected-mode fill, and preview treatment. System mode
+   automatically gets the same palette whenever Android resolves to light. */
+
+/* Reference-inspired light tokens. These are intentionally Retra-native rather
+   than a screen-for-screen copy: the palette relationships come from the
+   supplied light-mode references while Retra keeps its own layout and shapes. */
+body[data-resolved-mode="light"][data-theme="default"]{
+  --light-page:#fdfbfe; --light-surface:#ffffff; --light-surface-2:#f3f6ff;
+  --light-text:#252329; --light-muted:#6f6a75;
+  --accent:#0158cb; --accent-soft:rgba(1,88,203,.12); --cyan:#0158cb;
+  --light-mode-selected-bg:#d9e2ff; --light-mode-selected-fg:#0b57d0;
+}
+body[data-resolved-mode="light"][data-theme="dynamic"]{
+  --light-page:#fff9f3; --light-surface:#fffdf8; --light-surface-2:#f8eee0;
+  --light-text:#2e281f; --light-muted:#746a5d;
+  --accent:#7a590c; --accent-soft:rgba(122,89,12,.13); --cyan:#7a590c;
+  --light-mode-selected-bg:#f6e0bb; --light-mode-selected-fg:#70530c;
+}
+body[data-resolved-mode="light"][data-theme="catppuccin"]{
+  --light-page:#e6e9f0; --light-surface:#f3f5fa; --light-surface-2:#dfe3ec;
+  --light-text:#343846; --light-muted:#697083;
+  --accent:#8939f0; --accent-soft:rgba(137,57,240,.12); --cyan:#2f9f94;
+  --light-mode-selected-bg:#cdcfdB; --light-mode-selected-fg:#7a35d8;
+}
+body[data-resolved-mode="light"][data-theme="green-apple"]{
+  --light-page:#f5fbf1; --light-surface:#fbfff8; --light-surface-2:#e6f2e2;
+  --light-text:#17311f; --light-muted:#607365;
+  --accent:#015927; --accent-soft:rgba(1,89,39,.12); --cyan:#087b38;
+  --light-mode-selected-bg:#96f7a8; --light-mode-selected-fg:#005523;
+}
+body[data-resolved-mode="light"][data-theme="lavender"]{
+  --light-page:#ede2ff; --light-surface:#f6efff; --light-surface-2:#e2d3f6;
+  --light-text:#4d2f78; --light-muted:#8068a0;
+  --accent:#6c40c7; --accent-soft:rgba(108,64,199,.14); --cyan:#6c40c7;
+  --light-mode-selected-bg:#c9b0e7; --light-mode-selected-fg:#6c40c7;
+}
+body[data-resolved-mode="light"][data-theme="midnight-dusk"]{
+  --light-page:#fffbff; --light-surface:#fff7fb; --light-surface-2:#f8e7ef;
+  --light-text:#3b2630; --light-muted:#765f69;
+  --accent:#ba0052; --accent-soft:rgba(186,0,82,.11); --cyan:#337a24;
+  --light-mode-selected-bg:#efbad4; --light-mode-selected-fg:#a50049;
+}
+body[data-resolved-mode="light"][data-theme="nord"]{
+  --light-page:#eceff4; --light-surface:#f6f8fb; --light-surface-2:#dfe5ec;
+  --light-text:#2f3947; --light-muted:#667385;
+  --accent:#5e81ab; --accent-soft:rgba(94,129,171,.14); --cyan:#5e81ab;
+  --light-mode-selected-bg:#92b4d7; --light-mode-selected-fg:#385f8c;
+}
+body[data-resolved-mode="light"][data-theme="strawberry-daiquiri"]{
+  --light-page:#fafafa; --light-surface:#ffffff; --light-surface-2:#f7e9ed;
+  --light-text:#2d2024; --light-muted:#735e65;
+  --accent:#b50040; --accent-soft:rgba(181,0,64,.11); --cyan:#b50040;
+  --light-mode-selected-bg:#d53855; --light-mode-selected-fg:#ffffff;
+}
+body[data-resolved-mode="light"][data-theme="tako"]{
+  --light-page:#f7f5ff; --light-surface:#fcfaff; --light-surface-2:#e9e4ef;
+  --light-text:#3d3447; --light-muted:#766b80;
+  --accent:#67577e; --accent-soft:rgba(103,87,126,.13); --cyan:#4f8f96;
+  --light-mode-selected-bg:#c9becf; --light-mode-selected-fg:#5f506f;
+}
+body[data-resolved-mode="light"][data-theme="teal-turquoise"]{
+  --light-page:#fafafa; --light-surface:#ffffff; --light-surface-2:#e7f1f0;
+  --light-text:#203031; --light-muted:#607273;
+  --accent:#008183; --accent-soft:rgba(0,129,131,.12); --cyan:#008183;
+  --light-mode-selected-bg:#cfe5e3; --light-mode-selected-fg:#007678;
+}
+body[data-resolved-mode="light"][data-theme="tidal-wave"]{
+  --light-page:#fdfbff; --light-surface:#ffffff; --light-surface-2:#e8f5fb;
+  --light-text:#17333d; --light-muted:#5d7580;
+  --accent:#006780; --accent-soft:rgba(0,103,128,.12); --cyan:#006780;
+  --light-mode-selected-bg:#9ae1ff; --light-mode-selected-fg:#005e75;
+}
+body[data-resolved-mode="light"][data-theme="yin-yang"]{
+  --light-page:#fdfdfd; --light-surface:#ffffff; --light-surface-2:#eeeeee;
+  --light-text:#111111; --light-muted:#666666;
+  --accent:#000000; --accent-soft:rgba(0,0,0,.09); --cyan:#000000;
+  --light-mode-selected-bg:#dddddd; --light-mode-selected-fg:#111111;
+}
+body[data-resolved-mode="light"][data-theme="yotsuba"]{
+  --light-page:#fcfcfc; --light-surface:#fffdfa; --light-surface-2:#f6e8e2;
+  --light-text:#33251f; --light-muted:#75665f;
+  --accent:#ae3200; --accent-soft:rgba(174,50,0,.11); --cyan:#ae3200;
+  --light-mode-selected-bg:#ebcdc2; --light-mode-selected-fg:#983000;
+}
+body[data-resolved-mode="light"][data-theme="tokyo-night"]{
+  --light-page:#e1e2e7; --light-surface:#eef2f7; --light-surface-2:#d1d9e4;
+  --light-text:#2e3d55; --light-muted:#60718b;
+  --accent:#2f7de9; --accent-soft:rgba(47,125,233,.13); --cyan:#2f7de9;
+  --light-mode-selected-bg:#a9c7d2; --light-mode-selected-fg:#256bc9;
+}
+body[data-resolved-mode="light"][data-theme="monochrome"]{
+  --light-page:#ffffff; --light-surface:#ffffff; --light-surface-2:#efefef;
+  --light-text:#111111; --light-muted:#656565;
+  --accent:#000000; --accent-soft:rgba(0,0,0,.09); --cyan:#000000;
+  --light-mode-selected-bg:#888888; --light-mode-selected-fg:#ffffff;
+}
+body[data-resolved-mode="light"][data-theme="aurora-mint"]{
+  --light-page:#f2fbf8; --light-surface:#fbfffd; --light-surface-2:#dff3ed;
+  --light-text:#18352f; --light-muted:#60766f;
+  --accent:#167c6e; --accent-soft:rgba(22,124,110,.12); --cyan:#167c6e;
+  --light-mode-selected-bg:#cbeee4; --light-mode-selected-fg:#116f63;
+}
+
+/* Apply the selected light palette throughout Retra. */
+body[data-resolved-mode="light"]{
+  --bg:var(--light-page,#fdfbfe);
+  --panel:var(--light-surface,#ffffff);
+  --panel-2:var(--light-surface-2,#f1f3f7);
+  --text:var(--light-text,#252329);
+  --muted:var(--light-muted,#6f6a75);
+  --line:color-mix(in srgb, var(--text) 18%, transparent);
+  --danger:#b3261e;
+
+  --body-glow:color-mix(in srgb, var(--accent) 7%, transparent);
+  --body-start:var(--light-page,#fdfbfe);
+  --body-end:var(--light-page,#fdfbfe);
+  --shell-start:var(--light-page,#fdfbfe);
+  --shell-end:var(--light-page,#fdfbfe);
+  --shell-border:color-mix(in srgb, var(--text) 10%, transparent);
+  --shell-outline:color-mix(in srgb, var(--light-page,#fdfbfe) 80%, #b9bdc5 20%);
+
+  --header-1:color-mix(in srgb, var(--light-page,#fdfbfe) 94%, white 6%);
+  --header-2:color-mix(in srgb, var(--light-page,#fdfbfe) 97%, white 3%);
+  --header-3:color-mix(in srgb, var(--light-page,#fdfbfe) 91%, transparent);
+
+  --glass-bg:color-mix(in srgb, var(--light-surface,#fff) 91%, transparent);
+  --glass-bg-2:color-mix(in srgb, var(--light-surface-2,#f1f3f7) 95%, transparent);
+  --chip-bg:color-mix(in srgb, var(--light-surface,#fff) 86%, transparent);
+  --nav-bg:color-mix(in srgb, var(--light-page,#fdfbfe) 96%, white 4%);
+  --nav-text:var(--light-muted,#6f6a75);
+  --nav-active-text:var(--accent);
+  --nav-active-bg:var(--accent-soft);
+  --on-accent:#ffffff;
+}
+
+/* Selected System/Light/Dark segment follows each palette's real light tone. */
+body[data-resolved-mode="light"] #appearanceSettingsPage .theme-mode-toggle{
+  background:color-mix(in srgb, var(--light-surface,#fff) 70%, transparent);
+  border-color:color-mix(in srgb, var(--text) 42%, transparent);
+}
+body[data-resolved-mode="light"] #appearanceSettingsPage .theme-mode-option{
+  color:var(--text);
+  border-right-color:color-mix(in srgb, var(--text) 22%, transparent);
+}
+body[data-resolved-mode="light"] #appearanceSettingsPage .theme-mode-option.active{
+  background:var(--light-mode-selected-bg,var(--accent-soft)) !important;
+  color:var(--light-mode-selected-fg,var(--accent)) !important;
+}
+
+/* Light preview cards: the preview strip itself changes with mode, so users can
+   see how every palette will look before selecting it. */
+body[data-resolved-mode="light"] .theme-preview-shell{
+  background:#f9f9fb;
+  border-color:#d0d3dc;
+  box-shadow:inset 0 -10px 22px rgba(30,35,45,.06);
+}
+body[data-resolved-mode="light"] .theme-preview-top{ background:#17171b; }
+body[data-resolved-mode="light"] .theme-preview-body{
+  background:#d1ced8;
+  box-shadow:none;
+}
+body[data-resolved-mode="light"] .theme-preview-bar{ background:#85838b; }
+
+body[data-resolved-mode="light"] .dynamic-shell{background:#fff8ed;border-color:#ded3c1}body[data-resolved-mode="light"] .dynamic-top{background:#2a241c}body[data-resolved-mode="light"] .dynamic-body{background:#d5cbbb}body[data-resolved-mode="light"] .dynamic-dot{background:#8a650f}
+body[data-resolved-mode="light"] .cat-shell{background:#edf0f6;border-color:#c8ced9}body[data-resolved-mode="light"] .cat-top{background:#303543}body[data-resolved-mode="light"] .cat-body{background:#c9cfda}body[data-resolved-mode="light"] .cat-dot{background:#8939f0}
+body[data-resolved-mode="light"] .green-shell{background:#f6fff2;border-color:#bdcbb9}body[data-resolved-mode="light"] .green-top{background:#142018}body[data-resolved-mode="light"] .green-body{background:#c8d2c5}body[data-resolved-mode="light"] .green-dot{background:#015927}
+body[data-resolved-mode="light"] .lavender-shell{background:#f1e6ff;border-color:#c9b8dd}body[data-resolved-mode="light"] .lavender-top{background:#211b26}body[data-resolved-mode="light"] .lavender-body{background:#cec4d8}body[data-resolved-mode="light"] .lavender-dot{background:#6c40c7}
+body[data-resolved-mode="light"] .dusk-shell{background:#fff8fc;border-color:#d8c8d1}body[data-resolved-mode="light"] .dusk-top{background:#211d22}body[data-resolved-mode="light"] .dusk-body{background:#d6cbd2}body[data-resolved-mode="light"] .dusk-dot{background:#ba0052}
+body[data-resolved-mode="light"] .nord-shell{background:#edf2f8;border-color:#cbd5e1}body[data-resolved-mode="light"] .nord-top{background:#313847}body[data-resolved-mode="light"] .nord-body{background:#cbd5e3}body[data-resolved-mode="light"] .nord-dot{background:#5e81ab}
+body[data-resolved-mode="light"] .strawberry-shell{background:#fffefe;border-color:#e1cbd2}body[data-resolved-mode="light"] .strawberry-top{background:#2b1818}body[data-resolved-mode="light"] .strawberry-body{background:#e4c0c1}body[data-resolved-mode="light"] .strawberry-dot{background:#b50040}
+body[data-resolved-mode="light"] .tako-shell{background:#f8f5ff;border-color:#d3cbd8}body[data-resolved-mode="light"] .tako-top{background:#211f25}body[data-resolved-mode="light"] .tako-body{background:#d1cbd5}body[data-resolved-mode="light"] .tako-dot{background:#67577e}
+body[data-resolved-mode="light"] .teal-shell{background:#fbffff;border-color:#c9dddc}body[data-resolved-mode="light"] .teal-top{background:#1a2324}body[data-resolved-mode="light"] .teal-body{background:#c9d4d2}body[data-resolved-mode="light"] .teal-dot{background:#008183}
+body[data-resolved-mode="light"] .tidal-shell{background:#f7fdff;border-color:#c7dce5}body[data-resolved-mode="light"] .tidal-top{background:#13262d}body[data-resolved-mode="light"] .tidal-body{background:#cbd8dd}body[data-resolved-mode="light"] .tidal-dot{background:#006780}
+body[data-resolved-mode="light"] .yin-shell{background:#ffffff;border-color:#c9c9c9}body[data-resolved-mode="light"] .yin-top{background:#111111}body[data-resolved-mode="light"] .yin-body{background:#dddddd}body[data-resolved-mode="light"] .yin-dot{background:#000000}body[data-resolved-mode="light"] .yin-bar{background:#777777}
+body[data-resolved-mode="light"] .yotsuba-shell{background:#fffaf7;border-color:#dfcec7}body[data-resolved-mode="light"] .yotsuba-top{background:#271a16}body[data-resolved-mode="light"] .yotsuba-body{background:#e0cac2}body[data-resolved-mode="light"] .yotsuba-dot{background:#ae3200}
+body[data-resolved-mode="light"] .tokyo-shell{background:#edf2fa;border-color:#bcc9da}body[data-resolved-mode="light"] .tokyo-top{background:#17263e}body[data-resolved-mode="light"] .tokyo-body{background:#c6d2e5}body[data-resolved-mode="light"] .tokyo-dot{background:#2f7de9}
+body[data-resolved-mode="light"] .mono-shell{background:#ffffff;border-color:#bcbcbc}body[data-resolved-mode="light"] .mono-top{background:#000000}body[data-resolved-mode="light"] .mono-body{background:#e6e6e6}body[data-resolved-mode="light"] .mono-dot{background:#000000}body[data-resolved-mode="light"] .mono-bar{background:#777777}
+body[data-resolved-mode="light"] .aurora-shell{background:#f3fffb;border-color:#bfdad2}body[data-resolved-mode="light"] .aurora-top{background:#142824}body[data-resolved-mode="light"] .aurora-body{background:#c9ddd7}body[data-resolved-mode="light"] .aurora-dot{background:#167c6e}
+
+/* Default card has no dedicated class in the markup. */
+body[data-resolved-mode="light"] .theme-preview-card[data-theme-name="Default"] .theme-preview-shell{background:#fbfbff;border-color:#ccd2df}
+body[data-resolved-mode="light"] .theme-preview-card[data-theme-name="Default"] .theme-preview-body{background:#d3d6df}
+body[data-resolved-mode="light"] .theme-preview-card[data-theme-name="Default"] .theme-preview-dot{background:#0158cb}
+
+/* Keep current-theme selection visible without turning the whole preview dark. */
+body[data-resolved-mode="light"] #appearanceSettingsPage .theme-preview-card.active .theme-preview-shell{
+  border-color:var(--accent) !important;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent), inset 0 -10px 22px rgba(30,35,45,.05) !important;
+}
+body[data-resolved-mode="light"] #appearanceSettingsPage .theme-preview-card.active .theme-preview-shell::after{
+  background:var(--accent);
+  color:#ffffff;
+}
+
+/* Make the rest of the Light UI inherit the palette instead of reverting to
+   hard-coded white/blue surfaces from the legacy generic light pass. */
+body[data-resolved-mode="light"] #settingsHomePage .settings-menu{
+  border-color:color-mix(in srgb,var(--text) 9%,transparent);
+  background:linear-gradient(180deg,var(--light-surface,#fff),color-mix(in srgb,var(--light-surface-2,#f1f3f7) 88%,var(--light-surface,#fff) 12%));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 14px 28px color-mix(in srgb,var(--accent) 7%,transparent);
+}
+body[data-resolved-mode="light"] #settingsHomePage .settings-item{
+  border-bottom-color:color-mix(in srgb,var(--text) 8%,transparent);
+}
+body[data-resolved-mode="light"] #settingsHomePage .settings-item:hover{
+  background:color-mix(in srgb,var(--accent) 5%,transparent);
+}
+body[data-resolved-mode="light"] #settingsHomePage .settings-item-icon{
+  background:color-mix(in srgb,var(--accent) 7%,transparent);
+  color:var(--accent);
+}
+body[data-resolved-mode="light"] #settingsHomePage .chevron,
+body[data-resolved-mode="light"] #settingsHomePage .version{
+  color:var(--muted);
+}
+body[data-resolved-mode="light"] .library-overflow-menu,
+body[data-resolved-mode="light"] .rom-overflow-menu,
+body[data-resolved-mode="light"] .toast{
+  background:color-mix(in srgb,var(--light-surface,#fff) 97%,transparent);
+  border-color:color-mix(in srgb,var(--text) 11%,transparent);
+  color:var(--text);
+}
+body[data-resolved-mode="light"] .icon-btn,
+body[data-resolved-mode="light"] .back-btn,
+body[data-resolved-mode="light"] .small-icon-btn{
+  background:color-mix(in srgb,var(--light-surface,#fff) 72%,transparent);
+}
+body[data-resolved-mode="light"] .bottom-nav{
+  border-top-color:color-mix(in srgb,var(--text) 9%,transparent);
+}
+
+/* Light mode keeps Pure Black disabled exactly as before; disabled treatment is
+   palette-neutral and remains readable on every supplied reference palette. */
+body[data-resolved-mode="light"] .appearance-disabled-row{ opacity:.46; }
+
+/* Keep ROM / ROM-hack titles readable on cover art in Light mode.
+   Mihon keeps the library card labels high-contrast even on bright artwork,
+   so Retra explicitly restores white title text plus a stronger bottom fade. */
+body[data-resolved-mode="light"] .cover-card::after{
+  background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.18) 20%, rgba(0,0,0,.88) 100%);
+}
+body[data-resolved-mode="light"] .cover-info strong{
+  color:#ffffff;
+  text-shadow:0 2px 12px rgba(0,0,0,.78), 0 0 1px rgba(0,0,0,.74);
+}
+body[data-resolved-mode="light"] .cover-info span{
+  color:rgba(255,255,255,.84);
+  text-shadow:0 2px 10px rgba(0,0,0,.72);
+}
+
+/* Keep ROM detail hero content readable in Light mode too.
+   The detail page still sits on top of real artwork, so the title and metadata
+   must stay high-contrast like Mihon instead of inheriting palette colors. */
+body[data-resolved-mode="light"] .rom-hero-overlay{
+  background:linear-gradient(180deg, rgba(10,12,20,.30) 0%, rgba(10,12,20,.74) 58%, rgba(10,12,20,.94) 100%);
+}
+body[data-resolved-mode="light"] .rom-meta h2{
+  color:#ffffff;
+  text-shadow:0 2px 14px rgba(0,0,0,.78), 0 0 1px rgba(0,0,0,.72);
+}
+body[data-resolved-mode="light"] .meta-line{
+  color:rgba(255,255,255,.96);
+  text-shadow:0 2px 10px rgba(0,0,0,.66);
+}
+body[data-resolved-mode="light"] .meta-line svg{
+  color:rgba(255,255,255,.92);
+}
+
+/* Statistics page needs true light-mode contrast instead of dark-theme values.
+   Use dark text/icons on bright statistic cards so every label remains legible. */
+body[data-resolved-mode="light"] #statisticsPage .stats-section h3,
+body[data-resolved-mode="light"] #statisticsPage .sub-header h2{
+  color:var(--text);
+}
+body[data-resolved-mode="light"] #statisticsPage .stats-panel,
+body[data-resolved-mode="light"] #statisticsPage .playtime-item{
+  border-color:color-mix(in srgb, var(--text) 8%, transparent);
+  background:linear-gradient(180deg, color-mix(in srgb,var(--light-surface,#fff) 98%, white 2%) 0%, color-mix(in srgb,var(--light-surface-2,#f1f3f7) 84%, var(--light-surface,#fff) 16%) 100%);
+  box-shadow:0 12px 26px rgba(35,41,58,.10);
+}
+body[data-resolved-mode="light"] #statisticsPage .stats-metric strong,
+body[data-resolved-mode="light"] #statisticsPage .playtime-copy strong{
+  color:var(--text);
+}
+body[data-resolved-mode="light"] #statisticsPage .stats-metric span,
+body[data-resolved-mode="light"] #statisticsPage .stats-empty-message,
+body[data-resolved-mode="light"] #statisticsPage .playtime-copy span{
+  color:var(--muted);
+}
+body[data-resolved-mode="light"] #statisticsPage .stats-icon,
+body[data-resolved-mode="light"] #statisticsPage .stats-icon svg{
+  color:var(--text);
+}
+body[data-resolved-mode="light"] #statisticsPage .playtime-cover,
+body[data-resolved-mode="light"] #statisticsPage .playtime-left img{
+  border-color:color-mix(in srgb, var(--text) 8%, transparent);
+}
+body[data-resolved-mode="light"] #statisticsPage .playtime-cover-placeholder{
+  color:color-mix(in srgb, var(--text) 76%, transparent);
+  background:color-mix(in srgb, var(--light-surface-2,#f1f3f7) 84%, white 16%);
+}
+
+/* Retra branding stays white by default in dark mode, but should render black
+   on the bright More/About pages when Light mode is active. */
+body[data-resolved-mode="light"] .more-logo,
+body[data-resolved-mode="light"] .about-logo{
+  filter:brightness(0) saturate(100%) drop-shadow(0 10px 24px rgba(35,41,58,.08));
+}
+
+/* Mihon-inspired separator contrast for Light mode.
+   Darker neutral dividers make grouped rows easier to scan without changing
+   Retra's card layout or introducing heavy black borders everywhere. */
+body[data-resolved-mode="light"] #morePage .more-card{
+  border-color:color-mix(in srgb, var(--text) 24%, transparent);
+}
+body[data-resolved-mode="light"] #morePage .more-toggle-row,
+body[data-resolved-mode="light"] #morePage .more-item{
+  border-bottom-color:color-mix(in srgb, var(--text) 24%, transparent);
+}
+body[data-resolved-mode="light"] #settingsHomePage .settings-menu{
+  border-color:color-mix(in srgb, var(--text) 18%, transparent);
+}
+body[data-resolved-mode="light"] #settingsHomePage .settings-item{
+  border-bottom-color:color-mix(in srgb, var(--text) 16%, transparent);
+}
+body[data-resolved-mode="light"] .detail-row,
+body[data-resolved-mode="light"] .detail-range-row{
+  border-bottom-color:color-mix(in srgb, var(--text) 16%, transparent);
+}
+body[data-resolved-mode="light"] .bottom-nav{
+  border-top-color:color-mix(in srgb, var(--text) 20%, transparent);
+}
+
+/* ROM detail genre/source chips need a visible surface in every Light palette.
+   Some themes made Local ROM / GBA blend into the page because genre-chip
+   inherited the nearly-white glass surface. Keep the treatment palette-aware
+   while giving it enough fill and border contrast to remain obvious. */
+body[data-resolved-mode="light"] .rom-detail-body .genre-chip{
+  color:var(--text);
+  background:color-mix(
+    in srgb,
+    var(--light-surface-2,#f1f3f7) 78%,
+    var(--accent) 22%
+  );
+  border-color:color-mix(in srgb, var(--accent) 28%, var(--text) 8%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.68),
+    0 2px 8px color-mix(in srgb, var(--accent) 7%, transparent);
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+
+/* Recent-saves play/load buttons also need a visible Light-mode treatment.
+   Some palette variants were too faint against the card surface, so use the
+   same accent-aware chip/button language as the detail chips. */
+body[data-resolved-mode="light"] #detailEntries .entry-download{
+  border-color:color-mix(in srgb, var(--accent) 28%, rgba(26,40,76,.10));
+  background:color-mix(in srgb, var(--accent-soft) 78%, var(--light-surface,#fff) 22%);
+  color:var(--accent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.72);
+}
+body[data-resolved-mode="light"] #detailEntries .entry-download:hover,
+body[data-resolved-mode="light"] #detailEntries .entry-download:active,
+body[data-resolved-mode="light"] #detailEntries .entry-download:focus,
+body[data-resolved-mode="light"] #detailEntries .entry-download:focus:not(:focus-visible){
+  border-color:color-mix(in srgb, var(--accent) 42%, rgba(26,40,76,.12));
+  background:color-mix(in srgb, var(--accent-soft) 92%, var(--light-surface,#fff) 8%);
+  color:var(--accent);
+}

@@ -475,15 +475,13 @@ main::-webkit-scrollbar{display:none}
   border-color:rgba(240,182,109,.14);
 }
 .rom-description{
-  margin:0 0 16px;
-  font-size:14px;
-  line-height:1.72;
-  color:#dce0f0;
+  display:none;
 }
 .chip-row{
   display:flex;
   flex-wrap:wrap;
   gap:10px;
+  margin-top:-4px;
   margin-bottom:24px;
 }
 .genre-chip{
