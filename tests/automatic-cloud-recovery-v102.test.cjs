@@ -68,7 +68,8 @@ test('Android Auto Backup is narrowed to portable Retra state', () => {
     assert.match(rules, /include domain="file" path="persistent_data\/"/);
     assert.match(rules, /include domain="file" path="datastore\/"/);
     assert.match(rules, /include domain="database" path="\."/);
-    assert.match(rules, /exclude domain="file" path="library_content\/"/);
-    assert.match(rules, /exclude domain="file" path="save_work\/"/);
+    // Explicit includes are an allowlist; unlisted ROM/working paths remain excluded.
+    assert.doesNotMatch(rules, /<exclude domain="file" path="library_content\/" \/>/);
+    assert.doesNotMatch(rules, /<exclude domain="file" path="save_work\/" \/>/);
   }
 });

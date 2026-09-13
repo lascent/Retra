@@ -1369,13 +1369,15 @@ restoreBackupBtn?.addEventListener('click', () => {
   }
 });
 
-restoreCloudBackupBtn?.addEventListener('click', () => {
-  if (window.AndroidBridge && typeof window.AndroidBridge.restoreFromGoogleDrive === 'function') {
-    window.AndroidBridge.restoreFromGoogleDrive();
-  } else {
-    showToast('Google Drive recovery is available in the Android app');
-  }
-});
+if (restoreCloudBackupBtn) {
+  restoreCloudBackupBtn.addEventListener('click', function () {
+    if (window.AndroidBridge && typeof window.AndroidBridge.restoreFromGoogleDrive === 'function') {
+      window.AndroidBridge.restoreFromGoogleDrive();
+    } else {
+      showToast('Google Drive recovery is available in the Android app');
+    }
+  });
+}
 
 window.retraBackupRestored = function(){
   try { refreshNativeSettings(); } catch (_) {}

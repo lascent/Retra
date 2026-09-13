@@ -2,17 +2,12 @@
 <full-backup-content>
     <!--
       Retra keeps Android Auto Backup intentionally compact so save recovery is
-      less likely to hit the platform quota. Only portable user state is opted
-      in: persistent saves/metadata, Preferences DataStore and the Room library
-      database. ROMs, BIOS, transient working saves, WebView/cache state and
-      cloud OAuth/session state are reconstructed or reauthorized instead.
+      less likely to hit the platform quota. Once explicit include rules are
+      present Android treats this file as an allowlist, so unlisted ROM, BIOS,
+      cache, temporary and working directories remain excluded automatically.
     -->
     <include domain="file" path="persistent_data/" />
     <include domain="file" path="datastore/" />
     <include domain="database" path="." />
     <include domain="sharedpref" path="retra_library.xml" />
-
-    <!-- Defense-in-depth documentation for paths that must never enter backup. -->
-    <exclude domain="file" path="library_content/" />
-    <exclude domain="file" path="save_work/" />
 </full-backup-content>

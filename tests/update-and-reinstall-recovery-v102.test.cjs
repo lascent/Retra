@@ -17,9 +17,12 @@ test('v1.0.2 is upgrade-safe and Android offers keep-data uninstall recovery', (
   assert.match(manifest, /android:hasFragileUserData="true"/);
   assert.match(manifest, /android:dataExtractionRules="@xml\/data_extraction_rules"/);
   assert.match(manifest, /android:fullBackupContent="@xml\/backup_rules"/);
-  assert.match(backupRules, /exclude domain="file" path="library_content\/"/);
-  assert.match(backupRules, /exclude domain="file" path="save_work\/"/);
-  assert.doesNotMatch(backupRules, /exclude domain="file" path="persistent_data\/"/);
+  assert.match(backupRules, /<include domain="file" path="persistent_data\/" \/>/);
+  assert.match(backupRules, /<include domain="file" path="datastore\/" \/>/);
+  // Explicit include rules are an allowlist: unlisted ROM/working paths stay excluded
+  // without invalid redundant <exclude> entries that Android Lint rejects.
+  assert.doesNotMatch(backupRules, /<exclude domain="file" path="library_content\/" \/>/);
+  assert.doesNotMatch(backupRules, /<exclude domain="file" path="save_work\/" \/>/);
   assert.match(extractionRules, /<cloud-backup>/);
   assert.match(extractionRules, /<device-transfer>/);
 });
