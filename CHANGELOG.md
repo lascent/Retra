@@ -2,6 +2,7 @@
 
 ## v1.0.2 — 2026-09-13 — Update checking and reinstall recovery
 
+- Fixed GitHub Actions Android 17 provisioning by installing the published `platforms;android-37.0` SDK package into the runner SDK root while keeping app `compileSdk`/`targetSdk` at API 37.
 - Hardened automatic Google Drive recovery: debounced/coalesced background protection, last-backup status, urgent foreground-exit flush, and an explicit Restore from Google Drive action.
 - Added remote-first clean-reinstall recovery so freshly generated empty metadata cannot overwrite an existing cloud library/settings copy.
 - Cloud downloads now rehydrate Room library/statistics and portable settings immediately, including missing-ROM placeholders.
