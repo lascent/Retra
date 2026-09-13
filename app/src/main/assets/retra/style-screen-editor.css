@@ -282,8 +282,8 @@
   font-size:22px;
   font-weight:700;
 }
-.preview-ab .button-b{ left:0; top:8px; }
-.preview-ab .button-a{ right:0; bottom:0; }
+.preview-ab .button-b{ left:0; top:20px; }
+.preview-ab .button-a{ right:0; top:20px; bottom:auto; }
 
 .screen-preview-shell[data-size-mode="fullscreen"] .preview-screen-frame{
   width:100%;
@@ -993,8 +993,8 @@ body.landscape-preview-mode .preview-ab span{
   height:58px;
   font-size:24px;
 }
-body.landscape-preview-mode .preview-ab .button-b{ left:0; top:8px; }
-body.landscape-preview-mode .preview-ab .button-a{ right:0; bottom:0; }
+body.landscape-preview-mode .preview-ab .button-b{ left:0; top:20px; }
+body.landscape-preview-mode .preview-ab .button-a{ right:0; top:20px; bottom:auto; }
 body.landscape-preview-mode .screen-help-text{
   bottom:14px;
   padding:7px 12px;
@@ -1243,7 +1243,7 @@ body.landscape-preview-mode .screen-help-text{
     box-shadow:none;
   }
   body.landscape-preview-mode .screen-size-page > .screen-preview-shell{
-    inset:max(4px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+    inset:max(4px, var(--device-safe-top)) max(4px, var(--device-safe-right)) max(4px, var(--device-safe-bottom)) max(4px, var(--device-safe-left));
   }
 }
 

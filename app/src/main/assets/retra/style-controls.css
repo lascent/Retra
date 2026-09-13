@@ -1,15 +1,15 @@
 /* v3.32 responsive add-control modal scaling for Android */
 .add-control-modal{
   padding:
-    max(10px, env(safe-area-inset-top))
-    max(10px, env(safe-area-inset-right))
-    max(10px, env(safe-area-inset-bottom))
-    max(10px, env(safe-area-inset-left));
+    max(10px, var(--device-safe-top))
+    max(10px, var(--device-safe-right))
+    max(10px, var(--device-safe-bottom))
+    max(10px, var(--device-safe-left));
 }
 .add-control-dialog{
   width:min(92vw, 440px);
   max-width:440px;
-  max-height:min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px), 520px);
+  max-height:min(calc(100dvh - var(--device-safe-top) - var(--device-safe-bottom) - 24px), 520px);
   border-radius:clamp(18px, 3.6vw, 28px);
 }
 .add-control-header,
@@ -56,7 +56,7 @@
 @media (max-width: 540px), (max-height: 520px){
   .add-control-dialog{
     width:min(90vw, 380px);
-    max-height:min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px), 430px);
+    max-height:min(calc(100dvh - var(--device-safe-top) - var(--device-safe-bottom) - 18px), 430px);
   }
   .add-control-header,
   .add-control-footer{
@@ -74,7 +74,7 @@
 @media (max-height: 420px){
   .add-control-dialog{
     width:min(88vw, 340px);
-    max-height:min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px), 340px);
+    max-height:min(calc(100dvh - var(--device-safe-top) - var(--device-safe-bottom) - 12px), 340px);
     border-radius:18px;
   }
   .add-control-header h3{
@@ -473,16 +473,16 @@ body[data-resolved-mode="light"] .add-control-icon.duo span{
 /* More compact frame, designed to fit Android portrait and landscape screens */
 .add-control-modal{
   padding:
-    max(8px, env(safe-area-inset-top))
-    max(8px, env(safe-area-inset-right))
-    max(8px, env(safe-area-inset-bottom))
-    max(8px, env(safe-area-inset-left));
+    max(8px, var(--device-safe-top))
+    max(8px, var(--device-safe-right))
+    max(8px, var(--device-safe-bottom))
+    max(8px, var(--device-safe-left));
 }
 .add-control-dialog{
   width:min(82vw, 338px);
   max-width:338px;
   max-height:min(
-    calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18px),
+    calc(100dvh - var(--device-safe-top) - var(--device-safe-bottom) - 18px),
     420px
   );
   border-radius:20px;
@@ -535,7 +535,7 @@ body[data-resolved-mode="light"] .add-control-icon.duo span{
   .add-control-dialog{
     width:min(70vw, 318px);
     max-width:318px;
-    max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 14px);
+    max-height:calc(100dvh - var(--device-safe-top) - var(--device-safe-bottom) - 14px);
     border-radius:16px;
   }
   .add-control-header,

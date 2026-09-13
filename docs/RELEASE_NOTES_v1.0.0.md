@@ -12,6 +12,7 @@ Retra is built around mGBA and focuses primarily on a polished GBA experience wh
 - GBA Local Link, Wi-Fi Remote Link, and Bluetooth Remote Link for supported normal Link Cable flows.
 - Adaptive 60/90/120 Hz interface presentation without changing native game timing.
 - Fast-forward and slow-motion modes with synchronized runtime/audio handling.
+- Dedicated audio-priority output path with pre-buffering and underrun recovery for cleaner music/SFX and fewer static/crackle artifacts.
 - Appearance themes, Color Style presets, translucent UI mode, controller opacity, and optional GLSL shaders.
 - Google Drive sync plus Android folder fallback.
 - Automatic artwork with persistent manual overrides.

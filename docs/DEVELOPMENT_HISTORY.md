@@ -10,6 +10,7 @@ These entries describe development milestones, not separate stable public releas
 v0.8.0 → v0.8.9
 v0.9.0 → v0.9.12
 v1.0.0  First stable public release
+v1.0.1  Create Backup and Restore Backup
 ```
 
 ## v0.9 series — release preparation
@@ -44,6 +45,15 @@ v1.0.0  First stable public release
 | **v0.8.2** | Library multi-select polish |
 | **v0.8.1** | GBA ROM-hack save-memory compatibility |
 | **v0.8.0** | Persistent ROM data foundation |
+
+## v1.0.1 — backup and restore
+
+The first stable update adds portable backup management:
+
+- **Create Backup** with selectable game saves, save states, cheats, library/metadata, controller layouts, artwork, and app settings;
+- **Restore Backup** from Retra `.retra` backup files;
+- Android save-picker support with filenames such as `Retra_20260913_0806.retra`;
+- validated, portable restore behavior with device-specific permissions and paths excluded.
 
 ## v1.0.0 — stable
 

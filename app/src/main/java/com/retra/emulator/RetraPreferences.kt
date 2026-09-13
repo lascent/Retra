@@ -181,6 +181,37 @@ class RetraPreferences(context: Context) {
         }
     }
 
+    /**
+     * Device-independent user settings safe to mirror into the selected Retra
+     * app folder. Provider grants, account identity, local filesystem paths and
+     * one-time migration markers intentionally remain device-local.
+     */
+    fun portableSettingsSnapshot(): Map<String, Any> = all.entries
+        .asSequence()
+        .filter { (key, _) -> isPortableSettingKey(key) }
+        .sortedBy { it.key }
+        .mapNotNull { entry -> entry.value?.let { value -> entry.key to value } }
+        .toMap(LinkedHashMap())
+
+    /** Restore only device-independent keys from a portable Retra backup. */
+    fun restorePortableSettings(values: Map<String, Any>): Int {
+        val editor = edit()
+        var restored = 0
+        values.forEach { (key, value) ->
+            if (!isPortableSettingKey(key)) return@forEach
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                else -> return@forEach
+            }
+            restored++
+        }
+        if (restored > 0) editor.commit()
+        return restored
+    }
+
     private fun applyDataStoreChanges(
         preferences: MutablePreferences,
         puts: Map<String, Any>,
@@ -220,6 +251,31 @@ class RetraPreferences(context: Context) {
                     produceFile = { context.preferencesDataStoreFile(DATASTORE_NAME) }
                 ).also { sharedDataStore = it }
             }
+
+        private val PORTABLE_EXCLUDED_KEYS = setOf(
+            "remote_link_host_v1",
+            "cloud_sync_enabled_v1",
+            "cloud_sync_uri_v1",
+            "cloud_sync_account_v1",
+            "cloud_sync_mode_v2",
+            "app_folder_uri_v1",
+            // BIOS files and the state that depends on them are device-local.
+            // Portable backups must never enable/label a BIOS that is not part
+            // of the backup payload. Keeping all BIOS-dependent state local also
+            // makes older backups safe because restorePortableSettings() filters
+            // these keys before applying them.
+            "bios_gba_path_v1",
+            "bios_gb_path_v1",
+            "bios_gbc_path_v1",
+            "use_bios_v1",
+            "boot_bios_v1",
+            "bios_last_label_v1",
+            "rom_identity_migration_v2",
+            "layouts_files_migration_v1",
+            "playtime_room_migration_v1",
+            "library_metadata_room_migration_v1",
+            "controller_layout_landscape_100_v394"
+        )
 
         private val GLOBAL_KEYS = setOf(
             "remote_link_host_v1",
@@ -270,5 +326,8 @@ class RetraPreferences(context: Context) {
 
         private fun isGlobalKey(key: String): Boolean =
             key in GLOBAL_KEYS || key.startsWith("ui_")
+
+        private fun isPortableSettingKey(key: String): Boolean =
+            isGlobalKey(key) && key !in PORTABLE_EXCLUDED_KEYS
     }
 }

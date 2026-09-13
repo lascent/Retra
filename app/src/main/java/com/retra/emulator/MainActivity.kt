@@ -7,17 +7,20 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.JavascriptInterface
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import com.retra.emulator.databinding.ActivityMainBinding
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
 
@@ -59,7 +62,6 @@ class MainActivity : AppCompatActivity() {
         internal const val CLOUD_SYNC_URI_PREF = "cloud_sync_uri_v1"
         internal const val CLOUD_SYNC_ACCOUNT_PREF = "cloud_sync_account_v1"
         internal const val CLOUD_SYNC_MODE_PREF = "cloud_sync_mode_v2"
-        internal const val APP_FOLDER_URI_PREF = "app_folder_uri_v1"
         internal const val ROM_IDENTITY_MIGRATION_PREF = "rom_identity_migration_v2"
         internal const val ROM_IDENTITY_SCHEMA_VERSION = 2
         internal const val AUTO_SAVE_LOAD_PREF = "auto_save_load_v1"
@@ -166,7 +168,15 @@ class MainActivity : AppCompatActivity() {
     internal var currentPlatform = PLATFORM_GBA
     internal var preferredOrientationValue = "Auto rotate"
     internal var preferredButtonsOpacity = 1f
-    internal val activeDpadKeys = mutableSetOf<Int>()
+    // Allocation-free D-pad state. Direction bits use the native mGBA key indexes
+    // (1 shl KEY_*), so high-rate ACTION_MOVE events never allocate Sets.
+    internal var activeDpadMask = 0
+    internal var activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
+    internal val dpadScreenLocation = IntArray(2)
+    internal var dpadTouchCenterX = 0f
+    internal var dpadTouchCenterY = 0f
+    internal var dpadTouchRadius = 1f
+    internal var dpadTouchGeometryValid = false
     internal var screenEditorPresentationActive = false
 
     // Controller coordinates are persisted independently for portrait and landscape.
@@ -217,7 +227,12 @@ class MainActivity : AppCompatActivity() {
     internal var pendingCloudEnable = false
     internal var pendingCloudAccount: String? = null
     internal var pendingDriveAuthAccount: String? = null
-    internal var pendingAppFolderSelection = false
+    internal var pendingBackupSelection: BackupRepository.Selection? = null
+    // Coalesce repeated portable-folder writes (volume sliders, rapid save-state
+    // updates, lifecycle commits) into one serialized SAF export. A dirty bit
+    // guarantees a change that arrives during an export gets one final pass.
+    internal val appFolderSyncQueued = AtomicBoolean(false)
+    internal val appFolderSyncDirty = AtomicBoolean(false)
 
     internal val ioExecutor = taskExecutors.serialIo
 
@@ -230,7 +245,10 @@ class MainActivity : AppCompatActivity() {
             isEnabled = { prefs.getBoolean(ENABLE_SOUND_PREF, true) },
             sampleRate = { prefs.getInt(SOUND_FREQUENCY_PREF, 44100) },
             volume = { prefs.getInt(VOLUME_PREF, 100).coerceIn(0, 100) / 100f },
-            readSamples = { buffer -> readAudioSamples(buffer) }
+            readSamples = { buffer -> readAudioSamples(buffer) },
+            onOutputRateChanged = { rate ->
+                try { setCoreConfigOption("retra.outputSampleRate", rate.toString()) } catch (_: Throwable) {}
+            }
         )
     }
 
@@ -307,6 +325,16 @@ class MainActivity : AppCompatActivity() {
             romIdentityStore = romIdentityStore,
             saveData = saveData,
             saveStates = saveStates,
+            preparePortableMetadata = { writePortableMetadataFiles() }
+        )
+    }
+
+    internal val backupRepository: BackupRepository by lazy {
+        BackupRepository(
+            context = this,
+            prefs = prefs,
+            fileOps = fileOps,
+            romIdentityStore = romIdentityStore,
             preparePortableMetadata = { writePortableMetadataFiles() }
         )
     }
@@ -596,13 +624,66 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    internal val appFolderPicker =
-        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-            pendingAppFolderSelection = false
+    internal val backupCreatePicker =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+            val selection = pendingBackupSelection
+            pendingBackupSelection = null
+            if (uri == null || selection == null) return@registerForActivityResult
+
+            ioExecutor.execute {
+                val result = runCatching { backupRepository.create(uri, selection) }
+                runOnUiThread {
+                    result.onSuccess { summary ->
+                        RetraNotice.makeText(
+                            this,
+                            "Backup created • ${summary.fileCount} files",
+                            RetraNotice.LENGTH_LONG
+                        ).show()
+                    }.onFailure { error ->
+                        RetraNotice.makeText(
+                            this,
+                            "Could not create backup: ${error.message ?: "unknown error"}",
+                            RetraNotice.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
+
+    internal val backupRestorePicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri == null) return@registerForActivityResult
-            persistTreePermission(uri)
-            prefs.edit().putString(APP_FOLDER_URI_PREF, uri.toString()).apply()
-            exportSaveDataToTreeAsync(uri, showResult = true)
+            if (emulatorRunning) {
+                RetraNotice.makeText(this, "Close the running game before restoring a backup", RetraNotice.LENGTH_LONG).show()
+                return@registerForActivityResult
+            }
+
+            ioExecutor.execute {
+                val result = runCatching { backupRepository.restore(uri) }
+                runOnUiThread {
+                    result.onSuccess { summary ->
+                        runCatching { applyRuntimeSettingsToNative() }
+                        runCatching { colorStyleController.apply() }
+                        notifyWebSettingsState()
+                        syncAppFolderAsync(showResult = false)
+                        binding.webView.evaluateJavascript(
+                            "window.retraBackupRestored && window.retraBackupRestored()",
+                            null
+                        )
+                        RetraNotice.makeText(
+                            this,
+                            "Backup restored • ${summary.fileCount} files",
+                            RetraNotice.LENGTH_LONG
+                        ).show()
+                    }.onFailure { error ->
+                        RetraNotice.makeText(
+                            this,
+                            "Could not restore backup: ${error.message ?: "invalid backup"}",
+                            RetraNotice.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
         }
 
     internal val shaderFilePicker =
@@ -613,6 +694,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Enter edge-to-edge before inflating the first frame so the WebView never
+        // performs an initial legacy-fit layout and then jumps after insets arrive.
+        // WebUiInsetsManager remains the single owner that forwards the real safe
+        // geometry to the packaged web UI.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -646,7 +733,7 @@ class MainActivity : AppCompatActivity() {
             presentLatestGameplayFrame()
         }
 
-        webUiInsetsManager = WebUiInsetsManager(binding.root, binding.webView)
+        webUiInsetsManager = WebUiInsetsManager(window, binding.root, binding.webView)
         webUiInsetsManager.install()
 
         artworkRepository = ArtworkRepository(
@@ -703,6 +790,9 @@ class MainActivity : AppCompatActivity() {
         configureBackHandling()
         applyRuntimeSettingsToNative()
         shaderController.applySelection(showToast = false)
+        // Retra's provider-backed app folder is always available; refresh the
+        // portable metadata snapshot without opening any folder picker.
+        syncAppFolderAsync(showResult = false)
         if (prefs.getBoolean(CLOUD_SYNC_ENABLED_PREF, false)) {
             syncCloudAsync(showResult = false)
         }
@@ -760,6 +850,8 @@ class MainActivity : AppCompatActivity() {
             stopEmulation()
             if (romLoaded) commitActiveWorkingSaves()
         }
+        // Also persist settings-only sessions where no ROM was running.
+        syncAppFolderAsync(showResult = false)
         super.onPause()
     }
 
@@ -962,6 +1054,10 @@ class MainActivity : AppCompatActivity() {
         fun setSetting(key: String, value: String): Boolean = updateSetting(key, value)
 
         @JavascriptInterface
+        fun setRangeSetting(key: String, value: Int, commit: Boolean): Boolean =
+            updateRangeSetting(key, value, commit)
+
+        @JavascriptInterface
         fun setCloudSyncEnabled(enabled: Boolean) {
             runOnUiThread {
                 if (enabled) {
@@ -989,6 +1085,29 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun openAppFolder() {
             runOnUiThread { openAppFolderInternal() }
+        }
+
+        @JavascriptInterface
+        fun getStorageSummary(): String = storageSummaryJson()
+
+        @JavascriptInterface
+        fun createBackup(selectionJson: String) {
+            val selection = backupRepository.parseSelection(selectionJson)
+            if (!selection.anySelected()) {
+                runOnUiThread {
+                    RetraNotice.makeText(this@MainActivity, "Choose at least one item to back up", RetraNotice.LENGTH_SHORT).show()
+                }
+                return
+            }
+            pendingBackupSelection = selection
+            runOnUiThread { backupCreatePicker.launch(backupRepository.suggestedFileName()) }
+        }
+
+        @JavascriptInterface
+        fun restoreBackup() {
+            runOnUiThread {
+                backupRestorePicker.launch(arrayOf("application/octet-stream", "application/zip", "*/*"))
+            }
         }
 
         @JavascriptInterface
@@ -1029,12 +1148,7 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun setButtonsOpacity(value: Int) {
-            val percent = value.coerceIn(25, 100)
-            preferredButtonsOpacity = percent / 100f
-            prefs.edit().putInt(BUTTON_OPACITY_PREF, percent).apply()
-            runOnUiThread {
-                applyNativeButtonsOpacity()
-            }
+            updateRangeSetting("buttonsOpacity", value, commit = true)
         }
 
         @JavascriptInterface
@@ -1194,6 +1308,11 @@ class MainActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         if (::displayPerformanceManager.isInitialized) displayPerformanceManager.reapplyAfterConfigurationChange()
+        if (::binding.isInitialized && ::webUiInsetsManager.isInitialized) {
+            // Fold/unfold, split-screen resize, rotation and desktop-window changes
+            // can all alter the real safe area without recreating this Activity.
+            webUiInsetsManager.refresh()
+        }
         gameplayMenuDialog?.takeIf { it.isShowing }?.let { dialog ->
             dialog.window?.decorView?.post { sizeGameplayDialog(dialog) }
         }

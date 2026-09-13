@@ -10,6 +10,7 @@ Retra's native emulator integration is built around the mGBA emulator core.
 - Upstream: https://github.com/mgba-emu/mgba
 - Copyright: mGBA contributors, including Jeffrey Pfau
 - License: Mozilla Public License 2.0 (MPL-2.0)
+- Retra validated/pinned revision: `543a197582c30364584d773a974d7f991892fa43` (see `third_party/mgba.lock`)
 
 When building or redistributing Retra with mGBA, retain the mGBA license and notices from the exact source revision used for the build. Retra does not claim ownership of mGBA.
 

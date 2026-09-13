@@ -524,7 +524,7 @@ function setMainPage(pageId){
   pages.forEach(p => p.classList.remove('active'));
   navItems.forEach(n => n.classList.remove('active'));
   clearActiveHeaders();
-  document.body.classList.remove('subpage-open', 'more-headerless');
+  document.body.classList.remove('subpage-open', 'more-headerless', 'backup-create-open');
   updateRomDetailState(pageId);
   updateFloatingAddRomButton(pageId);
   updateShellOrientation(pageId);
@@ -532,6 +532,7 @@ function setMainPage(pageId){
   const nextPage = document.getElementById(pageId);
   if (!nextPage) return;
   nextPage.classList.add('active');
+  window.RetraMotion?.pageEnter?.(nextPage, 'tab');
   document.querySelector(`.nav-item[data-page="${pageId}"]`)?.classList.add('active');
 
   if (pageId !== 'morePage') {
@@ -576,10 +577,14 @@ function openSubPage(pageId){
   clearActiveHeaders();
   document.body.classList.remove('more-headerless');
   document.body.classList.add('subpage-open');
+  document.body.classList.toggle('backup-create-open', pageId === 'createBackupPage');
   updateRomDetailState(pageId);
   updateFloatingAddRomButton(pageId);
   updateShellOrientation(pageId);
-  document.getElementById(pageId).classList.add('active');
+  const nextPage = document.getElementById(pageId);
+  if (!nextPage) return;
+  nextPage.classList.add('active');
+  window.RetraMotion?.pageEnter?.(nextPage, 'forward');
   searchPanel?.classList.remove('open');
   if (appMain) appMain.scrollTop = Math.max(0, Number(pageUiState.get(pageId)?.scrollTop) || 0);
 

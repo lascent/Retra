@@ -1,0 +1,226 @@
+/* Retra v1.0.1 — Interaction & Motion Polish
+   Perceived-performance layer for the packaged Android WebView UI.
+   Keep gameplay/controller editor geometry untouched: motion here is limited
+   to app chrome, navigation, cards, sheets, dialogs and settings surfaces. */
+:root {
+  --retra-motion-press: 48ms;
+  --retra-motion-fast: 120ms;
+  --retra-motion-standard: 178ms;
+  --retra-motion-sheet: 210ms;
+  --retra-motion-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --retra-motion-ease-out: cubic-bezier(.16, 1, .3, 1);
+  --retra-motion-ease-press: cubic-bezier(.2, .85, .25, 1);
+  --retra-press-scale: .976;
+  --interaction-duration: var(--retra-motion-fast);
+  --interaction-easing: var(--retra-motion-ease-standard);
+}
+
+/* Main/content scrolling should track the finger directly. Never introduce
+   programmatic smooth scrolling globally; it makes fast navigation feel late. */
+main,
+.multi-category-list,
+.selection-modal-card,
+.sheet-content,
+.library-chips {
+  scroll-behavior: auto;
+}
+main {
+  overscroll-behavior-y: contain;
+}
+
+/* The old generic page fade began at opacity:0. That could expose the WebView
+   background for a frame. Page motion is now explicitly triggered by JS after
+   the destination is already visible, and uses compositor-only properties. */
+.page,
+#libraryPage.page,
+#historyPage.page,
+#morePage.page {
+  animation: none;
+}
+.page.retra-page-enter {
+  animation: retra-page-enter var(--retra-motion-standard) var(--retra-motion-ease-out) both;
+}
+.page.retra-page-tab-enter {
+  animation: retra-tab-enter var(--retra-motion-fast) var(--retra-motion-ease-standard) both;
+}
+.page.retra-page-back-enter {
+  animation: retra-page-back-enter 160ms var(--retra-motion-ease-out) both;
+}
+@keyframes retra-page-enter {
+  from { opacity: .985; transform: translate3d(0, 4px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes retra-tab-enter {
+  from { opacity: .992; transform: translate3d(0, 2px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes retra-page-back-enter {
+  from { opacity: .985; transform: translate3d(0, -3px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Finger-down must feel immediate. The transient class is installed on
+   pointerdown (before click work) and removed on release/scroll. Only transform
+   and opacity are animated so presses stay on the compositor. */
+.retra-pressing {
+  transform: scale(var(--retra-press-scale)) !important;
+  opacity: .92;
+  transition-property: transform, opacity !important;
+  transition-duration: var(--retra-motion-press) !important;
+  transition-timing-function: var(--retra-motion-ease-press) !important;
+  will-change: transform, opacity;
+}
+.nav-item.retra-pressing,
+.icon-btn.retra-pressing,
+.back-btn.retra-pressing,
+.small-icon-btn.retra-pressing,
+.library-selection-action.retra-pressing,
+.library-selection-close.retra-pressing {
+  opacity: .86;
+}
+.cover-card.retra-pressing {
+  --retra-press-scale: .986;
+  opacity: .97;
+}
+.settings-item.retra-pressing,
+.more-item.retra-pressing,
+.detail-row.retra-pressing,
+.frequency-option.retra-pressing,
+.selection-option.retra-pressing,
+.sheet-options-item.retra-pressing {
+  --retra-press-scale: .992;
+  opacity: .94;
+}
+
+/* Release settles a little more gently than press-down. Avoid animating broad
+   property groups such as `all`. */
+.nav-item,
+.settings-item,
+.more-item,
+.detail-row,
+.frequency-option,
+.selection-option,
+.sheet-options-item,
+.modal-btn,
+.text-action-btn,
+.icon-btn,
+.back-btn,
+.small-icon-btn,
+.library-selection-action,
+.library-selection-close,
+.cover-card,
+.rom-action,
+.chip,
+.add-rom-btn {
+  transition-duration: var(--retra-motion-fast);
+  transition-timing-function: var(--retra-motion-ease-standard);
+}
+
+/* Switches used to transition every property. Keep only the visual properties
+   that actually change. */
+.slider {
+  transition: background-color 160ms var(--retra-motion-ease-standard);
+}
+.slider::before {
+  transition: transform 160ms var(--retra-motion-ease-out),
+              background-color 160ms var(--retra-motion-ease-standard);
+}
+
+/* Bottom navigation should feel immediate when changing tabs. */
+.nav-item {
+  transition: color var(--retra-motion-fast) var(--retra-motion-ease-standard),
+              background-color var(--retra-motion-fast) var(--retra-motion-ease-standard),
+              transform var(--retra-motion-fast) var(--retra-motion-ease-standard),
+              opacity var(--retra-motion-fast) var(--retra-motion-ease-standard);
+}
+.bottom-nav {
+  transition: background-color var(--retra-motion-standard) var(--retra-motion-ease-standard),
+              border-color var(--retra-motion-standard) var(--retra-motion-ease-standard),
+              height var(--retra-motion-standard) var(--retra-motion-ease-standard),
+              padding-bottom var(--retra-motion-standard) var(--retra-motion-ease-standard),
+              opacity var(--retra-motion-fast) var(--retra-motion-ease-standard);
+}
+
+/* Bottom sheets: the original `.22s ease` shorthand animated every changed
+   property. Restrict it to compositor-friendly transform + opacity. */
+.rom-sheet {
+  transition: transform var(--retra-motion-sheet) var(--retra-motion-ease-out),
+              opacity 150ms var(--retra-motion-ease-standard);
+}
+.sheet-backdrop.open .rom-sheet,
+.rom-card-actions-backdrop.open .rom-card-actions-sheet {
+  will-change: transform, opacity;
+}
+.rom-card-actions-sheet {
+  transition: transform 190ms var(--retra-motion-ease-out),
+              opacity 140ms var(--retra-motion-ease-standard);
+}
+.library-selection-bar {
+  transition: transform 190ms var(--retra-motion-ease-out),
+              opacity 140ms var(--retra-motion-ease-standard);
+}
+
+/* Legacy category/confirm dialogs use display:flex when opened, so an entry
+   keyframe gives them motion without keeping invisible layers composited. */
+.modal-backdrop.open:not(.selection-modal) {
+  animation: retra-backdrop-in 145ms var(--retra-motion-ease-standard) both;
+}
+.modal-backdrop.open:not(.selection-modal) > .category-modal-card,
+.modal-backdrop.open:not(.selection-modal) > .confirm-modal-card {
+  animation: retra-dialog-in 180ms var(--retra-motion-ease-out) both;
+}
+.sheet-backdrop.open {
+  animation: retra-backdrop-in 140ms var(--retra-motion-ease-standard) both;
+}
+@keyframes retra-backdrop-in {
+  from { opacity: .72; }
+  to   { opacity: 1; }
+}
+@keyframes retra-dialog-in {
+  from { opacity: .94; transform: translate3d(0, 6px, 0) scale(.988); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* Search opens without animating layout dimensions. The content itself gets a
+   tiny compositor-only settle instead. */
+.search-panel.open {
+  animation: retra-search-in 130ms var(--retra-motion-ease-out) both;
+}
+@keyframes retra-search-in {
+  from { opacity: .94; transform: translate3d(0, -2px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* On touch devices, expensive blur is retained only where it materially helps
+   the design. Dense modal cards use their opaque/gradient backing instead of
+   layering an additional card blur over the already-dimmed backdrop. */
+@media (pointer: coarse) {
+  .selection-modal-card,
+  .category-modal-card,
+  .confirm-modal-card,
+  .rom-card-actions-sheet {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Don't reserve GPU layers indefinitely. `will-change` is limited to elements
+   while they are actually pressed or moving; settled surfaces return to the
+   browser's normal compositor decisions. */
+
+@media (prefers-reduced-motion: reduce) {
+  .page.retra-page-enter,
+  .page.retra-page-tab-enter,
+  .page.retra-page-back-enter,
+  .modal-backdrop.open,
+  .modal-backdrop.open > .category-modal-card,
+  .modal-backdrop.open > .confirm-modal-card,
+  .sheet-backdrop.open,
+  .search-panel.open {
+    animation: none !important;
+  }
+  .retra-pressing {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

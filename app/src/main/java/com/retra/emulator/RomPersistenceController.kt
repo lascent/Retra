@@ -62,6 +62,9 @@ internal fun MainActivity.commitActiveWorkingSaves() {
     } else if (currentRomId.isNotBlank()) {
         runCatching { saveData.commitWorkingSave(currentRomId, 0) }
     }
+    // A committed battery save is durable locally; mirror it to the user's
+    // persisted Retra folder without requiring another picker confirmation.
+    syncAppFolderAsync(showResult = false)
 }
 
 internal fun MainActivity.clearActiveLinkSaveTracking() {
@@ -212,6 +215,21 @@ internal fun MainActivity.writePortableMetadataFiles() {
         })
     }
     fileOps.atomicWriteText(File(metadataDir, "library.json"), libraryJson.toString(2))
+
+    // Keep a portable snapshot of Retra's device-independent settings beside
+    // saves. This reads only the preference cache so it is safe during startup
+    // migration before UI/render/audio controllers finish initializing.
+    val portableSettings = JSONObject().apply {
+        prefs.portableSettingsSnapshot().forEach { (key, value) -> put(key, value) }
+    }
+    fileOps.atomicWriteText(
+        File(metadataDir, "settings.json"),
+        JSONObject()
+            .put("schemaVersion", 1)
+            .put("generatedAt", System.currentTimeMillis())
+            .put("settings", portableSettings)
+            .toString(2)
+    )
 
     val indexedIds = romIdentityStore.all().map { it.romId }.toSet()
     val unmatched = JSONArray()

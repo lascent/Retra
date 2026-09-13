@@ -55,7 +55,7 @@ test('long-press click suppression is scoped to the pressed ROM only', () => {
 });
 
 test('bulk More popup sits lower, stays compact and uses a solid themed background', () => {
-  assert.match(css, /\.library-selection-more-menu\s*\{[\s\S]*right:\s*max\(calc\(env\(safe-area-inset-right, 0px\) \+ 12px\), clamp\(16px, 7vw, 28px\)\);[\s\S]*bottom:\s*calc\(86px \+ var\(--device-safe-bottom\)\);[\s\S]*z-index:\s*180;[\s\S]*width:\s*min\(184px, calc\(100vw - 38px\)\);[\s\S]*background:\s*linear-gradient\(180deg,/);
+  assert.match(css, /\.library-selection-more-menu\s*\{[\s\S]*right:\s*max\(calc\(var\(--device-safe-right\) \+ 12px\), clamp\(16px, 7vw, 28px\)\);[\s\S]*bottom:\s*calc\(86px \+ var\(--device-safe-bottom\)\);[\s\S]*z-index:\s*180;[\s\S]*width:\s*min\(184px, calc\(100vw - 38px\)\);[\s\S]*background:\s*linear-gradient\(180deg,/);
   assert.match(css, /\.library-selection-more-menu button\s*\{[\s\S]*min-height:\s*44px/);
 });
 

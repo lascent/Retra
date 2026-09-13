@@ -375,7 +375,7 @@ a:focus-visible,
 
 /* ROM detail stays compact: only a small breathing space at the bottom. */
 .rom-detail-body{
-  padding-bottom:max(20px, env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom:max(20px, var(--device-safe-bottom)) !important;
 }
 
 /* The ROM overflow menu is a real overlay. It may cover the title while open,
@@ -467,7 +467,7 @@ body.screen-editor-landscape .emulator-preview{
 
 @media (max-width:380px){
   .rom-detail-body{
-    padding-bottom:max(18px, env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom:max(18px, var(--device-safe-bottom)) !important;
   }
   .rom-hero.rom-menu-open .rom-top{
     padding-top:0 !important;
@@ -520,10 +520,10 @@ body.screen-editor-landscape .emulator-preview{
   body.game-landscape-allowed:not(.landscape-preview-mode) .main-header{
     min-height:var(--header-height);
     padding:
-      max(8px, env(safe-area-inset-top, 0px))
-      max(18px, calc(env(safe-area-inset-right, 0px) + 16px))
+      max(8px, var(--device-safe-top))
+      max(18px, calc(var(--device-safe-right) + 16px))
       8px
-      max(18px, calc(env(safe-area-inset-left, 0px) + 16px));
+      max(18px, calc(var(--device-safe-left) + 16px));
   }
 
   body.game-landscape-allowed:not(.landscape-preview-mode) .main-header h1{
@@ -533,8 +533,8 @@ body.screen-editor-landscape .emulator-preview{
   body.game-landscape-allowed:not(.landscape-preview-mode) main{
     width:100%;
     height:calc(100dvh - var(--header-height) - var(--bottom-nav-total-height));
-    padding:10px max(18px, calc(env(safe-area-inset-left, 0px) + 16px)) 16px;
-    padding-right:max(18px, calc(env(safe-area-inset-right, 0px) + 16px));
+    padding:10px max(18px, calc(var(--device-safe-left) + 16px)) 16px;
+    padding-right:max(18px, calc(var(--device-safe-right) + 16px));
     overflow-y:auto;
     overflow-x:hidden;
   }
@@ -569,9 +569,9 @@ body.screen-editor-landscape .emulator-preview{
     width:100%;
     grid-template-columns:repeat(3,minmax(0,1fr));
     padding:
-      6px max(18px, calc(env(safe-area-inset-right, 0px) + 16px))
+      6px max(18px, calc(var(--device-safe-right) + 16px))
       calc(8px + var(--device-safe-bottom))
-      max(18px, calc(env(safe-area-inset-left, 0px) + 16px));
+      max(18px, calc(var(--device-safe-left) + 16px));
   }
 
   body.game-landscape-allowed:not(.landscape-preview-mode) .nav-item{
@@ -581,7 +581,7 @@ body.screen-editor-landscape .emulator-preview{
   }
 
   body.game-landscape-allowed:not(.landscape-preview-mode) .add-rom-btn{
-    right:max(18px, calc(env(safe-area-inset-right, 0px) + 18px));
+    right:max(18px, calc(var(--device-safe-right) + 18px));
     bottom:calc(var(--bottom-nav-total-height) + 12px);
     width:52px;
     height:52px;

@@ -1,32 +1,36 @@
-let nativeBottomSystemInset = 0;
+let nativeInsetsConnected = false;
+const nativeSafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 
+window.retraSetNativeSafeInsets = (top, right, bottom, left) => {
+  nativeInsetsConnected = true;
+  const normalize = value => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+  };
+  nativeSafeInsets.top = normalize(top);
+  nativeSafeInsets.right = normalize(right);
+  nativeSafeInsets.bottom = normalize(bottom);
+  nativeSafeInsets.left = normalize(left);
+  updateDeviceSafeInsets();
+};
+
+// Backward-compatible entry point for older native builds during upgrades.
 window.retraSetNativeBottomInset = value => {
+  nativeInsetsConnected = true;
   const parsed = Number(value);
-  nativeBottomSystemInset = Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+  nativeSafeInsets.bottom = Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
   updateDeviceSafeInsets();
 };
 
 function updateDeviceSafeInsets(){
   const root = document.documentElement;
-  const isSmallMobile = window.matchMedia('(max-width: 640px) and (pointer: coarse)').matches;
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  let bottomInset = nativeBottomSystemInset;
-
-  if (isSmallMobile){
-    if (isAndroid && !isStandalone){
-      bottomInset = Math.max(14, Math.min(30, Math.round(window.innerHeight * 0.032)));
-    }
-
-    if (window.visualViewport){
-      const obstruction = Math.max(0, window.innerHeight - (window.visualViewport.height + window.visualViewport.offsetTop));
-      if (obstruction > 0){
-        bottomInset = Math.max(bottomInset, Math.min(32, Math.round(obstruction)));
-      }
-    }
-  }
-
-  root.style.setProperty('--device-bottom-ui', `${bottomInset}px`);
+  if (nativeInsetsConnected) root.dataset.retraRuntime = 'android';
+  // Do not guess Android navigation heights from viewport size. Native
+  // WindowInsets are authoritative; CSS env() remains the browser fallback.
+  root.style.setProperty('--device-top-ui', `${nativeSafeInsets.top}px`);
+  root.style.setProperty('--device-right-ui', `${nativeSafeInsets.right}px`);
+  root.style.setProperty('--device-bottom-ui', `${nativeSafeInsets.bottom}px`);
+  root.style.setProperty('--device-left-ui', `${nativeSafeInsets.left}px`);
 }
 
 previewScaleHandle?.addEventListener('pointerdown', event => {

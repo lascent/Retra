@@ -17,6 +17,8 @@
 <link href="style-editor-modern.css" rel="stylesheet"/>
 <link href="style-features.css" rel="stylesheet"/>
 <link href="ui-polish.css" rel="stylesheet"/>
+<link href="style-safe-insets.css" rel="stylesheet"/>
+<link href="style-motion-performance.css" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -177,10 +179,10 @@
 </div>
 <div class="sheet-category-list" id="sheetCategoryList"></div>
 <div class="sheet-empty" id="sheetCategoryEmpty">No categories yet. Create one in More → Categories.</div>
+</div>
 <div class="sheet-actions">
 <button class="modal-btn secondary" id="closeRomFilterSheet" type="button">Close</button>
 <button class="modal-btn primary" id="saveRomCategoriesBtn" type="button">Save</button>
-</div>
 </div>
 </div>
 </div>
@@ -228,6 +230,13 @@
 <svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20c.92 0 1.5-.76 1.5-1.67 0-.43-.16-.84-.42-1.16-.25-.32-.42-.73-.42-1.17a2 2 0 0 1 2-2h1.79A5.55 5.55 0 0 0 22 10.45C22 5.8 17.52 2 12 2Z"></path><circle cx="7.5" cy="10" r="1"></circle><circle cx="10" cy="6.8" r="1"></circle><circle cx="14" cy="6.8" r="1"></circle><circle cx="16.5" cy="10" r="1"></circle></svg>
 </div>
 <div class="more-copy"><strong>Color Style</strong><span id="colorStyleMoreSummary">Classic</span></div>
+<svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
+</button>
+<button class="more-item" data-more-open="dataStoragePage">
+<div class="more-icon">
+<svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-9Z"></path><path d="M4 10h16"></path><circle cx="16.5" cy="14.5" r="1"></circle></svg>
+</div>
+<div class="more-copy"><strong>Data and Storage</strong><span>Backup, restore, storage</span></div>
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
 <button class="more-item" data-more-open="settingsHomePage">
@@ -295,6 +304,72 @@
 <p class="color-style-note">Classic uses the provided reference image as the baseline look.</p>
 </div>
 </section>
+<!-- DATA AND STORAGE -->
+<section class="page settings-detail-page data-storage-page" id="dataStoragePage">
+<div class="sub-header">
+<button aria-label="Back" class="back-btn" data-back-to="morePage">
+<svg viewbox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
+</button>
+<h2>Data and Storage</h2>
+</div>
+<div class="data-storage-content">
+<div class="storage-section-label">Storage</div>
+<div class="detail-list data-storage-card">
+<button class="detail-row tappable" id="dataStorageOpenFolderBtn" type="button">
+<div><strong>Retra storage</strong><span>Open the Retra app folder in Android Files</span></div>
+<svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
+</button>
+<div class="storage-usage-block">
+<div class="storage-usage-head"><strong>Storage usage</strong><span id="dataStorageFreeText">Checking storage…</span></div>
+<div class="storage-meter" aria-hidden="true"><span id="dataStorageMeterFill"></span></div>
+<div class="storage-usage-foot" id="dataStorageTotalText">Retra uses your phone's internal storage</div>
+</div>
+</div>
+
+<div class="storage-section-label">Backup and restore</div>
+<div class="backup-action-grid">
+<button class="backup-action-btn" id="createBackupStartBtn" type="button">
+<svg viewbox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>
+<div><strong>Create backup</strong><span>Choose what to include, then save a .retra file anywhere</span></div>
+</button>
+<button class="backup-action-btn" id="restoreBackupBtn" type="button">
+<svg viewbox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"></path><path d="m7 14 5-5 5 5"></path><path d="M5 4h14"></path></svg>
+<div><strong>Restore backup</strong><span>Restore data from an existing Retra .retra backup</span></div>
+</button>
+</div>
+<p class="storage-info-note">Retra backups do not include ROM or BIOS files. Save files, save states, cheats, layouts, artwork, library metadata, and app settings can be backed up separately.</p>
+</div>
+</section>
+
+<!-- CREATE BACKUP -->
+<section class="page settings-detail-page create-backup-page" id="createBackupPage">
+<div class="sub-header">
+<button aria-label="Back" class="back-btn" data-back-to="dataStoragePage">
+<svg viewbox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
+</button>
+<h2>Create backup</h2>
+</div>
+<div class="backup-create-content">
+<p class="backup-create-intro">Choose what you want to include. The backup will be saved as a single <strong>.retra</strong> file.</p>
+<div class="backup-group-label">Game data</div>
+<div class="backup-check-card">
+<label class="backup-check-row"><input checked data-backup-key="saves" type="checkbox"/><span class="backup-check-box"><svg viewbox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span class="backup-check-copy"><strong>Game saves</strong><small>Battery saves used by your games</small></span></label>
+<label class="backup-check-row"><input checked data-backup-key="saveStates" type="checkbox"/><span class="backup-check-box"><svg viewbox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span class="backup-check-copy"><strong>Save states</strong><small>Manual, quick, and automatic save states</small></span></label>
+<label class="backup-check-row"><input checked data-backup-key="cheats" type="checkbox"/><span class="backup-check-box"><svg viewbox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span class="backup-check-copy"><strong>Cheats</strong><small>Saved cheat codes and enabled-state data</small></span></label>
+</div>
+<div class="backup-group-label">Retra</div>
+<div class="backup-check-card">
+<label class="backup-check-row"><input checked data-backup-key="library" type="checkbox"/><span class="backup-check-box"><svg viewbox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span class="backup-check-copy"><strong>Library and metadata</strong><small>Favorites, categories, playtime, and library metadata</small></span></label>
+<label class="backup-check-row"><input checked data-backup-key="layouts" type="checkbox"/><span class="backup-check-box"><svg viewbox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span class="backup-check-copy"><strong>Controller layouts</strong><small>Screen Editor and controller positioning</small></span></label>
+<label class="backup-check-row"><input checked data-backup-key="artwork" type="checkbox"/><span class="backup-check-box"><svg viewbox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span class="backup-check-copy"><strong>Artwork</strong><small>Downloaded covers and backgrounds</small></span></label>
+<label class="backup-check-row"><input checked data-backup-key="settings" type="checkbox"/><span class="backup-check-box"><svg viewbox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span class="backup-check-copy"><strong>App settings</strong><small>Portable Retra settings; device-specific permissions are excluded</small></span></label>
+</div>
+</div>
+<div class="backup-create-footer">
+<button class="backup-create-button" id="confirmCreateBackupBtn" type="button">Create backup</button>
+</div>
+</section>
+
 <!-- SETTINGS HOME -->
 <section class="page" id="settingsHomePage">
 <div class="sub-header">
@@ -345,7 +420,7 @@
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
 </div>
-<div class="version" id="settingsVersionLabel">Retra v1.0.0</div>
+<div class="version" id="settingsVersionLabel">Retra v1.0.1</div>
 </section>
 <!-- APPEARANCE -->
 <section class="page settings-detail-page" id="appearanceSettingsPage">
@@ -858,7 +933,7 @@
 <div class="detail-row"><div><strong>Full screen mode</strong><span>Make games fullscreen by hiding system bars</span></div><label class="switch"><input checked="" id="fullScreenModeToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-row"><div><strong>Immersive mode</strong><span>Hide gesture/navigation bars while a game is running</span></div><label class="switch"><input checked="" id="immersiveModeToggle" type="checkbox"/><span class="slider"></span></label></div>
 <button class="detail-row tappable" id="importSavesBtn"><div><strong>Import saves</strong><span>Import battery saves and save states from another Retra folder</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
-<button class="detail-row tappable" id="openAppFolderBtn"><div><strong>Open app folder</strong><span>Open the Retra export folder for save data</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
+<button class="detail-row tappable" id="openAppFolderBtn"><div><strong>Open app folder</strong><span>Open Retra storage in Android Files</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
 </div>
 </section>
 <!-- ADVANCED -->
@@ -920,7 +995,7 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version">Retra v1.0.0</p>
+<p class="about-version">Retra v1.0.1</p>
 <p class="disclaimer">Retra is an independent emulator frontend. No copyrighted game software or ROM files are included with this product.</p>
 <button class="privacy-btn" data-open-page="privacyPolicyPage" data-privacy-return="aboutSettingsPage" type="button">Privacy Policy</button>
 </div>
@@ -1092,7 +1167,7 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version">Retra v1.0.0</p>
+<p class="about-version">Retra v1.0.1</p>
 <p class="disclaimer">Retra is an independent emulator frontend. No copyrighted game software or ROM files are included with this product.</p>
 <button class="privacy-btn" data-open-page="privacyPolicyPage" data-privacy-return="aboutPage" type="button">Privacy Policy</button>
 </div>
@@ -1374,6 +1449,7 @@
 </button>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 </div>
+<script src="interaction-motion.js"></script>
 <script src="library-selection.js"></script>
 <script src="app-shell.js"></script>
 <script src="library-ui.js"></script>

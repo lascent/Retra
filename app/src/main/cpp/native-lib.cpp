@@ -13,6 +13,8 @@
 #include <unordered_map>
 #include <chrono>
 #include <thread>
+#include <array>
+#include <cmath>
 
 extern "C" {
 #include <mgba/core/core.h>
@@ -48,6 +50,289 @@ static std::mutex coreMutex;
 static bool configInitialized = false;
 static std::unordered_map<std::string, std::string> runtimeConfigOptions;
 
+// mGBA's GBA core exposes PCM at the emulated hardware audio clock (commonly
+// 32768 Hz, but games can switch it). Android output is normally 44.1/48 kHz,
+// so Retra must perform one explicit sample-rate conversion before AudioTrack.
+//
+// Do not use mAudioResampler's int16 sinc output here. A band-limited sinc can
+// overshoot between samples and an unchecked int16 conversion can wrap a loud
+// transient instead of saturating it, which is perceived as harsh/distorted
+// music. Retra keeps its own small polyphase FIR table, normalizes every phase
+// for unity DC gain, applies an anti-alias cutoff while downsampling, and clamps
+// the final accumulator to int16. The mGBA mixer itself remains untouched.
+static constexpr int RETRA_RESAMPLER_TAPS = 16;
+static constexpr int RETRA_RESAMPLER_LEFT_TAPS = 7;
+static constexpr int RETRA_RESAMPLER_RIGHT_TAPS = 8;
+static constexpr int RETRA_RESAMPLER_HISTORY = 8;
+static constexpr int RETRA_RESAMPLER_PHASES = 1024;
+static constexpr double RETRA_PI = 3.14159265358979323846264338327950288;
+
+struct RetraAudioResamplerState {
+    mAudioBuffer* source = nullptr;
+    unsigned sourceRate = 0;
+    unsigned destinationRate = 0;
+    double position = 0.0;
+    std::array<float, RETRA_RESAMPLER_PHASES * RETRA_RESAMPLER_TAPS> coefficients{};
+};
+
+// Final output conditioning is intentionally conservative. mGBA's libretro
+// frontend offers a single-pole low-pass specifically to reduce generated
+// audio harshness. Retra uses the same topology at a much gentler 22% strength
+// so background music is smoother without making percussion or sampled audio
+// sound muffled. A transparent ~18 Hz DC blocker removes sub-audible offset,
+// and a tiny amount of headroom protects Android's PCM16 path from inter-stage
+// peaks. Pitch, tempo, stereo placement, and the mGBA mixer are left untouched.
+static constexpr double RETRA_DC_BLOCK_HZ = 18.0;
+static constexpr double RETRA_SMOOTHING_STRENGTH = 0.22;
+static constexpr double RETRA_OUTPUT_HEADROOM = 0.99;
+
+struct RetraAudioConditionerState {
+    mAudioBuffer* source = nullptr;
+    unsigned sampleRate = 0;
+    double dcCoefficient = 0.0;
+    double previousInputLeft = 0.0;
+    double previousInputRight = 0.0;
+    double previousDcLeft = 0.0;
+    double previousDcRight = 0.0;
+    double smoothedLeft = 0.0;
+    double smoothedRight = 0.0;
+    bool initialized = false;
+};
+
+static RetraAudioResamplerState retraAudioResampler{};
+static RetraAudioConditionerState retraAudioConditioner{};
+
+static unsigned requestedAudioOutputRateLocked() {
+    constexpr unsigned DEFAULT_RATE = 44100;
+
+    // AudioController reports the actual physical AudioTrack clock separately
+    // from Retra's user-facing quality preference. On common Android hardware
+    // this is 48 kHz, avoiding an additional AudioFlinger conversion later.
+    const auto outputIt = runtimeConfigOptions.find("retra.outputSampleRate");
+    const auto sampleIt = runtimeConfigOptions.find("sampleRate");
+    const auto* value = outputIt != runtimeConfigOptions.end()
+            ? &outputIt->second
+            : (sampleIt != runtimeConfigOptions.end() ? &sampleIt->second : nullptr);
+    if (!value) return DEFAULT_RATE;
+    try {
+        const unsigned parsed = static_cast<unsigned>(std::stoul(*value));
+        return std::max(8000U, std::min(96000U, parsed));
+    } catch (...) {
+        return DEFAULT_RATE;
+    }
+}
+
+static void resetRetraAudioConditionerLocked() {
+    retraAudioConditioner = {};
+}
+
+static void resetRetraAudioResamplerLocked() {
+    retraAudioResampler = {};
+    resetRetraAudioConditionerLocked();
+}
+
+static double retraNormalizedSinc(double x) {
+    if (std::abs(x) < 1e-12) return 1.0;
+    const double pix = RETRA_PI * x;
+    return std::sin(pix) / pix;
+}
+
+static void rebuildRetraAudioResamplerCoefficientsLocked(
+        unsigned sourceRate,
+        unsigned destinationRate) {
+    // When reducing the sample rate, lower the FIR cutoff slightly below the
+    // new Nyquist edge to keep GBA high-frequency energy from folding back as
+    // gritty aliasing. Upsampling needs no spectral cut, only interpolation.
+    const double ratio = static_cast<double>(destinationRate) / sourceRate;
+    const double cutoff = ratio < 1.0 ? std::max(0.05, ratio * 0.94) : 1.0;
+    constexpr double TWO_PI = 2.0 * RETRA_PI;
+
+    for (int phase = 0; phase < RETRA_RESAMPLER_PHASES; ++phase) {
+        const double fraction = static_cast<double>(phase) / RETRA_RESAMPLER_PHASES;
+        double weightSum = 0.0;
+
+        for (int tap = 0; tap < RETRA_RESAMPLER_TAPS; ++tap) {
+            const int relative = tap - RETRA_RESAMPLER_LEFT_TAPS;
+            const double distance = static_cast<double>(relative) - fraction;
+
+            // 16-tap Blackman-windowed low-pass sinc. The fixed window and a
+            // phase-normalization pass below keep the output stable and free of
+            // gain pumping as the fractional source position advances.
+            const double n = static_cast<double>(tap);
+            const double window = 0.42
+                    - 0.5 * std::cos(TWO_PI * n / (RETRA_RESAMPLER_TAPS - 1))
+                    + 0.08 * std::cos(2.0 * TWO_PI * n / (RETRA_RESAMPLER_TAPS - 1));
+            const double weight = cutoff * retraNormalizedSinc(distance * cutoff) * window;
+            retraAudioResampler.coefficients[
+                    phase * RETRA_RESAMPLER_TAPS + tap] = static_cast<float>(weight);
+            weightSum += weight;
+        }
+
+        // Unity gain for DC/steady music tones; also prevents phase-dependent
+        // amplitude modulation from becoming audible on sustained notes.
+        if (std::abs(weightSum) > 1e-12) {
+            for (int tap = 0; tap < RETRA_RESAMPLER_TAPS; ++tap) {
+                auto& coefficient = retraAudioResampler.coefficients[
+                        phase * RETRA_RESAMPLER_TAPS + tap];
+                coefficient = static_cast<float>(coefficient / weightSum);
+            }
+        }
+    }
+}
+
+static bool ensureRetraAudioResamplerLocked(
+        mAudioBuffer* source,
+        unsigned sourceRate,
+        unsigned destinationRate) {
+    if (!source || !sourceRate || !destinationRate) return false;
+
+    const bool sourceChanged = retraAudioResampler.source != source;
+    const bool ratesChanged = retraAudioResampler.sourceRate != sourceRate ||
+            retraAudioResampler.destinationRate != destinationRate;
+
+    if (sourceChanged) {
+        retraAudioResampler.position = 0.0;
+        retraAudioResampler.source = source;
+    }
+    if (sourceChanged || ratesChanged) {
+        rebuildRetraAudioResamplerCoefficientsLocked(sourceRate, destinationRate);
+        retraAudioResampler.sourceRate = sourceRate;
+        retraAudioResampler.destinationRate = destinationRate;
+    }
+    return true;
+}
+
+static int16_t retraClampPcm16(double sample) {
+    if (sample >= 32767.0) return 32767;
+    if (sample <= -32768.0) return -32768;
+    return static_cast<int16_t>(std::lrint(sample));
+}
+
+static void prepareRetraAudioConditionerLocked(mAudioBuffer* source, unsigned sampleRate) {
+    if (!source || !sampleRate) return;
+    if (retraAudioConditioner.source == source &&
+            retraAudioConditioner.sampleRate == sampleRate) {
+        return;
+    }
+
+    retraAudioConditioner = {};
+    retraAudioConditioner.source = source;
+    retraAudioConditioner.sampleRate = sampleRate;
+    retraAudioConditioner.dcCoefficient = std::exp(
+            -2.0 * RETRA_PI * RETRA_DC_BLOCK_HZ / static_cast<double>(sampleRate));
+}
+
+static void conditionRetraAudioLocked(
+        mAudioBuffer* source,
+        unsigned sampleRate,
+        int16_t* samples,
+        size_t frames) {
+    if (!source || !samples || !frames || !sampleRate) return;
+    prepareRetraAudioConditionerLocked(source, sampleRate);
+
+    auto& state = retraAudioConditioner;
+    const double smoothingA = RETRA_SMOOTHING_STRENGTH;
+    const double smoothingB = 1.0 - smoothingA;
+
+    for (size_t frame = 0; frame < frames; ++frame) {
+        const double inputLeft = static_cast<double>(samples[frame * 2]);
+        const double inputRight = static_cast<double>(samples[frame * 2 + 1]);
+
+        if (!state.initialized) {
+            state.previousInputLeft = inputLeft;
+            state.previousInputRight = inputRight;
+            state.smoothedLeft = 0.0;
+            state.smoothedRight = 0.0;
+            state.initialized = true;
+        }
+
+        // One-pole DC blocker: removes sub-audible bias without changing bass.
+        const double dcLeft = inputLeft - state.previousInputLeft +
+                state.dcCoefficient * state.previousDcLeft;
+        const double dcRight = inputRight - state.previousInputRight +
+                state.dcCoefficient * state.previousDcRight;
+        state.previousInputLeft = inputLeft;
+        state.previousInputRight = inputRight;
+        state.previousDcLeft = dcLeft;
+        state.previousDcRight = dcRight;
+
+        // mGBA-style single-pole smoothing, intentionally lighter than the
+        // libretro 60% default so Retra keeps detail while taming gritty highs.
+        state.smoothedLeft = state.smoothedLeft * smoothingA + dcLeft * smoothingB;
+        state.smoothedRight = state.smoothedRight * smoothingA + dcRight * smoothingB;
+
+        samples[frame * 2] = retraClampPcm16(state.smoothedLeft * RETRA_OUTPUT_HEADROOM);
+        samples[frame * 2 + 1] = retraClampPcm16(state.smoothedRight * RETRA_OUTPUT_HEADROOM);
+    }
+}
+
+static size_t resampleRetraAudioLocked(
+        mAudioBuffer* source,
+        unsigned sourceRate,
+        unsigned destinationRate,
+        int16_t* output,
+        size_t maxFrames) {
+    if (!source || !output || !maxFrames || !sourceRate || !destinationRate) return 0;
+    if (!ensureRetraAudioResamplerLocked(source, sourceRate, destinationRate)) return 0;
+
+    // Exact-rate path is bit-transparent: no filter, no gain change, no extra
+    // interpolation. This matters on devices/routes whose AudioTrack clock
+    // already matches the emulated stream.
+    if (sourceRate == destinationRate) {
+        retraAudioResampler.position = 0.0;
+        return mAudioBufferRead(source, output, maxFrames);
+    }
+
+    size_t produced = 0;
+    size_t available = mAudioBufferAvailable(source);
+    const double step = static_cast<double>(sourceRate) / destinationRate;
+
+    while (produced < maxFrames) {
+        const double position = retraAudioResampler.position;
+        const int center = static_cast<int>(std::floor(position));
+        if (center + RETRA_RESAMPLER_RIGHT_TAPS >= static_cast<int>(available)) break;
+
+        double fraction = position - center;
+        int phase = static_cast<int>(fraction * RETRA_RESAMPLER_PHASES);
+        if (phase < 0) phase = 0;
+        if (phase >= RETRA_RESAMPLER_PHASES) phase = RETRA_RESAMPLER_PHASES - 1;
+        const float* weights = &retraAudioResampler.coefficients[
+                phase * RETRA_RESAMPLER_TAPS];
+
+        double left = 0.0;
+        double right = 0.0;
+        for (int tap = 0; tap < RETRA_RESAMPLER_TAPS; ++tap) {
+            const int index = center + tap - RETRA_RESAMPLER_LEFT_TAPS;
+            if (index < 0) continue;
+            const double weight = weights[tap];
+            left += static_cast<double>(mAudioBufferPeek(source, 0, static_cast<size_t>(index))) * weight;
+            if (source->channels > 1) {
+                right += static_cast<double>(mAudioBufferPeek(source, 1, static_cast<size_t>(index))) * weight;
+            } else {
+                right = left;
+            }
+        }
+
+        output[produced * 2] = retraClampPcm16(left);
+        output[produced * 2 + 1] = retraClampPcm16(right);
+        ++produced;
+        retraAudioResampler.position += step;
+    }
+
+    // Keep enough history in mGBA's ring for the left half of the FIR while
+    // consuming old source frames promptly so the native ring cannot overflow.
+    if (retraAudioResampler.position > RETRA_RESAMPLER_HISTORY) {
+        size_t drop = static_cast<size_t>(std::floor(retraAudioResampler.position))
+                - RETRA_RESAMPLER_HISTORY;
+        drop = std::min(drop, available);
+        if (drop > 0) {
+            const size_t consumed = mAudioBufferRead(source, nullptr, drop);
+            retraAudioResampler.position -= consumed;
+        }
+    }
+
+    return produced;
+}
 
 // Retra-only runtime options are kept outside mGBA's public config namespace.
 // They drive behavior that must be applied directly to the native core.
@@ -450,6 +735,7 @@ static void destroyCoreLocked() {
         return;
     }
 
+    resetRetraAudioResamplerLocked();
     removeGbaVideoHook(core);
     if (configInitialized) {
         mCoreConfigDeinit(&core->config);
@@ -755,6 +1041,7 @@ static void destroyPreparedLocalPlayer(LocalLinkPlayer& player) {
 }
 
 static void destroyLocalLinkLocked() {
+    resetRetraAudioResamplerLocked();
     const bool hadLink = localLinkActive.exchange(false, std::memory_order_acq_rel);
     localLinkPaused.store(false, std::memory_order_relaxed);
     activeLocalPlayer.store(0, std::memory_order_relaxed);
@@ -1706,6 +1993,7 @@ Java_com_retra_emulator_MainActivity_readAudioSamples(
         jshortArray output) {
     if (!output) return 0;
     std::lock_guard<std::mutex> lock(coreMutex);
+
     mCore* audioCore = core;
     if (localLinkActive.load(std::memory_order_acquire)) {
         const int playerIndex = activeLocalPlayer.load(std::memory_order_relaxed);
@@ -1713,19 +2001,35 @@ Java_com_retra_emulator_MainActivity_readAudioSamples(
             audioCore = localPlayers[playerIndex].core;
         }
     }
-    if (!audioCore || !audioCore->getAudioBuffer) return 0;
-    struct mAudioBuffer* buffer = audioCore->getAudioBuffer(audioCore);
-    if (!buffer) return 0;
+    if (!audioCore || !audioCore->getAudioBuffer || !audioCore->audioSampleRate) return 0;
+
+    struct mAudioBuffer* source = audioCore->getAudioBuffer(audioCore);
+    if (!source) return 0;
+    const unsigned sourceRate = audioCore->audioSampleRate(audioCore);
+    const unsigned destinationRate = requestedAudioOutputRateLocked();
+
+    // Convert from the core's actual hardware-rate PCM into the exact Android
+    // stream clock with Retra's saturating band-limited resampler. This keeps
+    // pitch/timing correct without allowing loud sinc overshoots to wrap int16.
     const jsize shortCapacity = env->GetArrayLength(output);
     if (shortCapacity < 2) return 0;
     const size_t maxFrames = static_cast<size_t>(shortCapacity) / 2;
-    const size_t available = mAudioBufferAvailable(buffer);
-    const size_t frames = std::min(maxFrames, available);
-    if (!frames) return 0;
+
     jshort* samples = env->GetShortArrayElements(output, nullptr);
     if (!samples) return 0;
-    const size_t produced = mAudioBufferRead(
-            buffer, reinterpret_cast<int16_t*>(samples), frames);
+    const size_t produced = resampleRetraAudioLocked(
+            source,
+            sourceRate,
+            destinationRate,
+            reinterpret_cast<int16_t*>(samples),
+            maxFrames);
+    if (produced > 0) {
+        conditionRetraAudioLocked(
+                source,
+                destinationRate,
+                reinterpret_cast<int16_t*>(samples),
+                produced);
+    }
     env->ReleaseShortArrayElements(output, samples, 0);
     return static_cast<jint>(produced * 2);
 }

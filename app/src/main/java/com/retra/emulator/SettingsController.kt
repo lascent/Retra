@@ -2,11 +2,13 @@ package com.retra.emulator
 
 import android.content.Intent
 import android.net.Uri
+import android.os.StatFs
+import android.provider.DocumentsContract
 import android.view.View
 import android.widget.ImageView
+import androidx.documentfile.provider.DocumentFile
 import org.json.JSONObject
 import java.io.File
-import com.retra.emulator.MainActivity.Companion.APP_FOLDER_URI_PREF
 import com.retra.emulator.MainActivity.Companion.ARTWORK_WIFI_ONLY_PREF
 import com.retra.emulator.MainActivity.Companion.AUTO_ARTWORK_PREF
 import com.retra.emulator.MainActivity.Companion.AUTO_SAVE_LOAD_PREF
@@ -45,14 +47,32 @@ import com.retra.emulator.MainActivity.Companion.VOLUME_PREF
  * Settings, cloud-picker coordination and runtime preference application.
  * Extracted from MainActivity without changing preference keys or behavior.
  */
-internal fun MainActivity.persistTreePermission(uri: Uri) {
-    try {
-        contentResolver.takePersistableUriPermission(
-            uri,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        )
-    } catch (_: Exception) {
+internal fun MainActivity.persistTreePermission(uri: Uri): Boolean {
+    val readWrite = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+    val persisted = runCatching {
+        contentResolver.takePersistableUriPermission(uri, readWrite)
+        true
+    }.getOrDefault(false)
+
+    // Some document providers are picky about the exact mode passed to
+    // takePersistableUriPermission. Retra requires durable write access; retry
+    // with write-only before rejecting the folder.
+    if (!persisted) {
+        runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
     }
+    return hasPersistedTreeWriteAccess(uri)
+}
+
+internal fun MainActivity.hasPersistedTreeWriteAccess(uri: Uri): Boolean {
+    val hasPersistedWrite = runCatching {
+        contentResolver.persistedUriPermissions.any { permission ->
+            permission.uri == uri && permission.isWritePermission
+        }
+    }.getOrDefault(false)
+    if (!hasPersistedWrite) return false
+    return runCatching {
+        DocumentFile.fromTreeUri(this, uri)?.let { it.exists() && it.isDirectory && it.canWrite() } == true
+    }.getOrDefault(false)
 }
 
 internal fun MainActivity.settingsStateJson(): String = JSONObject().apply {
@@ -94,6 +114,15 @@ internal fun MainActivity.settingsStateJson(): String = JSONObject().apply {
     put("buttonsOpacity", prefs.getInt(BUTTON_OPACITY_PREF, 70).coerceIn(25, 100))
     put("biosFileLabel", prefs.getString(BIOS_LAST_LABEL_PREF, "No BIOS selected") ?: "No BIOS selected")
 }.toString()
+
+internal fun MainActivity.storageSummaryJson(): String {
+    val stat = StatFs(filesDir.absolutePath)
+    fun decimalGb(bytes: Long): Long = kotlin.math.round(bytes / 1_000_000_000.0).toLong()
+    return JSONObject()
+        .put("availableGb", decimalGb(stat.availableBytes))
+        .put("totalGb", decimalGb(stat.totalBytes))
+        .toString()
+}
 
 internal fun MainActivity.notifyWebSettingsState() {
     if (!hasBinding()) return
@@ -199,6 +228,9 @@ internal fun MainActivity.updateSetting(key: String, value: String): Boolean {
         else -> return false
     }
     editor.apply()
+    // The preference cache is updated synchronously by RetraPreferences.apply(),
+    // so the portable settings snapshot can be queued immediately.
+    syncAppFolderAsync(showResult = false)
     if (key == "automaticArtwork" || key == "artworkWifiOnly") {
         artworkRepository.resumeDeferred()
     }
@@ -227,6 +259,53 @@ internal fun MainActivity.updateSetting(key: String, value: String): Boolean {
     return true
 }
 
+/**
+ * Fast path for settings changed continuously by range controls.
+ *
+ * The generic updateSetting() path intentionally reapplies the complete runtime
+ * settings surface and refreshes portable metadata. That is correct for discrete
+ * toggles, but wasteful for a slider that may emit dozens of events per second.
+ * This path updates only the affected subsystem while a drag is active and does
+ * one portable-metadata refresh when the UI reports the final value.
+ */
+internal fun MainActivity.updateRangeSetting(key: String, rawValue: Int, commit: Boolean): Boolean {
+    val value = when (key) {
+        "buttonsOpacity" -> rawValue.coerceIn(25, 100)
+        "frameSkip" -> rawValue.coerceIn(0, 10)
+        "volume" -> rawValue.coerceIn(0, 100)
+        "smcCheck" -> rawValue.coerceIn(0, 10)
+        else -> return false
+    }
+
+    when (key) {
+        "buttonsOpacity" -> prefs.edit().putInt(BUTTON_OPACITY_PREF, value).apply()
+        "frameSkip" -> prefs.edit().putInt(FRAME_SKIP_PREF, value).apply()
+        "volume" -> prefs.edit().putInt(VOLUME_PREF, value).apply()
+        "smcCheck" -> prefs.edit().putInt(SMC_CHECK_PREF, value).apply()
+    }
+
+    runOnUiThread {
+        when (key) {
+            "buttonsOpacity" -> {
+                preferredButtonsOpacity = value / 100f
+                applyNativeButtonsOpacity()
+            }
+            "frameSkip" -> {
+                try { setCoreConfigOption("frameskip", value.toString()) } catch (_: Throwable) {}
+            }
+            "volume" -> audioController.setVolume(value / 100f)
+            "smcCheck" -> {
+                try { setCoreConfigOption("retra.syncCheckLevel", value.toString()) } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    // Keep the expensive portable settings.json rewrite/export off the hot drag
+    // path. The final change/pointer release always commits the latest value.
+    if (commit) syncAppFolderAsync(showResult = false)
+    return true
+}
+
 internal fun MainActivity.resetAdvancedSettingsInternal() {
     prefs.edit()
         .putString(CPU_CORE_PREF, "Automatic")
@@ -239,6 +318,7 @@ internal fun MainActivity.resetAdvancedSettingsInternal() {
         .apply()
     applyRuntimeSettingsToNative()
     notifyWebSettingsState()
+    syncAppFolderAsync(showResult = false)
 }
 
 internal fun MainActivity.openImportPicker() {
@@ -268,26 +348,85 @@ internal fun MainActivity.requestCloudSyncFolder() {
 }
 
 internal fun MainActivity.openAppFolderInternal() {
-    val existing = prefs.getString(APP_FOLDER_URI_PREF, null)?.let {
-        try { Uri.parse(it) } catch (_: Exception) { null }
-    }
-    pendingAppFolderSelection = true
-    if (existing == null) {
-        RetraNotice.makeText(this, "Choose or create your Retra data folder", RetraNotice.LENGTH_LONG).show()
-    }
+    // Retra now owns its data root and exposes it through a DocumentsProvider,
+    // like emulator apps that appear as a dedicated location in Android Files.
+    // No ACTION_OPEN_DOCUMENT_TREE is involved here, so there is no "Use this
+    // folder" confirmation and no permission that has to be renewed later.
+    syncAppFolderAsync(showResult = false)
 
-    // Always use the registered picker so "Use this folder" returns the selected
-    // tree to Retra. The picker callback persists the permission/path and only
-    // then exports into the existing folder structure. This avoids exporting to
-    // an old tree before the user's selection is confirmed.
-    appFolderPicker.launch(existing)
+    // Open the provider ROOT, not its root document. Android DocumentsUI has a
+    // dedicated ACTION_VIEW route for Root.MIME_TYPE_ITEM; using a directory
+    // document URI can make some OEM file managers fall back to Downloads.
+    val rootUri = RetraDocumentsProvider.rootUri()
+    val browseIntent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(rootUri, DocumentsContract.Root.MIME_TYPE_ITEM)
+        addCategory(Intent.CATEGORY_DEFAULT)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+    }
+    val opened = runCatching {
+        if (browseIntent.resolveActivity(packageManager) != null) {
+            startActivity(browseIntent)
+            true
+        } else false
+    }.getOrDefault(false)
+
+    if (!opened) {
+        // Some OEM file managers don't register the standard directory VIEW
+        // handler. Retra is still available as a "Retra" location in the
+        // system document navigator; never fall back to a folder-selection
+        // picker because that would reintroduce the unwanted confirmation.
+        RetraNotice.makeText(
+            this,
+            "Open Android Files and choose Retra from the storage locations",
+            RetraNotice.LENGTH_LONG
+        ).show()
+    }
 }
 
 internal fun MainActivity.deleteCloudPathsAsync(paths: List<String>) { cloudSync.deletePaths(paths) }
 
-internal fun MainActivity.syncCloudAsync(showResult: Boolean) = cloudSync.sync(showResult)
+internal fun MainActivity.syncCloudAsync(showResult: Boolean) {
+    // Keep Retra's provider-backed metadata current independently of optional cloud sync.
+    syncAppFolderAsync(showResult = false)
+    cloudSync.sync(showResult)
+}
+
+internal fun MainActivity.syncAppFolderAsync(showResult: Boolean) {
+    // The DocumentsProvider exposes the exact persistent_data directory Retra
+    // already writes to, so saves never need to be copied to a selected tree.
+    // Keep only the coalesced metadata refresh so settings.json stays current
+    // without making slider changes or rapid save-state writes expensive.
+    appFolderSyncDirty.set(true)
+    if (!appFolderSyncQueued.compareAndSet(false, true)) return
+
+    runCatching {
+        ioExecutor.execute {
+            try {
+                do {
+                    appFolderSyncDirty.set(false)
+                    runCatching { writePortableMetadataFiles() }
+                    RetraDocumentsProvider.notifyDataChanged(this)
+                } while (appFolderSyncDirty.get())
+            } finally {
+                appFolderSyncQueued.set(false)
+                if (appFolderSyncDirty.get()) syncAppFolderAsync(showResult = false)
+            }
+            if (showResult) runOnUiThread {
+                RetraNotice.makeText(
+                    this,
+                    "Retra app folder is always active • no folder permission needed",
+                    RetraNotice.LENGTH_LONG
+                ).show()
+            }
+        }
+    }.onFailure {
+        appFolderSyncQueued.set(false)
+    }
+}
 
 internal fun MainActivity.exportSaveDataToTreeAsync(uri: Uri, showResult: Boolean) {
+    // Kept for explicit one-off export callers; the built-in Retra app folder
+    // itself no longer depends on a user-selected SAF tree.
     ioExecutor.execute {
         val exported = runCatching { saveTransfer.export(uri) }.getOrDefault(0)
         if (showResult) runOnUiThread {

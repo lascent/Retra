@@ -65,10 +65,56 @@ set(RETRA_MGBA_SOURCE_DIR "${RETRA_MGBA_DEFAULT_DIR}"
     CACHE PATH "Path to the mGBA source checkout")
 if(NOT EXISTS "${RETRA_MGBA_SOURCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR
-        "mGBA source is missing. Put a compatible checkout in third_party/mgba, "
-        "keep the legacy sibling mgba folder beside Retra, or set RETRA_MGBA_SOURCE_DIR. "
-        "See README.md.")
+        "mGBA source is missing. Run tools/prepare_mgba.py to fetch Retra's locked revision, "
+        "or set RETRA_MGBA_SOURCE_DIR to a checkout of that exact revision. See README.md.")
 endif()
+
+# Reproducible native builds: Retra is validated against one exact mGBA commit.
+# Do not silently build against whatever happens to be present on a developer's
+# machine. A normal Git checkout is verified directly; source archives may carry
+# a .retra-mgba-revision marker created from a verified checkout.
+set(RETRA_MGBA_EXPECTED_REVISION "543a197582c30364584d773a974d7f991892fa43")
+find_package(Git QUIET)
+set(RETRA_MGBA_ACTUAL_REVISION "")
+if(GIT_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -C "${RETRA_MGBA_SOURCE_DIR}" rev-parse HEAD
+        RESULT_VARIABLE RETRA_MGBA_GIT_RESULT
+        OUTPUT_VARIABLE RETRA_MGBA_GIT_HEAD
+        ERROR_QUIET
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(RETRA_MGBA_GIT_RESULT EQUAL 0)
+        string(TOLOWER "${RETRA_MGBA_GIT_HEAD}" RETRA_MGBA_ACTUAL_REVISION)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" -C "${RETRA_MGBA_SOURCE_DIR}" status --porcelain --untracked-files=no
+            OUTPUT_VARIABLE RETRA_MGBA_DIRTY
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(NOT RETRA_MGBA_DIRTY STREQUAL "")
+            message(FATAL_ERROR
+                "mGBA has tracked local modifications. Retra release builds require the clean locked source revision.")
+        endif()
+    endif()
+endif()
+if(RETRA_MGBA_ACTUAL_REVISION STREQUAL "" AND EXISTS "${RETRA_MGBA_SOURCE_DIR}/.retra-mgba-revision")
+    file(READ "${RETRA_MGBA_SOURCE_DIR}/.retra-mgba-revision" RETRA_MGBA_MARKER)
+    string(STRIP "${RETRA_MGBA_MARKER}" RETRA_MGBA_ACTUAL_REVISION)
+    string(TOLOWER "${RETRA_MGBA_ACTUAL_REVISION}" RETRA_MGBA_ACTUAL_REVISION)
+endif()
+if(RETRA_MGBA_ACTUAL_REVISION STREQUAL "")
+    message(FATAL_ERROR
+        "Could not verify the mGBA source revision. Use tools/prepare_mgba.py or provide a verified "
+        "source archive containing .retra-mgba-revision.")
+endif()
+if(NOT RETRA_MGBA_ACTUAL_REVISION STREQUAL RETRA_MGBA_EXPECTED_REVISION)
+    message(FATAL_ERROR
+        "Wrong mGBA revision. Retra requires ${RETRA_MGBA_EXPECTED_REVISION}, "
+        "but ${RETRA_MGBA_ACTUAL_REVISION} is checked out.")
+endif()
+message(STATUS "Retra verified mGBA revision: ${RETRA_MGBA_ACTUAL_REVISION}")
+
 add_subdirectory(
         "${RETRA_MGBA_SOURCE_DIR}"
         "${CMAKE_CURRENT_BINARY_DIR}/mgba"

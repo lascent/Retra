@@ -59,10 +59,13 @@ test('fresh installs default to crisp nearest-neighbor GBA scaling', () => {
   assert.doesNotMatch(html, /checked="" id="linearFilteringToggle"/);
 });
 
-test('audio output cannot block the emulation frame loop and retains partial writes', () => {
-  assert.match(audio, /AudioTrack\.WRITE_NON_BLOCKING/);
-  assert.match(audio, /pendingOffset \+= written/);
-  assert.match(audio, /written == 0/);
+test('audio output cannot block the emulation frame loop and is isolated on an audio-priority writer', () => {
+  assert.match(audio, /flushPendingOutput\(\)[\s\S]*enqueueOutput\(packet\)/);
+  assert.match(audio, /Thread\(::audioWriterLoop, "Retra-Audio"\)/);
+  assert.match(audio, /Process\.THREAD_PRIORITY_AUDIO/);
+  assert.match(audio, /AudioTrack\.WRITE_BLOCKING/);
+  assert.match(audio, /PREBUFFER_MS = 32/);
+  assert.match(audio, /safeUnderrunCount/);
   assert.match(audio, /MAX_PENDING_AUDIO_MS = 200/);
 });
 

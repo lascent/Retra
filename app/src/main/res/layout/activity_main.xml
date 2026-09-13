@@ -292,7 +292,7 @@
                     android:text="" />
             </LinearLayout>
 
-            <!-- A/B group with B slightly left/up and A right/down, matching v3.72. -->
+            <!-- A/B group: A and B share the same vertical centerline. -->
             <FrameLayout
                 android:id="@+id/abContainer"
                 android:layout_width="150dp"
@@ -305,7 +305,7 @@
                     android:id="@+id/buttonB"
                     android:layout_width="54dp"
                     android:layout_height="54dp"
-                    android:layout_gravity="top|start"
+                    android:layout_gravity="center_vertical|start"
                     android:background="@drawable/bg_controller_circle"
                     android:gravity="center"
                     android:fontFamily="sans-serif-medium"
@@ -318,7 +318,7 @@
                     android:id="@+id/buttonA"
                     android:layout_width="54dp"
                     android:layout_height="54dp"
-                    android:layout_gravity="bottom|end"
+                    android:layout_gravity="center_vertical|end"
                     android:background="@drawable/bg_controller_circle"
                     android:gravity="center"
                     android:fontFamily="sans-serif-medium"

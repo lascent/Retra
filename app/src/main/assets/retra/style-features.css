@@ -103,9 +103,9 @@ body.screen-editor-landscape .preview-ab span{
   font-size:20px !important;
 }
 body.screen-editor-portrait .preview-ab .button-b,
-body.screen-editor-landscape .preview-ab .button-b{left:0 !important; top:0 !important;}
+body.screen-editor-landscape .preview-ab .button-b{left:0 !important; top:20px !important; bottom:auto !important;}
 body.screen-editor-portrait .preview-ab .button-a,
-body.screen-editor-landscape .preview-ab .button-a{left:auto !important; right:0 !important; top:auto !important; bottom:0 !important;}
+body.screen-editor-landscape .preview-ab .button-a{left:auto !important; right:0 !important; top:20px !important; bottom:auto !important;}
 
 /* User-saved inline x/y remains authoritative after the deterministic base
    dimensions above have been measured. */
@@ -306,12 +306,12 @@ body[data-resolved-mode="light"] .recent-saves-empty{
    layout profile screen while still respecting gesture/navigation safe areas. */
 #layoutsSettingsPage #addLayoutProfileBtn{
   right:22px;
-  bottom:calc(54px + env(safe-area-inset-bottom, 0px));
+  bottom:calc(54px + var(--device-safe-bottom));
 }
 
 /* User-requested Categories FAB adjustment: move it a little farther upward. */
 #categoriesPage #addCategoryBtn{
-  bottom:calc(58px + env(safe-area-inset-bottom, 0px));
+  bottom:calc(58px + var(--device-safe-bottom));
 }
 
 .layout-profile-modal-card input{
@@ -321,10 +321,10 @@ body[data-resolved-mode="light"] .recent-saves-empty{
 @media (orientation:landscape) and (max-height:480px){
   #layoutsSettingsPage #addLayoutProfileBtn{
     right:18px;
-    bottom:calc(18px + env(safe-area-inset-bottom, 0px));
+    bottom:calc(18px + var(--device-safe-bottom));
   }
   #categoriesPage #addCategoryBtn{
-    bottom:calc(18px + env(safe-area-inset-bottom, 0px));
+    bottom:calc(18px + var(--device-safe-bottom));
   }
 }
 
@@ -348,11 +348,11 @@ body[data-resolved-mode="light"] .recent-saves-empty{
 
   #romFilterSheetBackdrop .sheet-content {
     max-height: calc(72vh - 118px);
-    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(14px, var(--device-safe-bottom));
   }
 
   #romFilterSheetBackdrop .sheet-actions {
-    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(6px, var(--device-safe-bottom));
   }
 }
 

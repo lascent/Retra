@@ -87,8 +87,8 @@ body[data-resolved-mode="light"] .entry-item{
    full-width hero/section backgrounds. Safe-area insets are respected too. */
 .rom-hero,
 .rom-detail-body{
-  padding-left:max(var(--rom-detail-gutter), env(safe-area-inset-left));
-  padding-right:max(var(--rom-detail-gutter), env(safe-area-inset-right));
+  padding-left:max(var(--rom-detail-gutter), var(--device-safe-left));
+  padding-right:max(var(--rom-detail-gutter), var(--device-safe-right));
 }
 
 .rom-actions,
@@ -206,8 +206,8 @@ body[data-resolved-mode="light"] .entry-item{
    the save-state rows span the full phone content width just like Settings
    detail rows. The text and menu buttons stay comfortably inset. */
 .rom-detail-body{
-  --rom-edge-left:max(var(--rom-detail-gutter), env(safe-area-inset-left));
-  --rom-edge-right:max(var(--rom-detail-gutter), env(safe-area-inset-right));
+  --rom-edge-left:max(var(--rom-detail-gutter), var(--device-safe-left));
+  --rom-edge-right:max(var(--rom-detail-gutter), var(--device-safe-right));
   padding-left:var(--rom-edge-left);
   padding-right:var(--rom-edge-right);
 }
@@ -550,7 +550,7 @@ body[data-theme="aurora-mint"] .add-rom-btn{
   z-index:240;
   align-items:flex-end;
   justify-content:center;
-  padding:14px 14px max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px));
+  padding:14px 14px max(14px, calc(var(--device-safe-bottom) + 10px));
   background:rgba(5,6,12,.56);
   backdrop-filter:blur(6px);
   -webkit-backdrop-filter:blur(6px);
@@ -737,7 +737,7 @@ body.more-headerless .add-rom-btn{
 
 .add-rom-btn{
   position:absolute;
-  right:max(14px, calc(env(safe-area-inset-right, 0px) + 14px));
+  right:max(14px, calc(var(--device-safe-right) + 14px));
   bottom:calc(var(--bottom-nav-total-height) + 14px);
   width:56px;
   height:56px;
@@ -753,15 +753,15 @@ body.rom-detail-open .rom-detail-page{
   margin-top:0;
 }
 body.rom-detail-open .rom-hero{
-  /* Keep the detail hero controls/title comfortably below the status bar.
-     The extra clamp makes the inset scale naturally across compact phones,
-     tall phones and larger devices instead of sitting too close to the top. */
-  padding-top:calc(env(safe-area-inset-top, 0px) + clamp(18px, 4.8vw, 30px));
+  /* Single-owner top safe area: the hero consumes the real Android status-bar
+     / cutout inset once, plus only a compact design gap. This stays clean on
+     high-density phones, tablets, unusual aspect ratios and landscape. */
+  padding-top:calc(var(--device-safe-top) + clamp(8px, 2.5vw, 12px));
 }
 
 .resume-fab{
   right:max(14px, calc((100vw - 428px)/2 + 14px));
-  bottom:max(24px, calc(env(safe-area-inset-bottom, 0px) + 24px));
+  bottom:max(24px, calc(var(--device-safe-bottom) + 24px));
   min-width:148px;
   height:60px;
   padding:0 18px;
@@ -776,17 +776,17 @@ body.rom-detail-open .rom-hero{
 
 @media (max-width:470px){
   .add-rom-btn{
-    right:max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
+    right:max(12px, calc(var(--device-safe-right) + 12px));
     bottom:calc(var(--bottom-nav-total-height) + 10px);
     width:54px;
     height:54px;
   }
   body.rom-detail-open .rom-hero{
-    padding-top:calc(env(safe-area-inset-top, 0px) + clamp(16px, 5.2vw, 24px));
+    padding-top:calc(var(--device-safe-top) + clamp(8px, 2.8vw, 10px));
   }
   .resume-fab{
-    right:max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
-    bottom:max(26px, calc(env(safe-area-inset-bottom, 0px) + 26px));
+    right:max(12px, calc(var(--device-safe-right) + 12px));
+    bottom:max(26px, calc(var(--device-safe-bottom) + 26px));
     min-width:142px;
     height:56px;
     padding:0 16px;
@@ -968,12 +968,12 @@ body.landscape-preview-mode .preview-start-select span{
 
 /* Keep add/back/scale controls clear of the outer edge. */
 body.landscape-preview-mode .preview-add-fab{
-  top:max(10px, env(safe-area-inset-top, 0px));
-  right:max(10px, env(safe-area-inset-right, 0px));
+  top:max(10px, var(--device-safe-top));
+  right:max(10px, var(--device-safe-right));
 }
 body.landscape-preview-mode .screen-size-page > .sub-header{
-  top:max(10px, env(safe-area-inset-top, 0px));
-  left:max(10px, env(safe-area-inset-left, 0px));
+  top:max(10px, var(--device-safe-top));
+  left:max(10px, var(--device-safe-left));
 }
 
 /* Very short Android landscape screens: tighten one more step so nothing is cut. */
@@ -1107,12 +1107,12 @@ body.landscape-preview-mode .preview-dpad{left:6px; bottom:6px;}
 body.landscape-preview-mode .preview-ab{right:6px; bottom:6px;}
 body.landscape-preview-mode .preview-start-select{bottom:6px;}
 body.landscape-preview-mode .preview-add-fab{
-  top:max(6px, env(safe-area-inset-top, 0px));
-  right:max(6px, env(safe-area-inset-right, 0px));
+  top:max(6px, var(--device-safe-top));
+  right:max(6px, var(--device-safe-right));
 }
 body.landscape-preview-mode .screen-size-page > .sub-header{
-  top:max(6px, env(safe-area-inset-top, 0px));
-  left:max(6px, env(safe-area-inset-left, 0px));
+  top:max(6px, var(--device-safe-top));
+  left:max(6px, var(--device-safe-left));
 }
 
 @media (orientation:landscape) and (max-height:390px){
@@ -1172,10 +1172,10 @@ body[data-resolved-mode="light"] .preview-scale-handle.screen-scale-mode svg{
   backdrop-filter:blur(4px);
   -webkit-backdrop-filter:blur(4px);
   padding:
-    max(14px, env(safe-area-inset-top))
-    max(14px, env(safe-area-inset-right))
-    max(14px, env(safe-area-inset-bottom))
-    max(14px, env(safe-area-inset-left));
+    max(14px, var(--device-safe-top))
+    max(14px, var(--device-safe-right))
+    max(14px, var(--device-safe-bottom))
+    max(14px, var(--device-safe-left));
   transition:
     opacity 150ms cubic-bezier(.2,.75,.25,1),
     visibility 0s linear 150ms;
@@ -1372,7 +1372,7 @@ body[data-translucent="true"] .selection-modal .myboy-dialog-card:not(.import-sa
   .selection-modal .selection-modal-card:not(.import-saves-card){
     width:min(330px, calc(100vw - 28px));
     max-width:330px;
-    max-height:calc(100dvh - max(28px, env(safe-area-inset-top)) - max(28px, env(safe-area-inset-bottom)));
+    max-height:calc(100dvh - max(28px, var(--device-safe-top)) - max(28px, var(--device-safe-bottom)));
     padding:16px 16px 12px;
     backdrop-filter:none;
     -webkit-backdrop-filter:none;
@@ -1783,15 +1783,15 @@ body[data-translucent="true"] .selection-modal .myboy-dialog-card:not(.import-sa
 }
 #screenSizePage .preview-ab .button-b{
   left:0 !important;
-  top:0 !important;
+  top:20px !important;
   right:auto !important;
   bottom:auto !important;
 }
 #screenSizePage .preview-ab .button-a{
   left:auto !important;
-  top:auto !important;
+  top:20px !important;
   right:0 !important;
-  bottom:0 !important;
+  bottom:auto !important;
 }
 
 /* Native optional utilities are 44dp square. */

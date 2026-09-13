@@ -1,0 +1,4 @@
+# Retra mGBA source lock
+# This is the exact mGBA revision documented by the validated Retra integration.
+repository=https://github.com/mgba-emu/mgba.git
+revision=543a197582c30364584d773a974d7f991892fa43

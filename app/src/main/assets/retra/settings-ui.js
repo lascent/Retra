@@ -62,7 +62,7 @@ function applyUiFont(fontName, { persist = false, notify = false } = {}){
   });
 
   if (settingsVersionLabel) {
-    settingsVersionLabel.textContent = 'Retra v1.0.0';
+    settingsVersionLabel.textContent = 'Retra v1.0.1';
   }
 
   if (persist) { localStorage.setItem(fontStorageKey, selected); setNativeUiPreference('font', selected); }
@@ -627,14 +627,62 @@ applyFastForwardSpeed();
 // Android DataStore is authoritative on device. Native settings are pulled below
 // through getSettingsState(); localStorage is only a browser/offline fallback.
 
+// High-frequency range controls get a dedicated bridge path. Labels and purely
+// visual previews update for every browser input event, while native work is
+// rate-limited to one update per short interval and receives one explicit final
+// commit when the gesture/key adjustment ends. This keeps WebView->JNI/DataStore
+// traffic off the hot pointer path without making volume/opacity feel delayed.
+function createNativeRangeDispatcher(key, intervalMs = 64){
+  let pendingValue = null;
+  let timer = 0;
+  let lastSentAt = 0;
+
+  const send = (commit) => {
+    if (timer) {
+      window.clearTimeout(timer);
+      timer = 0;
+    }
+    if (pendingValue === null) return;
+    const value = pendingValue;
+    pendingValue = null;
+    lastSentAt = performance.now();
+    try {
+      if (window.AndroidBridge && typeof window.AndroidBridge.setRangeSetting === 'function') {
+        window.AndroidBridge.setRangeSetting(key, value, Boolean(commit));
+      } else if (key === 'buttonsOpacity' && window.AndroidBridge && typeof window.AndroidBridge.setButtonsOpacity === 'function') {
+        window.AndroidBridge.setButtonsOpacity(value);
+      } else if (window.AndroidBridge && typeof window.AndroidBridge.setSetting === 'function') {
+        window.AndroidBridge.setSetting(key, String(value));
+      }
+    } catch (_) {}
+  };
+
+  return {
+    input(value){
+      pendingValue = Number.parseInt(value, 10) || 0;
+      const elapsed = performance.now() - lastSentAt;
+      if (lastSentAt === 0 || elapsed >= intervalMs) {
+        send(false);
+        return;
+      }
+      if (!timer) timer = window.setTimeout(() => send(false), Math.max(0, intervalMs - elapsed));
+    },
+    commit(value){
+      pendingValue = Number.parseInt(value, 10) || 0;
+      send(true);
+    }
+  };
+}
+
 const buttonsOpacityRange = document.getElementById('buttonsOpacityRange');
 const buttonsOpacityValue = document.getElementById('buttonsOpacityValue');
 const buttonsOpacityStorageKey = 'retraButtonsOpacity';
+const buttonsOpacityDispatch = createNativeRangeDispatcher('buttonsOpacity', 64);
 let selectedButtonsOpacity = Number.parseInt(localStorage.getItem(buttonsOpacityStorageKey) || '70', 10);
 if (!Number.isFinite(selectedButtonsOpacity)) selectedButtonsOpacity = 70;
 selectedButtonsOpacity = Math.min(100, Math.max(25, selectedButtonsOpacity));
 
-function applyButtonsOpacity(value, persist = false){
+function applyButtonsOpacity(value, persistLocal = false){
   const opacity = Math.min(100, Math.max(25, Number.parseInt(value, 10) || 70));
   selectedButtonsOpacity = opacity;
   if (buttonsOpacityRange) buttonsOpacityRange.value = String(opacity);
@@ -643,37 +691,40 @@ function applyButtonsOpacity(value, persist = false){
   // Preview the exact setting in the Screen Editor without fading editor-only
   // controls such as Back, Add Controller, resize handles, or selection UI.
   document.documentElement.style.setProperty('--retra-buttons-opacity', String(opacity / 100));
-
-  if (persist) {
-    localStorage.setItem(buttonsOpacityStorageKey, String(opacity));
-    if (window.AndroidBridge && typeof window.AndroidBridge.setButtonsOpacity === 'function') {
-      window.AndroidBridge.setButtonsOpacity(opacity);
-    }
-  }
+  if (persistLocal) localStorage.setItem(buttonsOpacityStorageKey, String(opacity));
 }
 
 buttonsOpacityRange?.addEventListener('input', () => {
+  applyButtonsOpacity(buttonsOpacityRange.value, false);
+  buttonsOpacityDispatch.input(buttonsOpacityRange.value);
+});
+buttonsOpacityRange?.addEventListener('change', () => {
   applyButtonsOpacity(buttonsOpacityRange.value, true);
+  buttonsOpacityDispatch.commit(buttonsOpacityRange.value);
 });
 
 applyButtonsOpacity(selectedButtonsOpacity, false);
 
 const frameSkipRange = document.getElementById('frameSkipRange');
 const frameSkipValue = document.getElementById('frameSkipValue');
+const frameSkipDispatch = createNativeRangeDispatcher('frameSkip', 72);
 if (frameSkipRange && frameSkipValue){
   frameSkipRange.addEventListener('input', () => {
     frameSkipValue.value = frameSkipRange.value;
-    try { window.AndroidBridge?.setSetting?.('frameSkip', String(frameSkipRange.value)); } catch (_) {}
+    frameSkipDispatch.input(frameSkipRange.value);
   });
+  frameSkipRange.addEventListener('change', () => frameSkipDispatch.commit(frameSkipRange.value));
 }
 
 const volumeRange = document.getElementById('volumeRange');
 const volumeValue = document.getElementById('volumeValue');
+const volumeDispatch = createNativeRangeDispatcher('volume', 48);
 if (volumeRange && volumeValue){
   volumeRange.addEventListener('input', () => {
     volumeValue.value = `${volumeRange.value}%`;
-    try { window.AndroidBridge?.setSetting?.('volume', String(volumeRange.value)); } catch (_) {}
+    volumeDispatch.input(volumeRange.value);
   });
+  volumeRange.addEventListener('change', () => volumeDispatch.commit(volumeRange.value));
 }
 
 const soundFrequencyBtn = document.getElementById('soundFrequencyBtn');
@@ -1069,10 +1120,12 @@ biosToggle?.addEventListener('change', () => {
   if (!biosToggle.checked) setNativeSetting('bootBios', false);
 });
 bootBiosToggle?.addEventListener('change', () => setNativeSetting('bootBios', bootBiosToggle.checked));
+const smcCheckDispatch = createNativeRangeDispatcher('smcCheck', 96);
 smcCheckRange?.addEventListener('input', () => {
   if (smcCheckValue) smcCheckValue.value = smcCheckRange.value;
-  setNativeSetting('smcCheck', smcCheckRange.value);
+  smcCheckDispatch.input(smcCheckRange.value);
 });
+smcCheckRange?.addEventListener('change', () => smcCheckDispatch.commit(smcCheckRange.value));
 
 applyFastForwardButtonMode();
 applyCpuCore();
@@ -1080,3 +1133,89 @@ applyCartridgeSaveType();
 applyColorStyleUi(selectedColorStyle);
 refreshNativeSettings();
 
+
+// v1.0 Data & Storage — selective portable .retra backups.
+const dataStorageOpenFolderBtn = document.getElementById('dataStorageOpenFolderBtn');
+const createBackupStartBtn = document.getElementById('createBackupStartBtn');
+const restoreBackupBtn = document.getElementById('restoreBackupBtn');
+const confirmCreateBackupBtn = document.getElementById('confirmCreateBackupBtn');
+const backupOptionInputs = [...document.querySelectorAll('[data-backup-key]')];
+const dataStorageFreeText = document.getElementById('dataStorageFreeText');
+const dataStorageTotalText = document.getElementById('dataStorageTotalText');
+const dataStorageMeterFill = document.getElementById('dataStorageMeterFill');
+
+function refreshDataStorageSummary(){
+  if (!(window.AndroidBridge && typeof window.AndroidBridge.getStorageSummary === 'function')) return;
+  try {
+    const raw = window.AndroidBridge.getStorageSummary();
+    const state = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+    const available = Math.max(0, Number(state.availableGb) || 0);
+    const total = Math.max(0, Number(state.totalGb) || 0);
+    if (dataStorageFreeText) dataStorageFreeText.textContent = `${Math.round(available)} GB free`;
+    if (dataStorageTotalText) dataStorageTotalText.textContent = total > 0
+      ? `Available: ${Math.round(available)} GB • Total: ${Math.round(total)} GB`
+      : 'Retra uses your phone\'s internal storage';
+    if (dataStorageMeterFill && total > 0) {
+      const usedRatio = Math.max(0, Math.min(1, (total - available) / total));
+      dataStorageMeterFill.style.width = `${Math.round(usedRatio * 100)}%`;
+    }
+  } catch (_) {}
+}
+
+function selectedBackupOptions(){
+  const result = {};
+  backupOptionInputs.forEach(input => { result[input.dataset.backupKey] = Boolean(input.checked); });
+  return result;
+}
+
+function refreshBackupCreateButton(){
+  if (!confirmCreateBackupBtn) return;
+  confirmCreateBackupBtn.disabled = !backupOptionInputs.some(input => input.checked);
+}
+
+backupOptionInputs.forEach(input => input.addEventListener('change', refreshBackupCreateButton));
+refreshBackupCreateButton();
+
+document.querySelector('[data-more-open="dataStoragePage"]')?.addEventListener('click', () => {
+  window.setTimeout(refreshDataStorageSummary, 0);
+});
+
+dataStorageOpenFolderBtn?.addEventListener('click', () => {
+  if (window.AndroidBridge && typeof window.AndroidBridge.openAppFolder === 'function') {
+    window.AndroidBridge.openAppFolder();
+  }
+});
+
+createBackupStartBtn?.addEventListener('click', () => openSubPage('createBackupPage'));
+
+confirmCreateBackupBtn?.addEventListener('click', () => {
+  const selected = selectedBackupOptions();
+  if (!Object.values(selected).some(Boolean)) {
+    showToast('Choose at least one item to back up');
+    return;
+  }
+  if (window.AndroidBridge && typeof window.AndroidBridge.createBackup === 'function') {
+    window.AndroidBridge.createBackup(JSON.stringify(selected));
+  }
+});
+
+restoreBackupBtn?.addEventListener('click', () => {
+  if (window.AndroidBridge && typeof window.AndroidBridge.restoreBackup === 'function') {
+    window.AndroidBridge.restoreBackup();
+  }
+});
+
+window.retraBackupRestored = function(){
+  try { refreshNativeSettings(); } catch (_) {}
+  try {
+    const restoredAppearance = JSON.parse(getNativeUiPreference('appearance') || '{}');
+    Object.assign(appearanceState, appearanceDefaults, restoredAppearance);
+    applyAppearanceState();
+    applyUiFont(getSavedUiFont(), { persist: false, notify: false });
+  } catch (_) {}
+  try {
+    hydrateLibraryFromNativeRoom();
+    renderLibraryFromStorage({ force: true });
+  } catch (_) {}
+  refreshDataStorageSummary();
+};

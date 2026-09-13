@@ -31,8 +31,16 @@
   --content-gutter: clamp(14px, 4.5vw, 20px);
   --header-height: 82px;
   --bottom-nav-height: 84px;
+  /* Native WindowInsets are the authoritative Android safe-area source.
+     env(safe-area-inset-*) stays as a browser/PWA fallback only. */
+  --device-top-ui: 0px;
+  --device-right-ui: 0px;
   --device-bottom-ui: 0px;
+  --device-left-ui: 0px;
+  --device-safe-top: max(env(safe-area-inset-top, 0px), var(--device-top-ui));
+  --device-safe-right: max(env(safe-area-inset-right, 0px), var(--device-right-ui));
   --device-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--device-bottom-ui));
+  --device-safe-left: max(env(safe-area-inset-left, 0px), var(--device-left-ui));
   --bottom-nav-total-height: calc(var(--bottom-nav-height) + var(--device-safe-bottom));
 }
 
@@ -203,7 +211,7 @@ body.landscape-preview-mode .screen-help-text{
   align-items:center;
   justify-content:space-between;
   gap:10px;
-  padding:max(16px, calc(env(safe-area-inset-top, 0px) + 10px)) var(--content-gutter) 14px;
+  padding:max(16px, calc(var(--device-safe-top) + 10px)) var(--content-gutter) 14px;
   min-height:var(--header-height);
   border-bottom:1px solid rgba(255,255,255,.03);
   background:linear-gradient(180deg, var(--header-1) 0%, var(--header-2) 72%, var(--header-3) 100%);
@@ -908,7 +916,7 @@ button.detail-row:hover{background:rgba(255,255,255,.02)}
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:2px;
-  padding:8px max(14px, env(safe-area-inset-right, 0px)) calc(12px + var(--device-safe-bottom)) max(14px, env(safe-area-inset-left, 0px));
+  padding:8px max(14px, var(--device-safe-right)) calc(12px + var(--device-safe-bottom)) max(14px, var(--device-safe-left));
   background:var(--nav-bg);
   border-top:1px solid var(--line);
   transition: background .28s ease, border-color .28s ease, height .2s ease, padding-bottom .2s ease;

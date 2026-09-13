@@ -7,6 +7,8 @@ This directory contains release, architecture, validation, and historical engine
 - [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) — user-facing release notes for Retra v1.0.0
 - [`RELEASE_CHECKLIST_v1.0.0.md`](RELEASE_CHECKLIST_v1.0.0.md) — final publication and device-smoke-test checklist
 - [`DEVELOPMENT_HISTORY.md`](DEVELOPMENT_HISTORY.md) — organized pre-v1.0 development version history
+- [`RETRA_V101_HARDENING_PLAN.md`](RETRA_V101_HARDENING_PLAN.md) — BIOS portability, slider hot-path, mGBA pinning, instrumentation and device-validation hardening
+- [`REAL_DEVICE_VALIDATION_MATRIX_v1.0.1.md`](REAL_DEVICE_VALIDATION_MATRIX_v1.0.1.md) — required physical-device/service validation matrix for v1.0.1
 
 ## Architecture and validation
 

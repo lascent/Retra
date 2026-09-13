@@ -16,6 +16,7 @@ import android.provider.MediaStore
 import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -1104,7 +1105,9 @@ internal fun MainActivity.releaseAllKeys() {
     for (key in 0..9) {
         try { setGameplayKey(key, false) } catch (_: Throwable) {}
     }
-    activeDpadKeys.clear()
+    activeDpadMask = 0
+    activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
+    dpadTouchGeometryValid = false
     if (hasBinding()) {
         binding.buttonUp.isPressed = false
         binding.buttonDown.isPressed = false

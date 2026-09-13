@@ -54,27 +54,48 @@ internal fun MainActivity.bindControls() {
 }
 
 /**
- * Continuous D-pad tracking. A normal per-button touch listener keeps the
- * original button as the touch target, which makes sliding from Up to Right
- * feel sticky. Instead every part of the D-pad forwards its MotionEvents here
- * and we hit-test against the whole pad on every MOVE. This lets the thumb
- * roll between cardinal and diagonal directions without lifting.
+ * Low-latency continuous D-pad tracking.
+ *
+ * Touch geometry is sampled once at the beginning of a gesture and reused for
+ * every MOVE. That keeps 120/240 Hz touch streams allocation-free and avoids
+ * repeated getLocationOnScreen() work on the UI thread. A dedicated pointer
+ * id also prevents another finger from stealing movement during multi-touch.
  */
 internal fun MainActivity.bindDpad() {
-    val handler = View.OnTouchListener { _, event ->
+    val handler = View.OnTouchListener { view, event ->
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN,
+            MotionEvent.ACTION_DOWN -> {
+                activeDpadPointerId = event.getPointerId(event.actionIndex)
+                refreshDpadTouchGeometry()
+                view.parent?.requestDisallowInterceptTouchEvent(true)
+                updateDpadFromMotionEvent(event)
+                true
+            }
+
             MotionEvent.ACTION_MOVE -> {
-                updateDpadFromRawPoint(event.rawX, event.rawY)
+                updateDpadFromMotionEvent(event)
+                true
+            }
+
+            MotionEvent.ACTION_POINTER_UP -> {
+                // Never transfer movement to another finger implicitly. If the
+                // controlling pointer leaves, release immediately so no input
+                // can remain latched.
+                if (event.getPointerId(event.actionIndex) == activeDpadPointerId) {
+                    finishDpadGesture(view)
+                }
                 true
             }
 
             MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL -> {
-                setActiveDpadKeys(emptySet())
+                finishDpadGesture(view)
                 true
             }
 
+            // Extra pointers are ignored here; Android can route them to A/B
+            // and other sibling controls without disturbing the D-pad finger.
+            MotionEvent.ACTION_POINTER_DOWN -> true
             else -> true
         }
     }
@@ -89,55 +110,115 @@ internal fun MainActivity.bindDpad() {
     binding.buttonRight.setOnTouchListener(handler)
 }
 
-internal fun MainActivity.updateDpadFromRawPoint(rawX: Float, rawY: Float) {
+internal fun MainActivity.finishDpadGesture(view: View? = null) {
+    activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
+    dpadTouchGeometryValid = false
+    setActiveDpadMask(0)
+    view?.parent?.requestDisallowInterceptTouchEvent(false)
+}
+
+internal fun MainActivity.refreshDpadTouchGeometry() {
     val pad = binding.dpadContainer
-    if (pad.width <= 0 || pad.height <= 0) return
-
-    val location = IntArray(2)
-    pad.getLocationOnScreen(location)
-    val centerX = location[0] + pad.width / 2f
-    val centerY = location[1] + pad.height / 2f
-    val radius = (minOf(pad.width, pad.height) / 2f).coerceAtLeast(1f)
-    val nx = (rawX - centerX) / radius
-    val ny = (rawY - centerY) / radius
-    val absX = kotlin.math.abs(nx)
-    val absY = kotlin.math.abs(ny)
-
-    // Small centre dead-zone prevents accidental direction changes when the
-    // thumb crosses the middle. Outside it, choose a cardinal direction or
-    // a natural diagonal. The broad diagonal transition makes rolling the
-    // thumb around the pad smooth and forgiving on phones.
-    if (maxOf(absX, absY) < 0.14f) {
-        setActiveDpadKeys(emptySet())
+    if (pad.width <= 0 || pad.height <= 0) {
+        dpadTouchGeometryValid = false
         return
     }
 
-    val next = mutableSetOf<Int>()
-    val maxAxis = maxOf(absX, absY).coerceAtLeast(0.0001f)
-    val diagonal = minOf(absX, absY) / maxAxis >= 0.42f
-
-    if (diagonal || absX > absY) {
-        next += if (nx < 0f) KEY_LEFT else KEY_RIGHT
-    }
-    if (diagonal || absY >= absX) {
-        next += if (ny < 0f) KEY_UP else KEY_DOWN
-    }
-
-    setActiveDpadKeys(next)
+    // Reuse one IntArray for the lifetime of the Activity. Screen Editor scale
+    // does not change measured width/height, so include scaleX/scaleY to keep
+    // the touch map exactly aligned with resized D-pads.
+    pad.getLocationOnScreen(dpadScreenLocation)
+    val scaledWidth = pad.width * kotlin.math.abs(pad.scaleX)
+    val scaledHeight = pad.height * kotlin.math.abs(pad.scaleY)
+    dpadTouchCenterX = dpadScreenLocation[0] + scaledWidth / 2f
+    dpadTouchCenterY = dpadScreenLocation[1] + scaledHeight / 2f
+    dpadTouchRadius = (minOf(scaledWidth, scaledHeight) / 2f).coerceAtLeast(1f)
+    dpadTouchGeometryValid = true
 }
 
-internal fun MainActivity.setActiveDpadKeys(next: Set<Int>) {
-    // Only send JNI changes when a direction actually changes. This avoids
-    // flooding the emulator core with duplicate key events during ACTION_MOVE.
-    (activeDpadKeys - next).forEach { key -> setGameplayKey(key, false) }
-    (next - activeDpadKeys).forEach { key -> setGameplayKey(key, true) }
-    activeDpadKeys.clear()
-    activeDpadKeys.addAll(next)
+internal fun MainActivity.updateDpadFromMotionEvent(event: MotionEvent) {
+    if (activeDpadPointerId == MotionEvent.INVALID_POINTER_ID) return
+    val pointerIndex = event.findPointerIndex(activeDpadPointerId)
+    if (pointerIndex < 0) {
+        // Defensive release for interrupted/malformed pointer streams.
+        finishDpadGesture()
+        return
+    }
 
-    binding.buttonUp.isPressed = KEY_UP in next
-    binding.buttonDown.isPressed = KEY_DOWN in next
-    binding.buttonLeft.isPressed = KEY_LEFT in next
-    binding.buttonRight.isPressed = KEY_RIGHT in next
+    // Per-pointer raw coordinates arrived in API 29. Retra keeps minSdk 26,
+    // so derive them from pointer 0 on older Android releases.
+    val rawX = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        event.getRawX(pointerIndex)
+    } else {
+        event.rawX + (event.getX(pointerIndex) - event.getX(0))
+    }
+    val rawY = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        event.getRawY(pointerIndex)
+    } else {
+        event.rawY + (event.getY(pointerIndex) - event.getY(0))
+    }
+
+    updateDpadFromRawPoint(rawX, rawY)
+}
+
+internal fun MainActivity.updateDpadFromRawPoint(rawX: Float, rawY: Float) {
+    if (!dpadTouchGeometryValid) refreshDpadTouchGeometry()
+    if (!dpadTouchGeometryValid) return
+
+    val nx = (rawX - dpadTouchCenterX) / dpadTouchRadius
+    val ny = (rawY - dpadTouchCenterY) / dpadTouchRadius
+    val absX = kotlin.math.abs(nx)
+    val absY = kotlin.math.abs(ny)
+    val radialDistance = kotlin.math.hypot(nx.toDouble(), ny.toDouble()).toFloat()
+
+    // Centre dead-zone hysteresis: entering a direction needs 15% radius,
+    // while an already-held direction releases only inside 10%. This removes
+    // centre jitter without making direction changes feel sticky.
+    val deadZone = if (activeDpadMask == 0) 0.15f else 0.10f
+    if (radialDistance < deadZone) {
+        setActiveDpadMask(0)
+        return
+    }
+
+    // Diagonal hysteresis: enter at 0.44, remain diagonal down to 0.35.
+    // Tiny thumb jitter can no longer flap RIGHT <-> UP+RIGHT every frame.
+    val maxAxis = maxOf(absX, absY).coerceAtLeast(0.0001f)
+    val axisRatio = minOf(absX, absY) / maxAxis
+    val wasDiagonal = activeDpadMask != 0 &&
+        (activeDpadMask and (activeDpadMask - 1)) != 0
+    val diagonalThreshold = if (wasDiagonal) 0.35f else 0.44f
+    val diagonal = axisRatio >= diagonalThreshold
+
+    var nextMask = 0
+    if (diagonal || absX > absY) {
+        nextMask = nextMask or (1 shl (if (nx < 0f) KEY_LEFT else KEY_RIGHT))
+    }
+    if (diagonal || absY >= absX) {
+        nextMask = nextMask or (1 shl (if (ny < 0f) KEY_UP else KEY_DOWN))
+    }
+
+    setActiveDpadMask(nextMask)
+}
+
+internal fun MainActivity.setActiveDpadMask(nextMask: Int) {
+    if (activeDpadMask == nextMask) return
+
+    // Only changed directions cross JNI or touch View state. Duplicate MOVE
+    // events for the same direction therefore do essentially no work.
+    fun syncDirection(key: Int, view: View) {
+        val bit = 1 shl key
+        val wasPressed = activeDpadMask and bit != 0
+        val isPressed = nextMask and bit != 0
+        if (wasPressed == isPressed) return
+        setGameplayKey(key, isPressed)
+        view.isPressed = isPressed
+    }
+
+    syncDirection(KEY_UP, binding.buttonUp)
+    syncDirection(KEY_DOWN, binding.buttonDown)
+    syncDirection(KEY_LEFT, binding.buttonLeft)
+    syncDirection(KEY_RIGHT, binding.buttonRight)
+    activeDpadMask = nextMask
 }
 
 internal fun MainActivity.bindKey(view: View, key: Int) {
@@ -188,8 +269,7 @@ internal fun MainActivity.leaveEmulatorPresentation() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
     } else {
-        WindowInsetsControllerCompat(window, binding.root).show(WindowInsetsCompat.Type.systemBars())
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        webUiInsetsManager.activateForWebUi()
     }
     applyPreferredOrientation(preferredOrientationValue)
 }
@@ -214,8 +294,7 @@ internal fun MainActivity.setScreenEditorPresentation(active: Boolean) {
             WindowCompat.setDecorFitsSystemWindows(window, true)
         }
     } else {
-        WindowInsetsControllerCompat(window, binding.root).show(WindowInsetsCompat.Type.systemBars())
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        webUiInsetsManager.activateForWebUi()
     }
 }
 
@@ -568,7 +647,7 @@ internal fun MainActivity.ensureGroupedAbButtons() {
             binding.abContainer.addView(
                 view,
                 FrameLayout.LayoutParams(dp(54f).roundToInt(), dp(54f).roundToInt()).apply {
-                    gravity = if (isA) Gravity.BOTTOM or Gravity.END else Gravity.TOP or Gravity.START
+                    gravity = Gravity.CENTER_VERTICAL or if (isA) Gravity.END else Gravity.START
                 }
             )
         } else {
@@ -576,7 +655,7 @@ internal fun MainActivity.ensureGroupedAbButtons() {
                 dp(54f).roundToInt(),
                 dp(54f).roundToInt()
             ).apply {
-                gravity = if (isA) Gravity.BOTTOM or Gravity.END else Gravity.TOP or Gravity.START
+                gravity = Gravity.CENTER_VERTICAL or if (isA) Gravity.END else Gravity.START
             }
         }
         view.translationX = 0f

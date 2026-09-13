@@ -15,22 +15,48 @@ const native = read('app/src/main/cpp/native-lib.cpp');
 test('gameplay actively drains mGBA PCM and speed-syncs it into AudioTrack', () => {
   assert.match(session, /audioController\.pump\([\s\S]*speed = speed,[\s\S]*flushOutput = \(i == loops - 1\)/);
   assert.match(audio, /readSamples\(nativeScratch\)/);
-  assert.match(audio, /AudioTrack\.WRITE_NON_BLOCKING/);
-  assert.doesNotMatch(audio, /AudioTrack\.WRITE_BLOCKING/);
+  assert.match(audio, /Thread\(::audioWriterLoop, "Retra-Audio"\)/);
+  assert.match(audio, /Process\.THREAD_PRIORITY_AUDIO/);
+  assert.match(audio, /AudioTrack\.WRITE_BLOCKING/);
+  assert.match(audio, /flushPendingOutput\(\)[\s\S]*enqueueOutput\(packet\)/);
   assert.match(audio, /appendTurboAveraged/);
   assert.match(audio, /appendSlowInterpolated/);
 });
 
 test('audio pipeline prevents crackle from dropped partial writes and smooths speed transitions', () => {
-  assert.match(audio, /pendingOffset \+= written/);
-  assert.match(audio, /compactPendingOutput/);
-  assert.match(audio, /trimAudioBacklogIfNeeded/);
-  assert.match(audio, /ERROR_DEAD_OBJECT/);
+  assert.match(audio, /PREBUFFER_MS = 32/);
+  assert.match(audio, /TRACK_BUFFER_MS = 80/);
+  assert.match(audio, /safeUnderrunCount/);
+  assert.match(audio, /track\.flush\(\)/);
   assert.match(audio, /requestFadeIn\(\)/);
   assert.match(audio, /applyFadeIn\(pendingOutput, appendedFrom, pendingCount - appendedFrom\)/);
   assert.match(audio, /turboAccumFrames >= factor/);
-  assert.match(audio, /~50 ms/i);
+  assert.match(audio, /ERROR_DEAD_OBJECT/);
   assert.match(audio, /MAX_PENDING_AUDIO_MS = 200/);
+});
+
+test('native PCM is resampled from the real mGBA hardware rate before Android playback', () => {
+  assert.match(native, /#include <mgba-util\/audio-buffer\.h>/);
+  assert.match(native, /audioCore->audioSampleRate\(audioCore\)/);
+  assert.match(native, /resampleRetraAudioLocked/);
+  assert.match(native, /retraNormalizedSinc/);
+  assert.match(native, /cutoff = ratio < 1\.0/);
+  assert.match(native, /mAudioBufferPeek\(source, 0/);
+  assert.match(native, /mAudioBufferRead\(source, nullptr, drop\)/);
+});
+
+test('resampler saturates loud transients instead of allowing int16 wrap distortion', () => {
+  assert.match(native, /sample >= 32767\.0[\s\S]*return 32767/);
+  assert.match(native, /sample <= -32768\.0[\s\S]*return -32768/);
+  assert.match(native, /weightSum[\s\S]*coefficient \/ weightSum/);
+  assert.doesNotMatch(native, /mINTERPOLATOR_SINC|mAudioResamplerProcess/);
+});
+
+test('resampler state follows dynamic game audio rates and is reset when cores change', () => {
+  assert.match(native, /retraAudioResampler\.source != source/);
+  assert.match(native, /retraAudioResampler\.sourceRate != sourceRate/);
+  assert.match(native, /retraAudioResampler\.destinationRate != destinationRate/);
+  assert.match(native, /resetRetraAudioResamplerLocked\(\)/);
 });
 
 test('audio volume is applied once and sound settings rebuild the output track', () => {

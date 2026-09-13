@@ -1,0 +1,289 @@
+/* Retra v1.0.1 adaptive system-safe-area layer.
+   Android WindowInsets are bridged into --device-safe-* by categories-ui.js.
+   Bottom-aligned UI consumes the system inset once per layout path. */
+
+/* Main navigation owns the system-navigation clearance for the primary shell.
+   Its content height remains unchanged; only the real system safe area extends
+   the bar to the physical bottom edge. */
+.bottom-nav {
+  height: var(--bottom-nav-total-height);
+  padding:
+    8px max(14px, var(--device-safe-right))
+    calc(12px + var(--device-safe-bottom))
+    max(14px, var(--device-safe-left));
+}
+
+/* Category/filter bottom sheet: sheet body scrolls, actions do not. The sheet
+   itself is flush to the physical bottom and the footer alone consumes the
+   navigation-bar inset. This prevents both double insets and a large empty tail. */
+#romFilterSheetBackdrop {
+  padding-bottom: 0 !important;
+}
+
+#romFilterSheetBackdrop .rom-sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(72dvh, calc(100dvh - var(--device-safe-top)));
+  padding-bottom: 0;
+}
+
+#romFilterSheetBackdrop .sheet-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding-bottom: 4px;
+  overscroll-behavior-y: contain;
+}
+
+#romFilterSheetBackdrop .sheet-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding:
+    14px max(22px, var(--device-safe-right))
+    calc(12px + var(--device-safe-bottom))
+    max(22px, var(--device-safe-left));
+  border-top: 1px solid var(--line);
+  background: #30314a;
+}
+
+/* Fixed backup footer follows the same single-owner rule. Its page content only
+   reserves the component height; the footer itself owns the system safe area. */
+body.backup-create-open #createBackupPage.active {
+  padding-bottom: calc(84px + var(--device-safe-bottom)) !important;
+}
+
+.backup-create-footer {
+  padding:
+    12px max(var(--content-gutter), var(--device-safe-right))
+    calc(12px + var(--device-safe-bottom))
+    max(var(--content-gutter), var(--device-safe-left));
+}
+
+/* Bottom-aligned selection bar uses the same native safe area without raw
+   safe-area env() calls or viewport-size guesses. */
+.library-selection-bar {
+  height: calc(112px + var(--device-safe-bottom));
+  padding:
+    9px max(10px, var(--device-safe-right))
+    calc(9px + var(--device-safe-bottom))
+    max(10px, var(--device-safe-left));
+}
+
+/* Compact landscape keeps Retra's existing control sizes and only changes the
+   physical system clearance. */
+@media (orientation: landscape) {
+  body.game-landscape-allowed:not(.landscape-preview-mode) .bottom-nav {
+    padding:
+      6px max(18px, calc(var(--device-safe-right) + 16px))
+      calc(8px + var(--device-safe-bottom))
+      max(18px, calc(var(--device-safe-left) + 16px));
+  }
+}
+
+/* Settings detail pages: the outer subpage scroller owns the Android bottom
+   inset. Inner pages keep design-only tail spacing so the inset is not stacked. */
+.settings-detail-page {
+  scroll-margin-bottom: 28px;
+}
+.settings-detail-page.active {
+  padding-bottom: 28px;
+}
+
+/* Toasts sit above Retra's adaptive navigation footprint in every nav mode. */
+.toast.show {
+  bottom: calc(var(--bottom-nav-total-height) + 12px);
+}
+
+/* Edge-to-edge top geometry mirrors the same single-owner model. Keeping the
+   header's system inset in its total height prevents the main scroller from
+   growing underneath the bottom navigation after edge-to-edge is enabled. */
+:root {
+  --header-total-height: calc(var(--header-height) + var(--device-safe-top));
+}
+
+.main-header {
+  min-height: var(--header-total-height);
+  padding-top: calc(16px + var(--device-safe-top));
+}
+
+main {
+  height: calc(100% - var(--header-total-height) - var(--bottom-nav-total-height));
+}
+
+body.subpage-open main {
+  height: 100%;
+  padding-top: calc(18px + var(--device-safe-top));
+}
+
+/* ROM detail is a full-bleed hero subpage. The hero itself owns the status-bar
+   / display-cutout inset, so the parent must not consume the same top inset. */
+body.subpage-open.rom-detail-open main {
+  padding-top: 0;
+}
+
+body.more-headerless main {
+  height: calc(100% - var(--bottom-nav-total-height));
+}
+
+@media (max-width: 470px) {
+  main {
+    height: calc(100dvh - var(--header-total-height) - var(--bottom-nav-total-height));
+  }
+  body.subpage-open main {
+    height: 100dvh;
+  }
+  body.more-headerless main {
+    height: calc(100dvh - var(--bottom-nav-total-height));
+  }
+}
+
+@media (orientation: landscape) {
+  body.game-landscape-allowed:not(.landscape-preview-mode) .main-header {
+    min-height: var(--header-total-height);
+  }
+  body.game-landscape-allowed:not(.landscape-preview-mode) main {
+    height: calc(100dvh - var(--header-total-height) - var(--bottom-nav-total-height));
+  }
+  body.game-landscape-allowed:not(.landscape-preview-mode).more-headerless main {
+    height: calc(100dvh - var(--bottom-nav-total-height));
+  }
+  body.game-landscape-allowed:not(.landscape-preview-mode).subpage-open main {
+    height: 100dvh;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   v1.0.1 adaptive-window hardening
+
+   The packaged Android runtime must use the real app window as its canvas.
+   Retra's 428x926 shell remains useful as a desktop/browser preview, but it
+   must never constrain a phone, tablet, foldable, split-screen or freeform
+   Android window. The native bridge marks only the Android runtime with
+   data-retra-runtime="android" so these overrides cannot affect web previews.
+   ------------------------------------------------------------------------- */
+html[data-retra-runtime="android"],
+html[data-retra-runtime="android"] body {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 100%;
+}
+
+html[data-retra-runtime="android"] body {
+  padding: 0;
+  margin: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
+}
+
+html[data-retra-runtime="android"] .app-shell {
+  width: 100vw;
+  height: 100dvh;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Horizontal cutouts and side navigation bars are just as important as the
+   bottom inset, particularly in landscape, foldables and desktop windowing. */
+html[data-retra-runtime="android"] .main-header {
+  padding-left: max(var(--content-gutter), var(--device-safe-left));
+  padding-right: max(var(--content-gutter), var(--device-safe-right));
+}
+
+html[data-retra-runtime="android"] main {
+  padding-left: max(var(--content-gutter), var(--device-safe-left));
+  padding-right: max(var(--content-gutter), var(--device-safe-right));
+  scroll-padding-top: calc(var(--device-safe-top) + 16px);
+  scroll-padding-bottom: calc(var(--device-safe-bottom) + 24px);
+}
+
+/* ROM detail already has dedicated full-bleed safe-area ownership. */
+html[data-retra-runtime="android"] body.rom-detail-open main {
+  padding-left: 0;
+  padding-right: 0;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
+/* The original ROM detail layout used negative inline margins to cancel the
+   normal main content gutter. Android ROM-detail mode now removes that parent
+   gutter directly, so retaining the old negative margins makes the page wider
+   than the physical viewport and lets it slide left/right. Reset only the
+   inline margins here; keep the vertical full-bleed margins untouched. */
+html[data-retra-runtime="android"] body.rom-detail-open .rom-detail-page {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* Headerless More still needs a real top safe area. The old fixed 34px value
+   happened to fit some phones but was not valid for notches/caption bars. */
+html[data-retra-runtime="android"] body.more-headerless main {
+  padding-top: max(34px, calc(var(--device-safe-top) + 16px));
+}
+
+/* Centered dialogs must remain reachable in short landscape windows and beside
+   cutouts. The sheet variant is intentionally excluded because its footer is
+   already the single owner of the bottom system inset above. */
+html[data-retra-runtime="android"] .modal-backdrop {
+  padding:
+    max(16px, var(--device-safe-top))
+    max(16px, var(--device-safe-right))
+    max(16px, var(--device-safe-bottom))
+    max(16px, var(--device-safe-left));
+}
+
+html[data-retra-runtime="android"] .modal-backdrop > .category-modal-card,
+html[data-retra-runtime="android"] .modal-backdrop > .confirm-modal-card,
+html[data-retra-runtime="android"] .modal-backdrop > .selection-modal-card {
+  max-height: calc(100dvh - var(--device-safe-top) - var(--device-safe-bottom) - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The legacy coarse-pointer landscape rule intentionally preserved a narrow
+   portrait mock-phone. In the Android app that prevents real landscape and
+   split-screen adaptation, so the native runtime always uses the whole window. */
+@media (orientation: landscape) and (pointer: coarse) {
+  html[data-retra-runtime="android"] body:not(.game-landscape-allowed),
+  html[data-retra-runtime="android"] body:not(.game-landscape-allowed) .app-shell {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Tablet / foldable spacing scales with the current window, not with physical
+   display resolution or a device model. Content remains comfortably readable
+   while the app shell itself stays fully edge-to-edge. */
+@media (min-width: 600px) {
+  html[data-retra-runtime="android"] {
+    --content-gutter: clamp(22px, 4vw, 40px);
+  }
+
+  html[data-retra-runtime="android"] .bottom-nav {
+    padding-left: max(22px, var(--device-safe-left), calc((100vw - 760px) / 2));
+    padding-right: max(22px, var(--device-safe-right), calc((100vw - 760px) / 2));
+  }
+}
+
+@media (min-width: 840px) {
+  html[data-retra-runtime="android"] {
+    --content-gutter: clamp(28px, 5vw, 56px);
+  }
+}
+

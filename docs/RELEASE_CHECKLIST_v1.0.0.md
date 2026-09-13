@@ -9,7 +9,9 @@ Use this checklist before publishing the final APK/AAB or creating the `v1.0.0` 
 - [ ] `python3 tools/validate_release.py` passes.
 - [ ] GitHub Actions is green.
 - [ ] Android/Kotlin compile and Android lint checks pass in CI.
-- [ ] A clean release APK/AAB builds with the exact validated mGBA source revision.
+- [ ] `python3 tools/prepare_mgba.py` resolves the revision in `third_party/mgba.lock`.
+- [ ] A clean release APK/AAB builds with the exact locked mGBA source revision and CMake reports it as verified.
+- [ ] `connectedDebugAndroidTest` passes on at least one physical Android device.
 
 ## Install / upgrade
 
@@ -43,6 +45,7 @@ Use this checklist before publishing the final APK/AAB or creating the `v1.0.0` 
 - [ ] Sound, volume, and audio frequency apply and persist.
 - [ ] Orientation/fullscreen/immersive mode apply without trapping the UI.
 - [ ] BIOS enable/boot/file selection work on supported games.
+- [ ] Create/restore a portable `.retra` backup and verify BIOS file, BIOS path, Use BIOS, Boot BIOS, and BIOS label remain device-local.
 - [ ] Cheats and ROM patches apply and can be disabled cleanly.
 - [ ] Reset advanced settings returns only the intended settings to defaults.
 
@@ -62,6 +65,7 @@ Use this checklist before publishing the final APK/AAB or creating the `v1.0.0` 
 - [ ] Bluetooth Remote Link works on at least two supported Android devices.
 - [ ] Google Drive authorization and sync work, including a conflict/backup case.
 - [ ] Automatic artwork respects Wi-Fi-only mode and manual artwork precedence.
+- [ ] Complete `REAL_DEVICE_VALIDATION_MATRIX_v1.0.1.md` and attach evidence for Drive, Wi-Fi Link, Bluetooth Link, IME, foldable/resize, 60 Hz, 90 Hz, and 120 Hz cases.
 
 ## Final package
 

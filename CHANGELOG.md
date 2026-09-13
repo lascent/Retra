@@ -1,8 +1,68 @@
 # Changelog
 
+## v1.0.1 — 2026-09-13 — Backup, restore, storage, and audio polish
+
+### Release hardening: portable BIOS state, slider hot paths, reproducible mGBA and device tests
+
+- Kept BIOS paths, enable/boot state, and last BIOS label device-local so `.retra` restore cannot enable a BIOS file that was intentionally excluded from the backup.
+- Added specialized rate-limited native handling for controller opacity, frameskip, volume, and Link sync sliders; portable metadata is refreshed once at the final committed value instead of throughout the drag.
+- Locked native builds to mGBA commit `543a197582c30364584d773a974d7f991892fa43`, added `tools/prepare_mgba.py`, and made CMake reject wrong/dirty/unverifiable mGBA source trees.
+- Expanded Android instrumentation coverage for portable preference safety, atomic file operations, IME window policy/adaptive display selection, alongside the existing ROM identity/migration tests.
+- Added a physical-device validation matrix for Google Drive, Wi-Fi Link, Bluetooth Link, IME, foldables/resizing, and 60/90/120 Hz behavior.
+
+### Adaptive Android bottom safe areas
+
+- Centralized Android system-bar and display-cutout handling through `WebUiInsetsManager` and native `WindowInsetsCompat`.
+- Normal Retra Web UI now renders edge-to-edge while consuming the real device safe area exactly once.
+- Removed the viewport-size navigation-height guess that could create artificial bottom gaps on emulators and phones.
+- Fixed Library / History / More bottom navigation spacing for gesture, 2-button/legacy where available, and 3-button navigation.
+- Moved the ROM category sheet Close / Save footer outside the scrolling body and made only that footer consume the bottom system inset.
+- Centralized WebView safe-area CSS variables for top/right/bottom/left cutout handling, rotation, tablets, and landscape.
+- Removed duplicated Settings detail-page bottom inset while retaining normal design-only scroll tail spacing.
+
+- Added an ~18 Hz DC blocker after Retra's existing band-limited sample-rate conversion to remove sub-audible offset without cutting musical bass.
+- Added gentle 22% mGBA-style single-pole smoothing to reduce gritty/harsh high-frequency character while preserving detail; this is intentionally far lighter than mGBA libretro's 60% default filter strength.
+- Added 1% PCM headroom before the final saturating PCM16 handoff to Android.
+- Kept mGBA's original mixer, game pitch, tempo, stereo image, speed synchronization, AudioTrack writer, and adaptive underrun handling unchanged.
+- Added regression coverage for DC removal, smoothing strength, post-resampler placement, and output headroom.
+
+
+### Backup UI alignment / fixed action bar
+
+- Vertically centered the Create backup / Restore backup icons and copy in their action rows.
+- Made the Create backup action a true fixed bottom bar so it does not move with checklist scrolling.
+- Added bottom scroll clearance so the final backup option remains fully visible above the fixed action.
+
+### Data and Storage backup / restore
+
+- Added **Data and Storage** directly below **Color Style** in the More panel.
+- Added selective portable backups for game saves, save states, cheats, library metadata, controller layouts, artwork, and app settings.
+- Backups use a single `Retra_yyyyMMdd_HHmm.retra` file and Android's normal save picker so users can choose any supported destination.
+- Added validated restore with path-traversal protection, size/entry limits, portable-setting filtering, and library metadata recovery for ROMs already known to Retra.
+- ROM and BIOS files are intentionally excluded from `.retra` backups.
+
+### Built-in Retra app folder
+
+- Added a Retra `DocumentsProvider` so Android Files can show Retra as its own storage location.
+- `Open app folder` now opens the Retra root directly instead of launching `ACTION_OPEN_DOCUMENT_TREE`.
+- Removed the repeated `Use this folder` requirement from Retra's normal save/settings workflow.
+- Saves and settings continue to use Retra-owned persistent storage; explicit import/export and Drive folder selection still use SAF where appropriate.
+
+### Authentic audio and A/B alignment
+
+- Fixed normal-speed game music pitch/tempo/tone by resampling mGBA's real dynamic core audio rate to the Android output rate with mGBA's windowed-sinc resampler.
+- Aligned the default grouped A and B gameplay buttons to the same vertical centerline.
+- Updated the Screen Editor preview so A no longer sits lower than B.
+- Preserved the existing A/B group size and saved layout coordinates to avoid shifting user layouts.
+
+
 All notable Retra changes are documented here. Public release numbering follows Semantic Versioning beginning with `v1.0.0`.
 
 ## v1.0.0 — 2026-09-12
+### Authentic background-music output pass
+- Route high-quality audio through the Android device-native output clock when appropriate, so mGBA's sinc resampler performs the explicit conversion directly instead of relying on an extra OS resample.
+- Add bounded adaptive prebuffer/AudioTrack sizing after real underruns, with gradual recovery to the normal low-latency targets after stable playback.
+- Preserve the original-game audio goal: no EQ, bass boost, widening, normalization, or other enhancement DSP.
 
 **First stable public release.**
 
@@ -32,6 +92,7 @@ All notable Retra changes are documented here. Public release numbering follows 
 - Improved Library multi-select responsiveness, popup placement, category handling, and artwork refresh behavior.
 - Improved Settings safe-area handling and Home navigation warm-return performance.
 - Improved audio/runtime behavior across normal speed, fast-forward, and slow-motion modes.
+- Reworked Android audio output around a dedicated audio-priority writer, short startup pre-buffer, underrun recovery, and clean speed-transition flushing to reduce static/crackle without blocking the emulator frame loop.
 
 ### Security and release hardening
 
@@ -159,3 +220,9 @@ The entries below organize Retra's pre-1.0 development milestones into a clean `
 - Established the storage model that allows compatible user data to survive normal ROM file lifecycle changes.
 
 For detailed engineering notes from development, see [`docs/README.md`](docs/README.md) and the archived files under `docs/history/`.
+
+### Audio distortion hardening
+- Replaced Retra's final mGBA-to-Android utility sinc conversion with a normalized 16-tap/1024-phase band-limited converter.
+- Added explicit PCM16 saturation to prevent peak overflow/wrap distortion.
+- Added anti-alias filtering for downsampling and a bit-transparent exact-rate bypass.
+- Added regression coverage for resampler normalization, clipping safety, and exact-rate behavior.
