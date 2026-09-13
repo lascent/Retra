@@ -24,7 +24,7 @@ class WebUiController(
     private val activity: Activity,
     private val webView: WebView,
     private val fileOps: RetraFileOps,
-    private val javascriptBridge: Any,
+    private val javascriptBridge: MainActivity.RetraBridge,
     private val onPageReady: () -> Unit,
     private val launchFileChooser: (Intent) -> Unit,
     private val onRendererGone: () -> Unit
