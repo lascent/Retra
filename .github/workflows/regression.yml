@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      RETRA_ANDROID_API: "37"
+      RETRA_ANDROID_API: "37.0"
       RETRA_NDK_VERSION: "28.0.13004108"
       RETRA_CMAKE_VERSION: "3.22.1"
     steps:
@@ -87,8 +87,8 @@ jobs:
 
           # Accept already-known Android SDK licenses, then install exactly the
           # SDK/NDK/CMake versions Retra declares in app/build.gradle.kts.
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-          "$SDKMANAGER" --install \
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install \
             "platforms;android-${RETRA_ANDROID_API}" \
             "ndk;${RETRA_NDK_VERSION}" \
             "cmake;${RETRA_CMAKE_VERSION}"
