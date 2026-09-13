@@ -13,8 +13,9 @@ test('Open app folder targets the Retra provider root, not a generic directory d
   const body = settings.slice(start, settings.indexOf('\n}\n', start) + 2);
   assert.match(body, /RetraDocumentsProvider\.rootUri\(\)/);
   assert.match(body, /DocumentsContract\.Root\.MIME_TYPE_ITEM/);
-  assert.doesNotMatch(body, /rootDocumentUri\(\)/);
-  assert.doesNotMatch(body, /Document\.MIME_TYPE_DIR/);
+  assert.match(body, /rootDocumentUri\(\)/);
+  assert.match(body, /DocumentsContract\.Document\.MIME_TYPE_DIR/);
+  assert.doesNotMatch(body, /resolveActivity\(packageManager\)/);
   const codeOnly = body.replace(/\/\/[^\n]*$/gm, '');
   assert.doesNotMatch(codeOnly, /ACTION_OPEN_DOCUMENT_TREE/);
 });

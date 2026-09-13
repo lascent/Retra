@@ -40,8 +40,11 @@ escape Retra's managed data root.
 ## Direct-open and storage summary fix
 
 `Open app folder` now targets `DocumentsContract.buildRootUri(AUTHORITY, ROOT_ID)` with
-`DocumentsContract.Root.MIME_TYPE_ITEM`. This is the DocumentsUI root route and avoids
-OEM file managers falling back to Downloads when given only the provider's root document.
+`DocumentsContract.Root.MIME_TYPE_ITEM`. This is the preferred DocumentsUI root route.
+For OEM file managers that do not accept that route, Retra also tries the provider root
+document with the standard directory MIME type. Retra starts both routes directly instead
+of relying on `PackageManager.resolveActivity()`, because package visibility on some Android
+builds can hide a valid Files handler during preflight resolution.
 
 The Retra root subtitle is generated from `StatFs(...).availableBytes`, converted to decimal GB and rounded to the nearest whole GB, for example:
 `Retra storage • 162 GB free`.

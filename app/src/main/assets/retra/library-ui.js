@@ -273,6 +273,9 @@ async function hydratePlaytimeCover(row, rom){
     const media = row.querySelector('.playtime-cover');
     if (!media) return;
     const image = document.createElement('img');
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.fetchPriority = 'low';
     image.src = cover;
     image.alt = `${rom.title || 'ROM'} cover`;
     media.replaceChildren(image);
@@ -315,6 +318,9 @@ function renderPlaytimeByRom(playtimeByRom){
     const cover = romCoverObjectUrls.get(rom.id) || rom.cover || '';
     if (cover) {
       const image = document.createElement('img');
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.fetchPriority = 'low';
       image.src = cover;
       image.alt = `${rom.title || 'ROM'} cover`;
       coverWrap.appendChild(image);
@@ -415,7 +421,7 @@ function renderLibraryFromStorage({ force = false } = {}){
   // Chromium can skip painting off-screen card internals for large libraries
   // while preserving each card's grid geometry and hit target. Small libraries
   // keep the normal path to avoid unnecessary containment overhead.
-  libraryGrid.classList.toggle('large-library', libraryRoms.length >= 80);
+  libraryGrid.classList.toggle('large-library', libraryRoms.length >= 36);
 
   const signature = getLibraryRenderSignature();
   if (!force && libraryRenderInitialized && signature === lastLibraryRenderSignature) {

@@ -2,6 +2,12 @@
 
 ## v1.0.1 — 2026-09-13 — Backup, restore, storage, and audio polish
 
+### Controller responsiveness and input latency
+- Added pointer-owned, drift-tolerant low-latency touch handling for A/B and other native gameplay buttons.
+- Added native rising-edge input latching so sub-frame taps cannot disappear between mGBA input polls.
+- Explicitly enabled split multi-touch for the gameplay viewport/A-B group and hardened lifecycle stuck-key cleanup.
+- Suppressed duplicate Android-side key transitions and unnecessary all-key release traffic.
+
 ### Release hardening: portable BIOS state, slider hot paths, reproducible mGBA and device tests
 
 - Kept BIOS paths, enable/boot state, and last BIOS label device-local so `.retra` restore cannot enable a BIOS file that was intentionally excluded from the backup.
@@ -226,3 +232,9 @@ For detailed engineering notes from development, see [`docs/README.md`](docs/REA
 - Added explicit PCM16 saturation to prevent peak overflow/wrap distortion.
 - Added anti-alias filtering for downsampling and a bit-transparent exact-rate bypass.
 - Added regression coverage for resampler normalization, clipping safety, and exact-rate behavior.
+
+## Scroll smoothness / responsiveness (10/10 pass)
+- Added passive native-scroll coordination and scroll-idle background scheduling.
+- Reduced Android WebView scroll-time blur/raster work.
+- Expanded off-screen list/card rendering containment and earlier Home virtualization.
+- Added lazy/async low-priority statistics artwork decoding.

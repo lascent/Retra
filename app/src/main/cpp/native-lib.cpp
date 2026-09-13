@@ -46,6 +46,9 @@ static mColor videoBuffer[MAX_PIXEL_COUNT];
 static unsigned videoWidth = 240;
 static unsigned videoHeight = 160;
 static std::atomic<uint32_t> keyMask{0};
+// Rising-edge latch: guarantees even a press+release shorter than one GBA frame
+// is sampled by mGBA for one frame instead of disappearing between polls.
+static std::atomic<uint32_t> keyPressLatch{0};
 static std::mutex coreMutex;
 static bool configInitialized = false;
 static std::unordered_map<std::string, std::string> runtimeConfigOptions;
@@ -546,6 +549,7 @@ struct LocalLinkPlayer {
     unsigned width = 240;
     unsigned height = 160;
     std::atomic<uint32_t> keys{0};
+    std::atomic<uint32_t> keyPressLatch{0};
     std::atomic<uint64_t> frameNumber{0};
     int playerId = 0;
     std::mutex frameMutex;
@@ -745,6 +749,7 @@ static void destroyCoreLocked() {
     core->deinit(core);
     core = nullptr;
     keyMask.store(0, std::memory_order_relaxed);
+    keyPressLatch.store(0, std::memory_order_relaxed);
     videoWidth = 240;
     videoHeight = 160;
     std::memset(videoBuffer, 0, sizeof(videoBuffer));
@@ -863,14 +868,19 @@ static void localLinkKeysRead(void* context) {
         std::lock_guard<std::mutex> scheduleLock(linkInputScheduleMutex);
         auto& queue = linkInputSchedule[player->playerId];
         while (!queue.empty() && queue.front().frame <= upcomingFrame) {
-            player->keys.store(queue.front().mask, std::memory_order_relaxed);
+            const uint32_t nextMask = queue.front().mask;
+            const uint32_t previousMask = player->keys.exchange(nextMask, std::memory_order_relaxed);
+            const uint32_t risingEdges = nextMask & ~previousMask;
+            if (risingEdges != 0) {
+                player->keyPressLatch.fetch_or(risingEdges, std::memory_order_relaxed);
+            }
             queue.pop_front();
         }
     }
 
-    player->core->setKeys(
-            player->core,
-            player->keys.load(std::memory_order_relaxed));
+    const uint32_t heldKeys = player->keys.load(std::memory_order_relaxed);
+    const uint32_t tappedKeys = player->keyPressLatch.exchange(0, std::memory_order_relaxed);
+    player->core->setKeys(player->core, heldKeys | tappedKeys);
 }
 
 static void localLinkFrameEnded(struct mCoreThread* threadContext) {
@@ -927,6 +937,7 @@ static void localLinkFrameEnded(struct mCoreThread* threadContext) {
 
 static void clearLocalPlayer(LocalLinkPlayer& player) {
     player.keys.store(0, std::memory_order_relaxed);
+    player.keyPressLatch.store(0, std::memory_order_relaxed);
     player.frameNumber.store(0, std::memory_order_relaxed);
     player.playerId = 0;
     player.width = 240;
@@ -1426,7 +1437,12 @@ Java_com_retra_emulator_MainActivity_setLocalLinkKeyMask(
         player < 0 || player >= LOCAL_LINK_PLAYERS) {
         return JNI_FALSE;
     }
-    localPlayers[player].keys.store(static_cast<uint32_t>(mask) & 0x3FFu, std::memory_order_relaxed);
+    const uint32_t nextMask = static_cast<uint32_t>(mask) & 0x3FFu;
+    const uint32_t previousMask = localPlayers[player].keys.exchange(nextMask, std::memory_order_relaxed);
+    const uint32_t risingEdges = nextMask & ~previousMask;
+    if (risingEdges != 0) {
+        localPlayers[player].keyPressLatch.fetch_or(risingEdges, std::memory_order_relaxed);
+    }
     return JNI_TRUE;
 }
 
@@ -1742,7 +1758,9 @@ Java_com_retra_emulator_MainActivity_runFrame(
         if (!core) {
             return JNI_FALSE;
         }
-        core->setKeys(core, keyMask.load(std::memory_order_relaxed));
+        const uint32_t heldKeys = keyMask.load(std::memory_order_relaxed);
+        const uint32_t tappedKeys = keyPressLatch.exchange(0, std::memory_order_relaxed);
+        core->setKeys(core, heldKeys | tappedKeys);
         syncGbaMosaicRenderer(core);
         core->runFrame(core);
         width = videoWidth;
@@ -1814,14 +1832,28 @@ Java_com_retra_emulator_MainActivity_setKey(
 
     const uint32_t bit = 1u << static_cast<uint32_t>(key);
     std::atomic<uint32_t>* target = &keyMask;
+    std::atomic<uint32_t>* pressLatch = &keyPressLatch;
     if (localLinkActive.load(std::memory_order_acquire)) {
         const int playerIndex = activeLocalPlayer.load(std::memory_order_relaxed);
         target = &localPlayers[playerIndex].keys;
+        pressLatch = &localPlayers[playerIndex].keyPressLatch;
     }
     if (pressed) {
         target->fetch_or(bit, std::memory_order_relaxed);
+        pressLatch->fetch_or(bit, std::memory_order_relaxed);
     } else {
         target->fetch_and(~bit, std::memory_order_relaxed);
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_retra_emulator_MainActivity_clearKeyPressLatches(
+        JNIEnv*,
+        jobject) {
+    keyPressLatch.store(0, std::memory_order_relaxed);
+    for (auto& player : localPlayers) {
+        player.keyPressLatch.store(0, std::memory_order_relaxed);
     }
 }
 
@@ -2094,6 +2126,7 @@ Java_com_retra_emulator_MainActivity_resetCore(
         clearLinkCheckpointsLocked();
         for (auto& player : localPlayers) {
             player.keys.store(0, std::memory_order_relaxed);
+            player.keyPressLatch.store(0, std::memory_order_relaxed);
             player.frameNumber.store(0, std::memory_order_relaxed);
             if (player.threadStarted && player.thread.impl) {
                 mCoreThreadReset(&player.thread);
@@ -2106,6 +2139,7 @@ Java_com_retra_emulator_MainActivity_resetCore(
     }
 
     keyMask.store(0, std::memory_order_relaxed);
+    keyPressLatch.store(0, std::memory_order_relaxed);
     core->reset(core);
     // Reapply manual choices after Reset. In Automatic mode this handler is
     // non-destructive and keeps mGBA's Pokémon ROM-hack save selection intact.

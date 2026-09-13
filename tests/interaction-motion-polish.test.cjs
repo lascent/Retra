@@ -38,3 +38,24 @@ test('page switches invoke lightweight entrance motion after activation', () => 
   assert.match(ui, /RetraMotion\?\.pageEnter\?\.\(nextPage, 'tab'\)/);
   assert.match(ui, /RetraMotion\?\.pageEnter\?\.\(nextPage, 'forward'\)/);
 });
+
+
+test('settings and more navigation cards are tap-only: hold/drag cannot fall through to click navigation', () => {
+  const js = read('app/src/main/assets/retra/interaction-motion.js');
+  assert.match(js, /HOLD_CANCEL_MS\s*=\s*420/);
+  assert.match(js, /TAP_ONLY_SELECTOR/);
+  assert.match(js, /'\.settings-item'/);
+  assert.match(js, /'\.more-item'/);
+  assert.match(js, /state\.held \|\| state\.moved/);
+  assert.match(js, /event\.stopImmediatePropagation\(\)/);
+  assert.match(js, /suppressNextClick/);
+});
+
+test('tap-only navigation cards keep native vertical pan ownership and avoid Android row blur', () => {
+  const css = read('app/src/main/assets/retra/style-scroll-performance.css');
+  assert.match(css, /\.settings-item,[\s\S]*touch-action:\s*pan-y/);
+  assert.match(css, /-webkit-touch-callout:\s*none/);
+  assert.match(css, /data-retra-runtime="android"[\s\S]*\.settings-item/);
+  assert.match(css, /data-retra-runtime="android"[\s\S]*\.more-item/);
+  assert.match(css, /backdrop-filter:\s*none\s*!important/);
+});

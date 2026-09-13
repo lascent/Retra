@@ -273,9 +273,7 @@ internal fun MainActivity.closeEmulator() {
     if (romLoaded) saveAutoState(force = true)
     stopEmulation()
 
-    for (key in 0..9) {
-        setGameplayKey(key, false)
-    }
+    releaseAllKeys()
 
     val closingRemote = remoteTransport.isActive
     val closingRemoteRole = remoteTransport.role

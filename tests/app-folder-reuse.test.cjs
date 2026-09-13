@@ -51,6 +51,7 @@ test('Open app folder directly views Retra with no Use this folder flow', () => 
   assert.match(openBody, /RetraDocumentsProvider\.rootUri\(\)/);
   assert.match(openBody, /DocumentsContract\.Root\.MIME_TYPE_ITEM/);
   assert.doesNotMatch(openBody.replace(/\/\/[^\n]*$/gm, ''), /ACTION_OPEN_DOCUMENT_TREE|appFolderPicker|\.launch\(/);
+  assert.doesNotMatch(openBody, /resolveActivity\(packageManager\)/);
   assert.doesNotMatch(main, /internal val appFolderPicker/);
 });
 

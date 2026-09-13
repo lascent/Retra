@@ -565,6 +565,17 @@ internal fun MainActivity.establishRemoteLink(
 
 internal fun MainActivity.setGameplayKey(key: Int, pressed: Boolean) {
     if (key !in 0..9) return
+
+    val bit = 1 shl key
+    val wasPressed = activeGameplayKeyMask and bit != 0
+    if (wasPressed == pressed) return
+
+    activeGameplayKeyMask = if (pressed) {
+        activeGameplayKeyMask or bit
+    } else {
+        activeGameplayKeyMask and bit.inv()
+    }
+
     if (remoteTransport.handleGameplayKey(key, pressed)) return
     setKey(key, pressed)
 }

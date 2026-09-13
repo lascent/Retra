@@ -5,8 +5,8 @@
   --text:#f5f5fb;
   --muted:#a6aac3;
   --line:rgba(255,255,255,.075);
-  --accent:#e4ae6b;
-  --accent-soft:rgba(228,174,107,.16);
+  --accent:#8db6ff;
+  --accent-soft:rgba(141,182,255,.18);
   --cyan:#8ad8dd;
   --cyan-soft:rgba(138,216,221,.14);
   --danger:#ff9d9d;
@@ -1902,7 +1902,7 @@ body[data-resolved-mode="dark"][data-pure-black="true"]{
   --line: rgba(255,255,255,.11);
 }
 body[data-theme="default"]{
-  --bg:#17182b;--panel:#1c1d32;--panel-2:#23253b;--text:#f5f5fb;--muted:#a6aac3;--line:rgba(255,255,255,.075);--accent:#e4ae6b;--accent-soft:rgba(228,174,107,.16);--cyan:#8ad8dd;--cyan-soft:rgba(138,216,221,.14);--danger:#ff9d9d;--body-glow: rgba(83,89,173,.22);--body-start:#10111d;--body-end:#0b0c14;--shell-start:#1a1b30;--shell-end:#18192b;--shell-border:rgba(255,255,255,.08);--shell-outline:#090a0e;--header-1:rgba(22,23,40,.98);--header-2:rgba(22,23,40,.96);--header-3:rgba(22,23,40,.72);
+  --bg:#17182b;--panel:#1c1d32;--panel-2:#23253b;--text:#f5f5fb;--muted:#a6aac3;--line:rgba(255,255,255,.075);--accent:#8db6ff;--accent-soft:rgba(141,182,255,.18);--cyan:#8db6ff;--cyan-soft:rgba(141,182,255,.14);--danger:#ff9d9d;--body-glow: rgba(83,89,173,.22);--body-start:#10111d;--body-end:#0b0c14;--shell-start:#1a1b30;--shell-end:#18192b;--shell-border:rgba(255,255,255,.08);--shell-outline:#090a0e;--header-1:rgba(22,23,40,.98);--header-2:rgba(22,23,40,.96);--header-3:rgba(22,23,40,.72);
 }
 body[data-theme="dynamic"]{ --accent:#d9ba7b; --accent-soft:rgba(217,186,123,.18); --body-glow:rgba(140,90,45,.20); --body-start:#15110c; --body-end:#0f0b07; --shell-start:#241b12; --shell-end:#171007; --header-1:rgba(35,25,17,.98); --header-2:rgba(33,24,16,.94); --header-3:rgba(28,20,13,.74); --cyan:#d5c990; --cyan-soft:rgba(213,201,144,.14); }
 body[data-theme="catppuccin"]{ --accent:#c6a1ff; --accent-soft:rgba(198,161,255,.18); --body-glow:rgba(92,103,195,.24); --body-start:#12162d; --body-end:#0d1020; --shell-start:#1e2347; --shell-end:#151833; --header-1:rgba(29,35,71,.98); --header-2:rgba(25,30,59,.94); --header-3:rgba(22,26,49,.72); --cyan:#95e7d8; }

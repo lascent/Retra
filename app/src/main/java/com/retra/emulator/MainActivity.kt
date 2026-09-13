@@ -172,6 +172,9 @@ class MainActivity : AppCompatActivity() {
     // (1 shl KEY_*), so high-rate ACTION_MOVE events never allocate Sets.
     internal var activeDpadMask = 0
     internal var activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
+    // Logical Android-side key state. It suppresses duplicate JNI / Remote Link
+    // transitions and makes releaseAllKeys proportional to keys actually held.
+    internal var activeGameplayKeyMask = 0
     internal val dpadScreenLocation = IntArray(2)
     internal var dpadTouchCenterX = 0f
     internal var dpadTouchCenterY = 0f
@@ -839,6 +842,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         if (::binding.isInitialized) shaderController.onPause()
+        if (::binding.isInitialized && binding.emulatorOverlay.visibility == View.VISIBLE) {
+            // Cancel physical controller state before pausing native/remote
+            // emulation so no held A/B/D-pad input can survive app focus loss.
+            releaseAllKeys()
+        }
         if (remoteTransport.isActive && !isChangingConfigurations) {
             // RemoteLinkTransport owns the pause packet and paired-core suspension.
             remoteTransport.pauseForLifecycle()
@@ -1292,6 +1300,7 @@ class MainActivity : AppCompatActivity() {
     external fun clearLocalLinkInputSchedule()
     external fun runFrame(pixels: IntArray): Boolean
     external fun setKey(key: Int, pressed: Boolean)
+    external fun clearKeyPressLatches()
     external fun shutdownCore()
     external fun stringFromJNI(): String
     external fun getVideoWidth(): Int

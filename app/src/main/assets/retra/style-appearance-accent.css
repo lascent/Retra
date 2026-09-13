@@ -1,0 +1,163 @@
+/* Retra v1.0.1 — Appearance/current-theme consistency
+   The selected Appearance palette is the single source of truth for
+   interactive accent color. Semantic warning/danger/success colors remain
+   independent so status meaning is never lost. */
+
+:root{
+  --on-accent:#121522;
+}
+
+/* Every Appearance card gets the same current-theme indicator. Older markup
+   contained a badge only inside Tako, so the current indicator disappeared
+   when any other palette was selected. */
+#appearanceSettingsPage .theme-preview-selected{
+  display:none !important;
+}
+#appearanceSettingsPage .theme-preview-card.active .theme-preview-shell{
+  border-color:var(--accent) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
+    inset 0 -12px 28px rgba(0,0,0,.14) !important;
+}
+#appearanceSettingsPage .theme-preview-card.active .theme-preview-shell::after{
+  content:"✓";
+  position:absolute;
+  top:9px;
+  right:9px;
+  width:25px;
+  height:25px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:var(--accent);
+  color:var(--on-accent);
+  font:800 15px/1 Poppins,system-ui,sans-serif;
+  box-shadow:0 3px 9px rgba(0,0,0,.22);
+  z-index:4;
+}
+
+/* Mode selector follows the same selected palette. */
+#appearanceSettingsPage .theme-mode-option.active{
+  background:var(--accent-soft) !important;
+  color:var(--accent) !important;
+}
+
+/* Theme-aware switches. This replaces the old fixed teal checked state. */
+.switch input:checked + .slider{
+  background:var(--accent) !important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 78%, white 22%);
+}
+.switch input:checked + .slider::before{
+  background:color-mix(in srgb, var(--accent) 16%, white 84%) !important;
+}
+
+/* Native range/checkbox/radio controls use the active theme accent too. */
+input[type="range"]{
+  accent-color:var(--accent) !important;
+}
+.check-control input:checked + span{
+  background:var(--accent) !important;
+}
+.radio-dot{
+  border-color:var(--accent) !important;
+}
+.radio-dot::after{
+  background:var(--accent) !important;
+}
+.frequency-option.active .frequency-radio,
+.selection-option.active .selection-radio,
+.selection-modal .selection-option.active .selection-radio,
+.selection-modal .myboy-dialog-card .selection-option.active .selection-radio{
+  border-color:var(--accent) !important;
+}
+.frequency-option.active .frequency-radio::after,
+.selection-option.active .selection-radio::after,
+.selection-modal .selection-option.active .selection-radio::after,
+.selection-modal .myboy-dialog-card .selection-option.active .selection-radio::after{
+  background:var(--accent) !important;
+}
+.selection-modal .selection-option.active,
+.selection-modal .myboy-dialog-card .selection-option.active{
+  background:color-mix(in srgb, var(--accent) 8%, transparent) !important;
+  border-color:color-mix(in srgb, var(--accent) 18%, transparent) !important;
+}
+
+/* Tabs, category checks, and settings labels now match Appearance. */
+.section-label,
+.storage-section-label,
+.backup-group-label{
+  color:var(--accent) !important;
+}
+.sheet-tab.active{
+  color:var(--accent) !important;
+}
+.sheet-tab.active::after{
+  background:var(--accent) !important;
+}
+.sheet-category-check input:checked + .sheet-category-box{
+  background:var(--accent) !important;
+  border-color:var(--accent) !important;
+}
+
+/* Primary and accent actions. Keep the existing shapes/spacing and only make
+   their visual accent consistent with the current Appearance palette. */
+.primary-btn,
+.privacy-btn,
+.continue-btn{
+  background:var(--accent-soft) !important;
+  border-color:color-mix(in srgb, var(--accent) 38%, transparent) !important;
+  color:var(--accent) !important;
+}
+.modal-btn.primary,
+.big-fab,
+.detail-fab,
+.backup-create-button,
+.editor-pill.primary{
+  background:linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 91%, white 9%),
+    color-mix(in srgb, var(--accent) 92%, black 8%)
+  ) !important;
+  border-color:color-mix(in srgb, var(--accent) 52%, transparent) !important;
+  color:var(--on-accent) !important;
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--accent) 20%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.20) !important;
+}
+
+/* Secondary accent affordances that used to stay orange/teal. */
+.chip.active{
+  background:var(--accent-soft) !important;
+  border-color:color-mix(in srgb, var(--accent) 28%, transparent) !important;
+  color:var(--accent) !important;
+}
+.rom-action.active,
+.rom-action:hover,
+.more-icon,
+.stats-icon,
+.entry-download:hover,
+.playtime-time,
+.selection-modal .text-action-btn,
+.selection-modal .myboy-dialog-card .text-action-btn{
+  color:var(--accent) !important;
+}
+.rom-action.active,
+.rom-action:hover{
+  background:color-mix(in srgb, var(--accent) 8%, transparent) !important;
+  border-color:color-mix(in srgb, var(--accent) 16%, transparent) !important;
+}
+.progress span{
+  background:var(--accent) !important;
+}
+
+/* Monochrome/Yin & Yang intentionally retain a black/white feel while keeping
+   the checked state clearly readable. */
+body[data-theme="monochrome"],
+body[data-theme="yin-yang"]{
+  --on-accent:#111111;
+}
+
+/* In light mode, accent-filled controls keep a dark foreground for contrast. */
+body[data-resolved-mode="light"]{
+  --on-accent:#111522;
+}

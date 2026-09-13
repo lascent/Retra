@@ -1,0 +1,99 @@
+/* Retra v1.0.1 — 10/10 scroll-performance pass
+   Keep scrolling native to Chromium/Android WebView. The goal here is not to
+   fake smoothness with JS interpolation, but to reduce work on every scroll
+   frame so 60/90/120 Hz devices can track the finger naturally. */
+
+/* Explicit pan ownership lets Chromium begin compositor scrolling immediately
+   instead of waiting on unrelated gesture handlers. */
+main,
+.selection-modal-card,
+.multi-category-list,
+.sheet-content,
+#detailEntries {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: auto;
+}
+
+.library-chips,
+.theme-preview-strip {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+
+/* Navigation cards are tap-only surfaces. Let vertical pans transfer to the
+   native WebView scroller immediately, and prevent long-press selection/callout
+   work from competing with scrolling. interaction-motion.js consumes the
+   release click after a hold/drag so a card never opens accidentally. */
+.settings-item,
+.more-item,
+.detail-row.tappable,
+[data-open-page] {
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* The legacy appearance layer gives every Settings/More row its own backdrop
+   blur. On Android those overlapping blurs are repainted as the list moves.
+   Keep the card backgrounds, but let the containing surfaces provide depth so
+   scrolling stays compositor-friendly on 60/90/120 Hz displays. */
+@media (pointer: coarse) {
+  html[data-retra-runtime="android"] .settings-item,
+  html[data-retra-runtime="android"] .more-item {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Android WebView has to continuously recompute a backdrop blur when content
+   moves behind the bottom navigation. Retra's nav already has its own theme
+   background, so dropping only this runtime blur preserves the design while
+   removing one of the most expensive scroll-time effects. */
+@media (pointer: coarse) {
+  html[data-retra-runtime="android"] body[data-resolved-mode="dark"] .bottom-nav,
+  html[data-retra-runtime="android"] body[data-resolved-mode="light"] .bottom-nav {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Skip painting off-screen list rows. Chromium keeps their layout footprint,
+   then rasterizes them shortly before they enter the viewport. */
+.history-item {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 114px;
+}
+
+.playtime-item {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 82px;
+}
+
+#detailEntries .entry-item {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}
+
+/* Home already virtualizes cover cards. Start that optimization at a realistic
+   phone-library size rather than only at extremely large collections. */
+.library-grid.large-library .cover-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 250px;
+}
+
+/* Scroll itself must never animate layout or shadows. These declarations only
+   affect the active scrolling state installed by scroll-performance.js. */
+html.retra-scrolling .cover-card,
+html.retra-scrolling .history-item,
+html.retra-scrolling .playtime-item,
+html.retra-scrolling #detailEntries .entry-item {
+  transition-duration: 0ms !important;
+}

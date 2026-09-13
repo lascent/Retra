@@ -1102,17 +1102,34 @@ internal fun MainActivity.closeInGameSettings() {
 }
 
 internal fun MainActivity.releaseAllKeys() {
+    // Only emit releases for keys that Android currently considers held. This
+    // avoids up to ten unnecessary JNI calls / Remote Link packets on every
+    // menu open, pause or lifecycle transition.
+    val heldMask = activeGameplayKeyMask
     for (key in 0..9) {
+        if (heldMask and (1 shl key) == 0) continue
         try { setGameplayKey(key, false) } catch (_: Throwable) {}
     }
+    activeGameplayKeyMask = 0
     activeDpadMask = 0
     activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
     dpadTouchGeometryValid = false
+
+    // A sub-frame tap is latched natively so mGBA cannot miss it. When controls
+    // are intentionally cancelled (menu/background/close), discard any latch
+    // that has not yet reached an emulated frame to prevent a ghost tap later.
+    try { clearKeyPressLatches() } catch (_: Throwable) {}
+
     if (hasBinding()) {
-        binding.buttonUp.isPressed = false
-        binding.buttonDown.isPressed = false
-        binding.buttonLeft.isPressed = false
-        binding.buttonRight.isPressed = false
+        fun clearPressedState(view: View) {
+            view.isPressed = false
+            if (view is ViewGroup) {
+                for (index in 0 until view.childCount) {
+                    clearPressedState(view.getChildAt(index))
+                }
+            }
+        }
+        clearPressedState(binding.emulatorViewport)
     }
 }
 

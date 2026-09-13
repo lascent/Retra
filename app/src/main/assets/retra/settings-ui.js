@@ -10,7 +10,15 @@ const settingsPageMap = {
 };
 
 document.querySelectorAll('.settings-item').forEach(item => {
-  item.addEventListener('click', () => openSubPage(settingsPageMap[item.dataset.setting]));
+  item.addEventListener('click', () => {
+    openSubPage(settingsPageMap[item.dataset.setting]);
+    if (item.dataset.setting === 'Appearance') {
+      requestAnimationFrame(() => {
+        const currentThemeCard = document.querySelector('.theme-preview-card.active');
+        centerThemeCard(currentThemeCard, 'auto');
+      });
+    }
+  });
 });
 
 // v3.55 selectable UI font + edge-to-edge Settings and Recent Saves
@@ -201,11 +209,15 @@ function applyAppearanceState(){
   appShell?.classList.toggle('translucent-shell', appearanceState.translucent);
 
   themeModeOptions.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.themeMode === appearanceState.mode);
+    const active = btn.dataset.themeMode === appearanceState.mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 
   themePreviewCards.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.themeName === appearanceState.theme);
+    const active = btn.dataset.themeName === appearanceState.theme;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 
   if (pureBlackToggle) {
@@ -442,10 +454,19 @@ document.querySelectorAll('[data-back-to]').forEach(btn => {
   });
 });
 
+const RETRA_HELP_CENTER_URL = 'https://github.com/lascent/Retra/blob/main/TROUBLESHOOTING.md';
+
 document.querySelectorAll('[data-action]').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.dataset.openPage) {
       openSubPage(btn.dataset.openPage);
+      return;
+    }
+    if (btn.dataset.action === 'Open help center') {
+      // Navigate away from the bundled app-assets origin. WebUiController
+      // intercepts external HTTPS navigation and opens it with Android's
+      // ACTION_VIEW handler, so the Help Center appears in the user's browser.
+      window.location.href = RETRA_HELP_CENTER_URL;
       return;
     }
     if (btn.dataset.action === 'Reset advanced settings') {

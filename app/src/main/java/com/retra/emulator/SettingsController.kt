@@ -348,33 +348,41 @@ internal fun MainActivity.requestCloudSyncFolder() {
 }
 
 internal fun MainActivity.openAppFolderInternal() {
-    // Retra now owns its data root and exposes it through a DocumentsProvider,
-    // like emulator apps that appear as a dedicated location in Android Files.
-    // No ACTION_OPEN_DOCUMENT_TREE is involved here, so there is no "Use this
-    // folder" confirmation and no permission that has to be renewed later.
+    // Keep the provider-backed Retra root current before handing it to Android Files.
     syncAppFolderAsync(showResult = false)
 
-    // Open the provider ROOT, not its root document. Android DocumentsUI has a
-    // dedicated ACTION_VIEW route for Root.MIME_TYPE_ITEM; using a directory
-    // document URI can make some OEM file managers fall back to Downloads.
-    val rootUri = RetraDocumentsProvider.rootUri()
-    val browseIntent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(rootUri, DocumentsContract.Root.MIME_TYPE_ITEM)
-        addCategory(Intent.CATEGORY_DEFAULT)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-    }
-    val opened = runCatching {
-        if (browseIntent.resolveActivity(packageManager) != null) {
-            startActivity(browseIntent)
+    val grantFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+
+    // Do not preflight these intents with PackageManager.resolveActivity().
+    // On some Android/OEM builds package visibility can hide the handler from
+    // resolveActivity() even though startActivity() can route it correctly.
+    // Try both standardized DocumentsProvider deep-link forms instead.
+    val browseIntents = listOf(
+        Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(RetraDocumentsProvider.rootUri(), DocumentsContract.Root.MIME_TYPE_ITEM)
+            addCategory(Intent.CATEGORY_DEFAULT)
+            addFlags(grantFlags)
+        },
+        Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(
+                RetraDocumentsProvider.rootDocumentUri(),
+                DocumentsContract.Document.MIME_TYPE_DIR
+            )
+            addCategory(Intent.CATEGORY_DEFAULT)
+            addFlags(grantFlags)
+        }
+    )
+
+    val opened = browseIntents.any { intent ->
+        runCatching {
+            startActivity(intent)
             true
-        } else false
-    }.getOrDefault(false)
+        }.getOrDefault(false)
+    }
 
     if (!opened) {
-        // Some OEM file managers don't register the standard directory VIEW
-        // handler. Retra is still available as a "Retra" location in the
-        // system document navigator; never fall back to a folder-selection
-        // picker because that would reintroduce the unwanted confirmation.
+        // The Retra provider is still available in Android's document navigator,
+        // but this device's file manager does not support direct folder deep links.
         RetraNotice.makeText(
             this,
             "Open Android Files and choose Retra from the storage locations",

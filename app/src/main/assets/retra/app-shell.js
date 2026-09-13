@@ -280,10 +280,19 @@ function restorePageUiState(pageId){
 }
 
 function scheduleUiBackgroundTask(callback, timeout = 700){
-  if (typeof requestIdleCallback === 'function') {
-    return requestIdleCallback(() => callback(), { timeout });
+  const scheduleIdleWork = () => {
+    if (typeof requestIdleCallback === 'function') {
+      return requestIdleCallback(() => callback(), { timeout });
+    }
+    return window.setTimeout(callback, 32);
+  };
+
+  // Artwork lookup, metadata hydration and similar maintenance should never
+  // compete with an active finger/momentum scroll for the WebView main thread.
+  if (window.RetraScrollPerformance?.runWhenIdle) {
+    return window.RetraScrollPerformance.runWhenIdle(scheduleIdleWork, timeout);
   }
-  return window.setTimeout(callback, 32);
+  return scheduleIdleWork();
 }
 
 function openConfirmModal(title, message, onConfirm){

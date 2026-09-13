@@ -10,6 +10,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -221,22 +222,43 @@ internal fun MainActivity.setActiveDpadMask(nextMask: Int) {
     activeDpadMask = nextMask
 }
 
+/** Low-latency pointer-owned binding for A/B, L/R, Start and Select. */
 internal fun MainActivity.bindKey(view: View, key: Int) {
+    var activePointerId = MotionEvent.INVALID_POINTER_ID
+    val retentionSlopPx = maxOf(ViewConfiguration.get(view.context).scaledTouchSlop.toFloat(), dp(10f))
+    fun applyPressedState(v: View, pressed: Boolean) {
+        if (v.isPressed == pressed) return
+        setGameplayKey(key, pressed) // input first; visual redraw second
+        v.isPressed = pressed
+    }
+    fun finishGesture(v: View) {
+        activePointerId = MotionEvent.INVALID_POINTER_ID
+        applyPressedState(v, false)
+        v.parent?.requestDisallowInterceptTouchEvent(false)
+    }
     view.setOnTouchListener { v, event ->
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                v.isPressed = true
-                setGameplayKey(key, true)
+                activePointerId = event.getPointerId(event.actionIndex)
+                v.parent?.requestDisallowInterceptTouchEvent(true)
+                applyPressedState(v, true)
                 true
             }
-
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_CANCEL -> {
-                v.isPressed = false
-                setGameplayKey(key, false)
+            MotionEvent.ACTION_MOVE -> {
+                val pointerIndex = event.findPointerIndex(activePointerId)
+                if (pointerIndex < 0) finishGesture(v) else {
+                    val slop = if (v.isPressed) retentionSlopPx else 0f
+                    val x = event.getX(pointerIndex); val y = event.getY(pointerIndex)
+                    applyPressedState(v, x >= -slop && x <= v.width + slop && y >= -slop && y <= v.height + slop)
+                }
                 true
             }
-
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (event.getPointerId(event.actionIndex) == activePointerId) finishGesture(v)
+                true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { finishGesture(v); true }
+            MotionEvent.ACTION_POINTER_DOWN -> true // never transfer ownership implicitly
             else -> true
         }
     }

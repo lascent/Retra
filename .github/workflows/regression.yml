@@ -3,6 +3,7 @@ name: Retra regression checks
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,40 +17,110 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout sources
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
         with:
           node-version: 22
+          package-manager-cache: false
+
       - name: JavaScript syntax
+        shell: bash
         run: |
-          for file in app/src/main/assets/retra/*.js; do node --check "$file"; done
+          set -euo pipefail
+          for file in app/src/main/assets/retra/*.js; do
+            node --check "$file"
+          done
+
       - name: Regression tests
         run: node --test tests/*.test.cjs
+
       - name: Release structure validation
         run: python3 tools/validate_release.py
 
   android-kotlin-compile:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
+    env:
+      RETRA_ANDROID_API: "37"
+      RETRA_NDK_VERSION: "28.0.13004108"
+      RETRA_CMAKE_VERSION: "3.22.1"
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout sources
+        uses: actions/checkout@v5
         with:
-          submodules: recursive
-      - uses: actions/setup-java@v4
+          fetch-depth: 1
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
-      - name: Compile Kotlin, run JVM tests and Android lint
-        run: ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest :app:lintDebug --stacktrace
-      - name: Assemble debug APK when mGBA source is available
+
+      - name: Install pinned Android toolchain
         shell: bash
         run: |
-          if [ -f third_party/mgba/CMakeLists.txt ]; then
-            ./gradlew :app:assembleDebug --stacktrace
-          else
-            echo "mGBA source checkout is not bundled/submoduled; native APK assembly is intentionally skipped."
-            echo "Pin the validated mGBA revision under third_party/mgba to make this step mandatory."
+          set -euo pipefail
+
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [[ -z "$SDK_ROOT" ]]; then
+            echo "ANDROID_SDK_ROOT/ANDROID_HOME is not available on this runner." >&2
+            exit 1
           fi
+
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -perm -u+x 2>/dev/null | sort -V | tail -n 1)"
+          fi
+          if [[ -z "$SDKMANAGER" || ! -x "$SDKMANAGER" ]]; then
+            echo "sdkmanager could not be found under $SDK_ROOT." >&2
+            exit 1
+          fi
+
+          # Accept already-known Android SDK licenses, then install exactly the
+          # SDK/NDK/CMake versions Retra declares in app/build.gradle.kts.
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --install \
+            "platforms;android-${RETRA_ANDROID_API}" \
+            "ndk;${RETRA_NDK_VERSION}" \
+            "cmake;${RETRA_CMAKE_VERSION}"
+
+      - name: Prepare locked mGBA source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/prepare_mgba.py
+          test -f third_party/mgba/CMakeLists.txt
+          echo "Locked mGBA source is ready for Gradle/CMake."
+
+      - name: Print build tool versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          ./gradlew --version
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          echo "Retra Android API=${RETRA_ANDROID_API}"
+          echo "Retra NDK=${RETRA_NDK_VERSION}"
+          echo "Retra CMake=${RETRA_CMAKE_VERSION}"
+          cat third_party/mgba.lock
+
+      - name: Compile Kotlin
+        run: ./gradlew --no-daemon --console=plain :app:compileDebugKotlin --stacktrace
+
+      - name: Run JVM unit tests
+        run: ./gradlew --no-daemon --console=plain :app:testDebugUnitTest --stacktrace
+
+      - name: Run Android lint
+        run: ./gradlew --no-daemon --console=plain :app:lintDebug --stacktrace
+
+      - name: Assemble debug APK
+        run: ./gradlew --no-daemon --console=plain :app:assembleDebug --stacktrace

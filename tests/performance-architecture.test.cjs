@@ -58,7 +58,7 @@ test('background execution ownership is centralized, serialized for storage and 
 });
 
 test('large libraries use paint containment without forcing every card into a GPU layer', () => {
-  assert.match(script, /libraryGrid\.classList\.toggle\('large-library', libraryRoms\.length >= 80\)/);
+  assert.match(script, /libraryGrid\.classList\.toggle\('large-library', libraryRoms\.length >= 36\)/);
   assert.match(polish, /\.library-grid\.large-library \.cover-card[\s\S]*content-visibility: auto/);
   assert.match(polish, /\.cover-card[\s\S]*contain: layout paint style/);
   assert.doesNotMatch(polish, /\.cover-card\s*\{[^}]*will-change:\s*transform/s);
