@@ -271,9 +271,9 @@ class BackupRepository(
         }
     }
 
-    private fun restorePortableSettings(file: File) {
-        val root = runCatching { JSONObject(file.readText(Charsets.UTF_8)) }.getOrNull() ?: return
-        val settings = root.optJSONObject("settings") ?: return
+    private fun restorePortableSettings(file: File): Int {
+        val root = runCatching { JSONObject(file.readText(Charsets.UTF_8)) }.getOrNull() ?: return 0
+        val settings = root.optJSONObject("settings") ?: return 0
         val values = linkedMapOf<String, Any>()
         val keys = settings.keys()
         while (keys.hasNext()) {
@@ -288,21 +288,145 @@ class BackupRepository(
                 }
             }
         }
-        prefs.restorePortableSettings(values)
+        return prefs.restorePortableSettings(values)
+    }
+
+    /**
+     * Apply portable Metadata/library.json + settings.json that were downloaded
+     * by Drive/SAF sync. Cloud files live in the same persistent data tree as
+     * manual backups, but Room/DataStore must still be rehydrated explicitly so
+     * a clean reinstall immediately shows restored games, statistics and settings.
+     */
+    fun applyPortableMetadataFromPersistentData(): Int {
+        val metadataDir = fileOps.persistentCategoryDir("Metadata")
+        var applied = 0
+        val library = File(metadataDir, "library.json")
+        if (library.isFile && library.length() > 0L) {
+            restoreLibraryMetadata(library)
+            applied++
+        }
+        val settings = File(metadataDir, "settings.json")
+        if (settings.isFile && settings.length() > 0L) {
+            applied += restorePortableSettings(settings)
+        }
+        // Normalize the portable snapshot after merging it with any valid local
+        // ROM paths that already existed on this device. ROM binaries are never
+        // pulled from the cloud.
+        preparePortableMetadata()
+        return applied
     }
 
     private fun restoreLibraryMetadata(file: File) {
         if (!file.isFile) return
         val root = runCatching { JSONObject(file.readText(Charsets.UTF_8)) }.getOrNull() ?: return
         val roms = root.optJSONArray("roms") ?: return
+        val now = System.currentTimeMillis()
+
         for (index in 0 until roms.length()) {
             val item = roms.optJSONObject(index) ?: continue
             val romId = item.optString("romId").trim()
-            if (romId.isBlank() || romIdentityStore.getById(romId) == null) continue
-            val categories = item.optJSONArray("categories")?.toString() ?: "[]"
-            romIdentityStore.updateLibraryMetadata(romId, item.optBoolean("favorite", false), categories)
-            romIdentityStore.updatePlaytime(romId, item.optLong("playtimeMs", 0L))
-            romIdentityStore.setArchived(romId, item.optBoolean("archived", false))
+            if (romId.isBlank()) continue
+
+            val existing = romIdentityStore.getById(romId)
+            val contentHash = item.optString("contentHash").trim()
+                .ifBlank { existing?.contentHash.orEmpty() }
+            if (contentHash.isBlank()) continue
+
+            val platform = item.optString("platform").trim()
+                .ifBlank { existing?.platform ?: "ROM" }
+            val fileName = item.optString("fileName").trim()
+                .ifBlank { existing?.fileName ?: "$romId.gba" }
+            val displayName = item.optString("displayName").trim()
+                .ifBlank { existing?.displayName ?: fileName.substringBeforeLast('.').ifBlank { "ROM" } }
+            val categories = item.optJSONArray("categories")?.toString()
+                ?: existing?.categoriesJson
+                ?: "[]"
+            val favorite = if (item.has("favorite")) item.optBoolean("favorite", false) else existing?.favorite ?: false
+            val archived = if (item.has("archived")) item.optBoolean("archived", false) else existing?.archived ?: false
+            val backedUpPlaytime = item.optLong("playtimeMs", 0L).coerceAtLeast(0L)
+            val restoredPlaytime = maxOf(existing?.playtimeMs ?: 0L, backedUpPlaytime)
+
+            // Backup archives intentionally never contain ROM files. Preserve an
+            // already-valid local ROM on merge restore, otherwise recreate a
+            // first-class placeholder record under the exact original romId.
+            // That placeholder keeps saves/statistics visible and reconnects by
+            // SHA-256 automatically when the matching ROM is imported later.
+            val existingLaunch = existing?.launchPath?.let(::File)?.takeIf { it.isFile && it.length() > 0L }
+            val existingPatch = existing?.patchPath?.let(::File)?.takeIf { it.isFile && it.length() > 0L }
+            val hasLocalFile = existingLaunch != null || existingPatch != null
+            val restoredFileSize = if (hasLocalFile) existing?.fileSize ?: 0L else item.optLong("fileSize", 0L).coerceAtLeast(0L)
+            val restoredLastModified = if (hasLocalFile) existing?.lastModified ?: 0L else item.optLong("lastModified", 0L).coerceAtLeast(0L)
+            val hashAlgorithm = item.optString("hashAlgorithm").trim().ifBlank { existing?.hashAlgorithm ?: "SHA-256" }
+            val finalContentHash = item.optString("finalContentHash").trim().takeIf { it.isNotBlank() }
+                ?: existing?.finalContentHash
+            val legacyIdentityHash = item.optString("legacyIdentityHash").trim().takeIf { it.isNotBlank() }
+                ?: existing?.legacyIdentityHash
+            val createdAt = item.optLong("createdAt", 0L).takeIf { it > 0L }
+                ?: existing?.createdAt
+                ?: now
+
+            romIdentityStore.upsert(
+                RomIdentityStore.Record(
+                    romId = romId,
+                    contentHash = contentHash,
+                    hashAlgorithm = hashAlgorithm,
+                    platform = platform,
+                    displayName = displayName,
+                    fileName = fileName,
+                    sourceUri = if (hasLocalFile) existing?.sourceUri else null,
+                    currentFileUri = if (hasLocalFile) existing?.currentFileUri else null,
+                    launchPath = existingLaunch?.absolutePath,
+                    patchPath = existingPatch?.absolutePath,
+                    fileSize = restoredFileSize,
+                    lastModified = restoredLastModified,
+                    archived = archived,
+                    fileAvailable = hasLocalFile,
+                    favorite = favorite,
+                    categoriesJson = categories,
+                    playtimeMs = restoredPlaytime,
+                    finalContentHash = finalContentHash,
+                    legacyIdentityHash = legacyIdentityHash,
+                    createdAt = createdAt,
+                    updatedAt = now
+                )
+            )
+            romIdentityStore.addIdentityAlias(romId, finalContentHash, "restored_final_identity")
+            romIdentityStore.addIdentityAlias(romId, legacyIdentityHash, "restored_legacy_identity")
+
+            // Keep legacy preference mirrors coherent because save-state
+            // compatibility, locate/reconnect and downgrade-safe statistics still
+            // consult these keys in addition to Room.
+            val sourceExtension = item.optString("sourceExtension").trim()
+                .ifBlank { fileName.substringAfterLast('.', "").lowercase(Locale.US) }
+            val restoredLastPlayedAt = maxOf(
+                prefs.getLong("last_played_at_v1_$romId", 0L).coerceAtLeast(0L),
+                item.optLong("lastPlayedAt", 0L).coerceAtLeast(0L)
+            )
+            val restoredPlayCount = maxOf(
+                prefs.getInt("play_count_v1_$romId", 0).coerceAtLeast(0),
+                item.optInt("playCount", 0).coerceAtLeast(0)
+            )
+            val restoredCompleted = item.optBoolean("completed", prefs.getBoolean("completed_v1_$romId", false))
+            val editor = prefs.edit()
+                .putString("title_$romId", displayName)
+                .putString("file_name_$romId", fileName)
+                .putString("system_$romId", platform)
+                .putString("content_hash_$romId", contentHash)
+                .putString("source_ext_$romId", sourceExtension)
+                .putBoolean("archived_$romId", archived)
+                .putBoolean("file_available_$romId", hasLocalFile)
+                .putLong("playtime_ms_v1_$romId", restoredPlaytime)
+                .putLong("last_played_at_v1_$romId", restoredLastPlayedAt)
+                .putInt("play_count_v1_$romId", restoredPlayCount)
+                .putBoolean("completed_v1_$romId", restoredCompleted)
+
+            if (!hasLocalFile) {
+                editor.remove("content_path_$romId")
+                    .remove("patch_path_$romId")
+                    .remove("base_path_$romId")
+                    .remove("source_uri_$romId")
+            }
+            editor.commit()
         }
     }
 

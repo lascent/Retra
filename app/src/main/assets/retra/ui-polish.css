@@ -694,6 +694,16 @@ textarea:focus-visible{
 }
 .backup-action-btn + .backup-action-btn { border-left: 1px solid var(--line); }
 .backup-action-btn:active { background: rgba(255,255,255,.045); }
+
+.backup-action-btn.backup-cloud-recovery {
+  grid-column: 1 / -1;
+  min-height: 86px;
+  border-left: 0;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 430px) {
+  .backup-action-btn.backup-cloud-recovery { grid-column: auto; }
+}
 .backup-action-btn svg {
   width: 25px;
   height: 25px;
@@ -810,3 +820,61 @@ body.backup-create-open #createBackupPage.active {
   .backup-action-btn + .backup-action-btn { border-left:0; border-top:1px solid var(--line); }
   .backup-action-btn { min-height: 88px; }
 }
+
+/* v1.0.2 About/update surface — deliberately compact and native-settings-like. */
+.about-update-list{
+  width:min(100%, 380px);
+  margin:2px 0 22px;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+}
+.about-update-row{
+  width:100%;
+  min-height:66px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:13px 4px;
+  border:0;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  font:inherit;
+}
+.about-update-row:last-child{border-bottom:0}
+.about-update-row>div{min-width:0;flex:1}
+.about-update-row strong{display:block;font-size:13.5px;font-weight:600;line-height:1.3}
+.about-update-row span{display:block;margin-top:4px;color:var(--muted);font-size:10.75px;line-height:1.35}
+.about-update-button{cursor:pointer;border-radius:0}
+.about-update-button:active{background:rgba(255,255,255,.035)}
+.about-update-button .chevron{width:18px;height:18px;flex:0 0 auto;color:var(--muted)}
+body[data-resolved-mode="light"] .about-update-button:active{background:rgba(16,24,40,.045)}
+
+.app-update-card{max-width:390px}
+.app-update-kicker{
+  display:block;
+  margin-bottom:8px;
+  color:var(--accent);
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+.app-update-notes{
+  max-height:190px;
+  overflow:auto;
+  margin:12px 0 18px;
+  padding:12px 13px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(255,255,255,.025);
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.55;
+  text-align:left;
+  white-space:pre-wrap;
+  overscroll-behavior:contain;
+}
+body[data-resolved-mode="light"] .app-update-notes{background:rgba(16,24,40,.025)}

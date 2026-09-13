@@ -22,7 +22,7 @@ Retra `.retra` backups can include saves, save states, cheats, library metadata,
 
 ### APK says the app cannot be installed
 
-Make sure the APK is complete and compatible with your device. Retra v1.0.1 requires Android 8.0 or newer.
+Make sure the APK is complete and compatible with your device. Retra v1.0.2 requires Android 8.0 or newer.
 
 If Android reports a package/signature conflict while updating, the installed build may have been signed with a different key. Back up your Retra data first, uninstall the conflicting build, and then install the official build you want to use.
 
@@ -139,7 +139,7 @@ Removing a game from the Library is designed to be non-destructive. Permanent ga
 
 ## Create Backup or Restore Backup is not working
 
-Retra v1.0.1 supports portable `.retra` backup files.
+Retra v1.0.2 supports portable `.retra` backup files.
 
 ### Creating a backup
 
@@ -210,7 +210,7 @@ For multiplayer troubleshooting:
 - Keep both devices awake and Retra in the foreground during connection testing.
 - Return speed controls to normal before starting a Link session.
 
-Retra v1.0.1 does not support GBA Single-Pak/Multiboot or Wireless Adapter/RFU emulation.
+Retra v1.0.2 does not support GBA Single-Pak/Multiboot or Wireless Adapter/RFU emulation.
 
 ---
 
@@ -242,7 +242,7 @@ If the crash still happens, report it on the Retra GitHub repository under **Iss
 
 Include:
 
-- Retra version, for example `v1.0.1`
+- Retra version, for example `v1.0.2`
 - Android version
 - Device model
 - Whether the issue happens in portrait, landscape, or both

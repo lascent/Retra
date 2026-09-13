@@ -61,7 +61,7 @@ class SaveTransferRepository(
      * losing copy is preserved under Backups/CloudConflicts before the newer
      * copy wins, so sync never silently destroys either side.
      */
-    fun syncDetailed(rootUri: Uri): SyncResult {
+    fun syncDetailed(rootUri: Uri, preferRemoteOnFirstSync: Boolean = false): SyncResult {
         val root = DocumentFile.fromTreeUri(appContext, rootUri) ?: return SyncResult(errors = 1)
         if (!root.canRead() || !root.canWrite()) return SyncResult(errors = 1)
 
@@ -74,6 +74,7 @@ class SaveTransferRepository(
         }
 
         val lastState = readSyncState().toMutableMap()
+        val preferRemoteForUnpairedEmptyInstall = preferRemoteOnFirstSync || shouldPreferRemoteForFreshInstall(local, lastState)
         var uploaded = 0
         var downloaded = 0
         var conflicts = 0
@@ -136,7 +137,18 @@ class SaveTransferRepository(
                                 conflicts++
                                 val remoteTime = remoteFile.lastModified()
                                 val localTime = localFile.lastModified()
-                                if (remoteTime > localTime + CLOCK_TOLERANCE_MS) {
+                                // Explicit reinstall recovery is remote-first on an
+                                // unpaired device. This is critical for Metadata/*:
+                                // a clean install just generated fresh empty metadata,
+                                // whose timestamp must never overwrite the real cloud
+                                // library/settings before they can be restored.
+                                if (previous == null && preferRemoteForUnpairedEmptyInstall) {
+                                    preserveLocalConflict(path, localFile)
+                                    if (copyDocumentToFile(remoteFile, localFile)) {
+                                        downloaded++
+                                        lastState[path] = remoteHash
+                                    } else errors++
+                                } else if (remoteTime > localTime + CLOCK_TOLERANCE_MS) {
                                     preserveLocalConflict(path, localFile)
                                     if (copyDocumentToFile(remoteFile, localFile)) {
                                         downloaded++
@@ -222,6 +234,17 @@ class SaveTransferRepository(
         }
         walk(root)
         return imported
+    }
+
+
+    private fun shouldPreferRemoteForFreshInstall(local: Map<String, File>, lastState: Map<String, String>): Boolean {
+        if (lastState.isNotEmpty()) return false
+        if (local.keys.any { path -> !path.startsWith("Metadata/") }) return false
+        val library = local["Metadata/library.json"] ?: return true
+        return runCatching {
+            val root = JSONObject(library.readText(Charsets.UTF_8))
+            (root.optJSONArray("roms")?.length() ?: 0) == 0
+        }.getOrDefault(false)
     }
 
     private fun localSyncFiles(): Map<String, File> {

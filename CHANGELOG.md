@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.0.2 — 2026-09-13 — Update checking and reinstall recovery
+
+- Hardened automatic Google Drive recovery: debounced/coalesced background protection, last-backup status, urgent foreground-exit flush, and an explicit Restore from Google Drive action.
+- Added remote-first clean-reinstall recovery so freshly generated empty metadata cannot overwrite an existing cloud library/settings copy.
+- Cloud downloads now rehydrate Room library/statistics and portable settings immediately, including missing-ROM placeholders.
+- Narrowed Android Auto Backup/device-transfer rules to portable Retra data to reduce quota pressure.
+
+- Added an in-app **Check for updates** action to both About entry points with current-version status and a Retra-styled update prompt.
+- Added automatic background checks against the official `lascent/Retra` GitHub Releases feed with a six-hour success cooldown, bounded timeouts, and no gameplay-thread network work.
+- Update actions open only official HTTPS GitHub release/APK URLs; Android still owns the user-confirmed installation flow.
+- Enabled Android's `hasFragileUserData` uninstall prompt so supported Android builds can offer **Keep app data** when Retra is uninstalled.
+- Retained Android Auto Backup/device-transfer support for app data while continuing to exclude managed ROM content and transient save working files from cloud/device backup payloads.
+- Bumped Android release metadata to `versionName 1.0.2` / `versionCode 449`.
+
+### Backup restore accuracy hardening
+- Restored library entries now survive even when their ROM files are absent, retaining the original ROM identity, favorites, categories, playtime and save-state linkage.
+- Missing ROMs appear as `ROM file required` placeholders and reconnect automatically to the same `romId` when the matching SHA-256 ROM is imported.
+- Portable play-history metadata now restores Started/Recently Played statistics and History alongside save/battery-state counts.
+- Restored global settings and per-ROM `Config` data continue to use the existing portable settings/config restore path.
+
+
 ### v1.0.1 performance hardening
 - Triple-buffered gameplay presentation keeps Bitmap/GL upload work off the emulator frame lock.
 - High-frequency range previews persist preferences only on final commit.

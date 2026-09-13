@@ -70,7 +70,7 @@ function applyUiFont(fontName, { persist = false, notify = false } = {}){
   });
 
   if (settingsVersionLabel) {
-    settingsVersionLabel.textContent = 'Retra v1.0.1';
+    settingsVersionLabel.textContent = 'Retra v1.0.2';
   }
 
   if (persist) { localStorage.setItem(fontStorageKey, selected); setNativeUiPreference('font', selected); }
@@ -85,6 +85,130 @@ fontOptions.forEach(option => {
 
 applyUiFont(getSavedUiFont());
 if (!getNativeUiPreference('font')) setNativeUiPreference('font', getSavedUiFont());
+
+// v1.0.2 — GitHub Releases update checking. Native code performs the network
+// request off the UI/emulation thread; this layer only renders status/result UI.
+const retraVersionLabels = [...document.querySelectorAll('[data-retra-version-label]')];
+const retraVersionDetails = [...document.querySelectorAll('[data-retra-version-detail]')];
+const updateStatusLabels = [...document.querySelectorAll('[data-update-status]')];
+const checkUpdateButtons = [...document.querySelectorAll('[data-check-updates]')];
+const appUpdateModal = document.getElementById('appUpdateModal');
+const appUpdateTitle = document.getElementById('appUpdateTitle');
+const appUpdateMessage = document.getElementById('appUpdateMessage');
+const appUpdateNotes = document.getElementById('appUpdateNotes');
+const appUpdateLaterBtn = document.getElementById('appUpdateLaterBtn');
+const appUpdateInstallBtn = document.getElementById('appUpdateInstallBtn');
+let pendingOfficialUpdateUrl = '';
+
+function setUpdateStatus(text){
+  updateStatusLabels.forEach(label => { label.textContent = text; });
+}
+
+function hydrateRetraVersion(){
+  let versionName = '1.0.2';
+  try {
+    if (window.AndroidBridge && typeof window.AndroidBridge.getAppVersionInfo === 'function') {
+      const info = JSON.parse(String(window.AndroidBridge.getAppVersionInfo() || '{}'));
+      if (info && info.versionName) versionName = String(info.versionName);
+    }
+  } catch (_) {}
+  retraVersionLabels.forEach(label => { label.textContent = `Retra v${versionName}`; });
+  retraVersionDetails.forEach(label => { label.textContent = `Stable ${versionName}`; });
+  if (settingsVersionLabel) settingsVersionLabel.textContent = `Retra v${versionName}`;
+}
+
+function closeAppUpdateModal(){
+  appUpdateModal?.classList.remove('open');
+  appUpdateModal?.setAttribute('aria-hidden', 'true');
+}
+
+function openAppUpdateModal(result){
+  const latest = String(result.latestVersionName || '').trim();
+  pendingOfficialUpdateUrl = String(result.downloadUrl || result.releaseUrl || '').trim();
+  if (appUpdateTitle) appUpdateTitle.textContent = latest ? `Retra v${latest} is available` : 'A Retra update is available';
+  if (appUpdateMessage) appUpdateMessage.textContent = latest
+    ? `You are using Retra v${String(result.currentVersionName || '')}. Update to v${latest} for the latest fixes and improvements.`
+    : 'Update Retra to get the latest fixes and improvements.';
+  if (appUpdateNotes) {
+    const notes = String(result.notes || '').trim();
+    appUpdateNotes.textContent = notes || 'See the official GitHub release for details.';
+  }
+  appUpdateModal?.classList.add('open');
+  appUpdateModal?.setAttribute('aria-hidden', 'false');
+}
+
+function requestRetraUpdateCheck(manual = true){
+  if (!(window.AndroidBridge && typeof window.AndroidBridge.checkForUpdates === 'function')) {
+    if (manual) showToast('Update checking is available in the Android app', 'warning');
+    return;
+  }
+  if (manual) setUpdateStatus('Checking…');
+  try { window.AndroidBridge.checkForUpdates(Boolean(manual)); }
+  catch (_) {
+    if (manual) {
+      setUpdateStatus('Could not check');
+      showToast('Could not check for updates', 'error');
+    }
+  }
+}
+
+window.retraOnUpdateCheck = function(payloadJson, manual){
+  let result = {};
+  try { result = JSON.parse(String(payloadJson || '{}')); } catch (_) {}
+  const status = String(result.status || 'error');
+
+  if (status === 'checking') {
+    setUpdateStatus('Checking…');
+    return;
+  }
+
+  if (status === 'update_available') {
+    const latest = String(result.latestVersionName || '').trim();
+    setUpdateStatus(latest ? `v${latest} available` : 'Update available');
+    openAppUpdateModal(result);
+    return;
+  }
+
+  if (status === 'up_to_date') {
+    setUpdateStatus('You’re up to date');
+    if (manual) showToast('No new updates available', 'info', 2600);
+    return;
+  }
+
+  if (manual) {
+    setUpdateStatus('Could not check');
+    showToast(String(result.message || 'Could not check for updates'), 'error', 2800);
+  }
+};
+
+checkUpdateButtons.forEach(button => button.addEventListener('click', () => requestRetraUpdateCheck(true)));
+appUpdateLaterBtn?.addEventListener('click', closeAppUpdateModal);
+appUpdateModal?.addEventListener('click', event => { if (event.target === appUpdateModal) closeAppUpdateModal(); });
+appUpdateInstallBtn?.addEventListener('click', () => {
+  const url = pendingOfficialUpdateUrl;
+  if (!url) {
+    showToast('Update download is unavailable', 'error');
+    return;
+  }
+  let opened = false;
+  try {
+    if (window.AndroidBridge && typeof window.AndroidBridge.openUpdateUrl === 'function') {
+      opened = Boolean(window.AndroidBridge.openUpdateUrl(url));
+    }
+  } catch (_) {}
+  if (!opened) {
+    // Browser/debug fallback; Android WebUiController routes external HTTPS URLs
+    // to the system browser rather than loading them inside Retra.
+    try { window.location.href = url; opened = true; } catch (_) {}
+  }
+  if (opened) closeAppUpdateModal();
+});
+
+hydrateRetraVersion();
+// Automatic checks are intentionally delayed until the bundled UI has settled.
+// Native code applies a six-hour success cooldown, so frequent launches do not
+// hammer GitHub or compete with gameplay startup.
+window.setTimeout(() => requestRetraUpdateCheck(false), 1400);
 
 const appShell = document.querySelector('.app-shell');
 
@@ -950,14 +1074,28 @@ function applyNativeSettingsState(state){
   const cloudReady = !!state.cloudSync && !!state.cloudFolderConnected;
   const cloudAccount = String(state.cloudAccount || '').trim();
   const cloudMode = state.cloudSyncMode === 'api' ? 'Drive API' : 'Drive folder';
-  if (cloudSyncSummary) cloudSyncSummary.textContent = cloudReady
-    ? (cloudAccount ? `${cloudAccount} • ${cloudMode} • verified conflict-safe sync on` : `${cloudMode} connected • verified conflict-safe sync on`)
-    : 'Choose a Google account to sync saves across devices';
+  const cloudLastBackupAt = Math.max(0, Number(state.cloudLastBackupAt) || 0);
+  const cloudLastError = String(state.cloudLastSyncError || '').trim();
+  const cloudBackupTime = cloudLastBackupAt > 0
+    ? new Date(cloudLastBackupAt).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+    : '';
+  if (cloudSyncSummary) {
+    if (!cloudReady) cloudSyncSummary.textContent = 'Choose a Google account to protect saves across reinstalls and devices';
+    else if (cloudLastError && cloudLastBackupAt > 0) cloudSyncSummary.textContent = `Protected ${cloudBackupTime} • sync needs attention`;
+    else if (cloudLastError) cloudSyncSummary.textContent = `Connected • backup needs attention`;
+    else if (cloudLastBackupAt > 0) cloudSyncSummary.textContent = `Protected • last backup ${cloudBackupTime}`;
+    else cloudSyncSummary.textContent = `${cloudAccount ? `${cloudAccount} • ` : ''}${cloudMode} connected • waiting for first backup`;
+  }
   if (syncSettingsBtn) {
     syncSettingsBtn.disabled = !cloudReady;
     syncSettingsBtn.classList.toggle('disabled-row', !cloudReady);
   }
-  if (syncSettingsSummary) syncSettingsSummary.textContent = cloudReady ? 'Sync now, change account/folder, or disconnect' : 'Available when cloud sync is enabled';
+  if (syncSettingsSummary) {
+    if (!cloudReady) syncSettingsSummary.textContent = 'Available when automatic Drive backup is enabled';
+    else if (cloudLastError) syncSettingsSummary.textContent = `${cloudLastError} • tap for Sync now`;
+    else if (cloudLastBackupAt > 0) syncSettingsSummary.textContent = `Last protected ${cloudBackupTime} • Sync now or manage Drive`;
+    else syncSettingsSummary.textContent = 'Sync now, change account/folder, or disconnect';
+  }
 }
 
 window.retraNativeSettingsChanged = function(payload){
@@ -1159,6 +1297,7 @@ refreshNativeSettings();
 const dataStorageOpenFolderBtn = document.getElementById('dataStorageOpenFolderBtn');
 const createBackupStartBtn = document.getElementById('createBackupStartBtn');
 const restoreBackupBtn = document.getElementById('restoreBackupBtn');
+const restoreCloudBackupBtn = document.getElementById('restoreCloudBackupBtn');
 const confirmCreateBackupBtn = document.getElementById('confirmCreateBackupBtn');
 const backupOptionInputs = [...document.querySelectorAll('[data-backup-key]')];
 const dataStorageFreeText = document.getElementById('dataStorageFreeText');
@@ -1215,6 +1354,10 @@ confirmCreateBackupBtn?.addEventListener('click', () => {
     showToast('Choose at least one item to back up');
     return;
   }
+  // Flush portable history/statistics metadata before native metadata files are
+  // generated so a backup captures the newest Started/Recent information.
+  try { if (typeof savePlayHistory === 'function') savePlayHistory(); } catch (_) {}
+  try { if (typeof syncRomCompletionStateToNative === 'function') syncRomCompletionStateToNative(); } catch (_) {}
   if (window.AndroidBridge && typeof window.AndroidBridge.createBackup === 'function') {
     window.AndroidBridge.createBackup(JSON.stringify(selected));
   }
@@ -1223,6 +1366,14 @@ confirmCreateBackupBtn?.addEventListener('click', () => {
 restoreBackupBtn?.addEventListener('click', () => {
   if (window.AndroidBridge && typeof window.AndroidBridge.restoreBackup === 'function') {
     window.AndroidBridge.restoreBackup();
+  }
+});
+
+restoreCloudBackupBtn?.addEventListener('click', () => {
+  if (window.AndroidBridge && typeof window.AndroidBridge.restoreFromGoogleDrive === 'function') {
+    window.AndroidBridge.restoreFromGoogleDrive();
+  } else {
+    showToast('Google Drive recovery is available in the Android app');
   }
 });
 
@@ -1237,6 +1388,12 @@ window.retraBackupRestored = function(){
   try {
     hydrateLibraryFromNativeRoom();
     renderLibraryFromStorage({ force: true });
+    if (typeof renderHistory === 'function') renderHistory();
+    if (typeof updateStatistics === 'function') updateStatistics();
+    if (currentRomCard) {
+      refreshRomRecentSaves(currentRomCard);
+      updateRomLaunchAction(currentRomCard);
+    }
   } catch (_) {}
   refreshDataStorageSummary();
 };

@@ -11,6 +11,7 @@ v0.8.0 → v0.8.9
 v0.9.0 → v0.9.12
 v1.0.0  First stable public release
 v1.0.1  Create Backup and Restore Backup
+v1.0.2  Update checker and reinstall recovery
 ```
 
 ## v0.9 series — release preparation
@@ -45,6 +46,15 @@ v1.0.1  Create Backup and Restore Backup
 | **v0.8.2** | Library multi-select polish |
 | **v0.8.1** | GBA ROM-hack save-memory compatibility |
 | **v0.8.0** | Persistent ROM data foundation |
+
+## v1.0.2 — update checking and reinstall recovery
+
+The second stable update adds:
+
+- automatic and manual update checks against Retra's official GitHub Releases feed;
+- an About-page update status and in-app update prompt;
+- Android's uninstall **Keep app data** prompt where the platform supports it;
+- continued Auto Backup/device-transfer coverage for saves, statistics, library metadata, and settings while ROM binaries stay excluded from backup payloads.
 
 ## v1.0.1 — backup and restore
 

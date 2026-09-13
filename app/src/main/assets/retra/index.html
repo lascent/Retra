@@ -339,8 +339,12 @@
 <svg viewbox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"></path><path d="m7 14 5-5 5 5"></path><path d="M5 4h14"></path></svg>
 <div><strong>Restore backup</strong><span>Restore data from an existing Retra .retra backup</span></div>
 </button>
+<button class="backup-action-btn backup-cloud-recovery" id="restoreCloudBackupBtn" type="button">
+<svg viewbox="0 0 24 24" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.2 8.3 4.5 4.5 0 0 0 7 18Z"></path><path d="M12 16V9"></path><path d="m9 12 3-3 3 3"></path></svg>
+<div><strong>Restore from Google Drive</strong><span>Recover saves, library, statistics and settings after reinstalling Retra</span></div>
+</button>
 </div>
-<p class="storage-info-note">Retra backups do not include ROM or BIOS files. Save files, save states, cheats, layouts, artwork, library metadata, and app settings can be backed up separately.</p>
+<p class="storage-info-note">Retra backups do not include ROM or BIOS files. Save files, save states, cheats, layouts, artwork, library metadata, statistics, and portable app settings can be recovered separately.</p>
 </div>
 </section>
 
@@ -423,7 +427,7 @@
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
 </div>
-<div class="version" id="settingsVersionLabel">Retra v1.0.1</div>
+<div class="version" id="settingsVersionLabel">Retra v1.0.2</div>
 </section>
 <!-- APPEARANCE -->
 <section class="page settings-detail-page" id="appearanceSettingsPage">
@@ -916,7 +920,7 @@
 <h2>Misc</h2>
 </div>
 <div class="detail-list">
-<div class="detail-row"><div><strong>Sync to Google Drive</strong><span id="cloudSyncSummary">Keep game saves in sync across devices</span></div><label class="switch"><input id="cloudSyncToggle" type="checkbox"/><span class="slider"></span></label></div>
+<div class="detail-row"><div><strong>Automatic Google Drive backup</strong><span id="cloudSyncSummary">Protect saves, statistics and settings across reinstalls and devices</span></div><label class="switch"><input id="cloudSyncToggle" type="checkbox"/><span class="slider"></span></label></div>
 <button class="detail-row tappable disabled-row" disabled="" id="syncSettingsBtn"><div><strong>Sync settings</strong><span id="syncSettingsSummary">Available when cloud sync is enabled</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
 <div class="detail-row"><div><strong>Enable cheats</strong><span>Allow cheat codes while playing</span></div><label class="switch"><input checked="" id="enableCheatsToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-row"><div><strong>ROM patching</strong><span>Auto IPS/UPS/BPS patching when a matching patch is available</span></div><label class="check-control"><input checked="" id="romPatchingToggle" type="checkbox"/><span></span></label></div>
@@ -998,7 +1002,16 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version">Retra v1.0.1</p>
+<p class="about-version" data-retra-version-label>Retra v1.0.2</p>
+<div class="about-update-list">
+  <div class="about-update-row about-version-row">
+    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.2</span></div>
+  </div>
+  <button class="about-update-row about-update-button" data-check-updates type="button">
+    <div><strong>Check for updates</strong><span data-update-status>Automatically checked in the background</span></div>
+    <svg class="chevron" viewbox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+  </button>
+</div>
 <p class="disclaimer">Retra is an independent emulator frontend. No copyrighted game software or ROM files are included with this product.</p>
 <button class="privacy-btn" data-open-page="privacyPolicyPage" data-privacy-return="aboutSettingsPage" type="button">Privacy Policy</button>
 </div>
@@ -1013,13 +1026,14 @@
 </div>
 <div class="about-panel privacy-policy-panel">
 <h3>Retra Privacy Policy</h3>
-<p class="about-version">Effective for Retra v1.0.0</p>
+<p class="about-version">Effective for Retra v1.0.2</p>
 <p class="disclaimer"><strong>Local game data.</strong> Retra stores your library metadata, settings, save files, save states, cheats, controller layouts, artwork preferences, and play statistics on your device. Retra does not include ROMs or copyrighted game software.</p>
-<p class="disclaimer"><strong>Network features.</strong> Internet access is used only for features you choose to use, such as automatic artwork lookup, optional Google Drive synchronization, and Wi-Fi Remote Link. Bluetooth access is used only for Bluetooth Remote Link.</p>
-<p class="disclaimer"><strong>Google Drive.</strong> If you enable Drive sync and select an account, Retra uses the authorization granted by you to synchronize supported Retra data with your own Drive storage. Drive sync can be disabled at any time.</p>
+<p class="disclaimer"><strong>Network features.</strong> Internet access is used for features such as automatic artwork lookup, optional Google Drive synchronization, Wi-Fi Remote Link, and the lightweight GitHub Releases update check. Update checks contact Retra's official GitHub repository and do not include your ROMs, saves, or library contents. Bluetooth access is used only for Bluetooth Remote Link.</p>
+<p class="disclaimer"><strong>Google Drive.</strong> If you enable automatic Drive backup or explicitly choose Restore from Google Drive, Retra uses the authorization granted by you to synchronize supported saves, save states, library metadata, statistics, and portable settings with your own Drive storage. ROM and BIOS files are not uploaded. Drive backup can be disabled at any time.</p>
 <p class="disclaimer"><strong>No advertising or analytics SDK.</strong> This build does not include an advertising SDK or a third-party analytics SDK.</p>
 <p class="disclaimer"><strong>Permissions.</strong> Retra requests device or network permissions only when needed for enabled features. You can revoke Android permissions from system settings.</p>
 <p class="disclaimer"><strong>Data deletion.</strong> Removing a game from the Library is non-destructive by design. Use Retra's explicit Delete Game Data action when you want associated local game data removed.</p>
+<p class="disclaimer"><strong>Uninstall and reinstall.</strong> Retra participates in Android backup/device transfer and asks supported Android versions to offer a Keep app data option during uninstall. Android still controls whether retained or cloud-backed data is available after reinstall, so a portable <code>.retra</code> backup remains the safest explicit recovery copy.</p>
 <p class="disclaimer"><strong>Policy updates.</strong> If Retra's data practices change, this policy should be updated before publishing the changed build.</p>
 </div>
 </section>
@@ -1170,7 +1184,16 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version">Retra v1.0.1</p>
+<p class="about-version" data-retra-version-label>Retra v1.0.2</p>
+<div class="about-update-list">
+  <div class="about-update-row about-version-row">
+    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.2</span></div>
+  </div>
+  <button class="about-update-row about-update-button" data-check-updates type="button">
+    <div><strong>Check for updates</strong><span data-update-status>Automatically checked in the background</span></div>
+    <svg class="chevron" viewbox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+  </button>
+</div>
 <p class="disclaimer">Retra is an independent emulator frontend. No copyrighted game software or ROM files are included with this product.</p>
 <button class="privacy-btn" data-open-page="privacyPolicyPage" data-privacy-return="aboutPage" type="button">Privacy Policy</button>
 </div>
@@ -1272,6 +1295,19 @@
 <button class="modal-btn primary" id="confirmOkBtn">OK</button>
 </div>
 </div>
+</div>
+<!-- APP UPDATE MODAL -->
+<div class="modal-backdrop confirm-modal" id="appUpdateModal" aria-hidden="true">
+  <div class="confirm-modal-card app-update-card" role="dialog" aria-modal="true" aria-labelledby="appUpdateTitle">
+    <span class="app-update-kicker">UPDATE AVAILABLE</span>
+    <h3 class="modal-title" id="appUpdateTitle">A new Retra version is available</h3>
+    <p class="modal-copy" id="appUpdateMessage">Update Retra to get the latest improvements.</p>
+    <div class="app-update-notes" id="appUpdateNotes"></div>
+    <div class="confirm-actions">
+      <button class="modal-btn secondary" id="appUpdateLaterBtn" type="button">Later</button>
+      <button class="modal-btn primary" id="appUpdateInstallBtn" type="button">Update</button>
+    </div>
+  </div>
 </div>
 <!-- SCREEN ORIENTATION MODAL -->
 <div class="modal-backdrop selection-modal" id="screenOrientationModal">

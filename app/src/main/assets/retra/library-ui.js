@@ -128,8 +128,10 @@ function createRomCard(rom){
   article.dataset.system = rom.system;
   article.dataset.author = 'Local file';
   article.dataset.studio = rom.system === 'PATCH' ? 'ROM patch file' : `${rom.system} ROM`;
-  article.dataset.status = rom.system === 'PATCH' ? 'Patch file' : 'Ready to Play';
-  article.dataset.source = 'Local Library';
+  const fileAvailable = rom.fileAvailable !== false;
+  article.dataset.fileAvailable = fileAvailable ? 'true' : 'false';
+  article.dataset.status = !fileAvailable ? 'ROM file required' : (rom.system === 'PATCH' ? 'Patch file' : 'Ready to Play');
+  article.dataset.source = !fileAvailable ? 'Restored Library' : 'Local Library';
   article.dataset.description = `${rom.fileName} • ${formatRomFileSize(rom.size)}`;
   article.dataset.entries = '';
 
@@ -1121,6 +1123,9 @@ function filterCards(){
 
 function savePlayHistory(){
   localStorage.setItem(playHistoryStorageKey, JSON.stringify(playHistory));
+  if (window.AndroidBridge && typeof window.AndroidBridge.syncRomPlayHistory === 'function') {
+    try { window.AndroidBridge.syncRomPlayHistory(JSON.stringify(playHistory.slice(0, 100))); } catch (_) {}
+  }
 }
 
 function isHistoryPaused(){

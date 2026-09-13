@@ -6,12 +6,12 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('Retra exposes version 1.0.1 consistently with an upgrade-safe versionCode', () => {
+test('Retra exposes version 1.0.2 consistently with an upgrade-safe versionCode', () => {
   const gradle = read('app/build.gradle.kts');
   const html = read('app/src/main/assets/retra/index.html');
-  assert.match(gradle, /versionCode = 448/);
-  assert.match(gradle, /versionName = "1\.0\.1"/);
-  assert.match(html, /Retra v1\.0\.1/);
+  assert.match(gradle, /versionCode = 449/);
+  assert.match(gradle, /versionName = "1\.0\.2"/);
+  assert.match(html, /Retra v1\.0\.2/);
 });
 
 test('Privacy Policy is a real offline in-app page instead of a toast-only action', () => {

@@ -190,7 +190,8 @@ async function resumeCurrentRom(){
     return;
   }
 
-  const wantsResume = resumeAction?.dataset.launchMode === 'resume' || nativeHasResumeState(romId);
+  const needsRom = currentRomCard?.dataset.fileAvailable === 'false';
+  const wantsResume = !needsRom && (resumeAction?.dataset.launchMode === 'resume' || nativeHasResumeState(romId));
   if (launchNativeRom(currentRomCard, wantsResume)) return;
 
   const file = await getStoredRomFile(romId);

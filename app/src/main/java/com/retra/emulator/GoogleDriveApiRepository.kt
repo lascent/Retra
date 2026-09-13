@@ -68,12 +68,13 @@ class GoogleDriveApiRepository(
         writeTombstones(pending)
     }
 
-    fun sync(accessToken: String): SyncResult {
+    fun sync(accessToken: String, preferRemoteOnFirstSync: Boolean = false): SyncResult {
         preparePortableMetadata()
         val rootId = findOrCreateRoot(accessToken)
         val local = localFiles()
         val remote = listRemoteFiles(accessToken, rootId).associateBy { it.path }.toMutableMap()
         val lastState = readState().toMutableMap()
+        val preferRemoteForUnpairedEmptyInstall = preferRemoteOnFirstSync || shouldPreferRemoteForFreshInstall(local, lastState)
         val tombstones = readTombstones().toMutableSet()
         val completedDeletes = mutableSetOf<String>()
         tombstones.forEach { path ->
@@ -152,7 +153,19 @@ class GoogleDriveApiRepository(
                             }
                             else -> {
                                 conflicts++
-                                if (remoteFile.modifiedAt > localFile.lastModified() + CLOCK_TOLERANCE_MS) {
+                                // Explicit reinstall recovery is remote-first when
+                                // this device has no sync journal yet. A clean install
+                                // creates new empty Metadata/library.json and
+                                // Metadata/settings.json immediately; timestamp-only
+                                // conflict resolution would otherwise let those empty
+                                // files overwrite the user's real cloud backup.
+                                if (previous == null && preferRemoteForUnpairedEmptyInstall) {
+                                    preserveLocalConflict(path, localFile)
+                                    if (download(accessToken, remoteFile, localFile)) {
+                                        downloaded++
+                                        lastState[path] = remoteHash
+                                    } else errors++
+                                } else if (remoteFile.modifiedAt > localFile.lastModified() + CLOCK_TOLERANCE_MS) {
                                     preserveLocalConflict(path, localFile)
                                     if (download(accessToken, remoteFile, localFile)) {
                                         downloaded++
@@ -177,6 +190,20 @@ class GoogleDriveApiRepository(
         }
         writeState(lastState)
         return SyncResult(uploaded, downloaded, conflicts, unchanged, errors)
+    }
+
+
+    private fun shouldPreferRemoteForFreshInstall(local: Map<String, File>, lastState: Map<String, String>): Boolean {
+        if (lastState.isNotEmpty()) return false
+        // Directly meaningful portable files mean this device already has user
+        // data and should use normal conflict handling. Metadata-only state is
+        // what a brand-new Retra install generates before its first sync.
+        if (local.keys.any { path -> !path.startsWith("Metadata/") }) return false
+        val library = local["Metadata/library.json"] ?: return true
+        return runCatching {
+            val root = JSONObject(library.readText(Charsets.UTF_8))
+            (root.optJSONArray("roms")?.length() ?: 0) == 0
+        }.getOrDefault(false)
     }
 
     private fun localFiles(): Map<String, File> {

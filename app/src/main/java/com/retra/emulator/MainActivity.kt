@@ -235,8 +235,10 @@ class MainActivity : AppCompatActivity() {
     internal val remoteExecutor = taskExecutors.network
 
     internal var pendingCloudEnable = false
+    internal var pendingCloudRestore = false
     internal var pendingCloudAccount: String? = null
     internal var pendingDriveAuthAccount: String? = null
+    internal var pendingDriveAuthRestore = false
     internal var pendingBackupSelection: BackupRepository.Selection? = null
     // Coalesce repeated portable-folder writes (volume sliders, rapid save-state
     // updates, lifecycle commits) into one serialized SAF export. A dirty bit
@@ -352,6 +354,24 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    internal val appUpdateController: AppUpdateController by lazy {
+        AppUpdateController(
+            activity = this,
+            prefs = prefs,
+            networkExecutor = taskExecutors.network,
+            onResult = { payloadJson, manual ->
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed && ::binding.isInitialized) {
+                        binding.webView.evaluateJavascript(
+                            "window.retraOnUpdateCheck && window.retraOnUpdateCheck(${jsQuote(payloadJson)}, ${if (manual) "true" else "false"})",
+                            null
+                        )
+                    }
+                }
+            }
+        )
+    }
+
     internal val driveApi: GoogleDriveApiRepository by lazy {
         GoogleDriveApiRepository(
             filesDir = filesDir,
@@ -368,10 +388,31 @@ class MainActivity : AppCompatActivity() {
             driveApi = driveApi,
             ioExecutor = ioExecutor,
             cloudRootUri = { cloudRootUri() },
-            onSettingsChanged = { notifyWebSettingsState() },
+            onSettingsChanged = { runOnUiThread { notifyWebSettingsState() } },
+            onPortableDataDownloaded = { explicitRecovery ->
+                val applied = backupRepository.applyPortableMetadataFromPersistentData()
+                runOnUiThread {
+                    applyRuntimeSettingsToNative()
+                    notifyWebSettingsState()
+                    if (::binding.isInitialized) {
+                        binding.webView.evaluateJavascript(
+                            "window.retraBackupRestored && window.retraBackupRestored()",
+                            null
+                        )
+                    }
+                    if (explicitRecovery && applied > 0) {
+                        RetraNotice.makeText(
+                            this,
+                            "Retra recovery restored saves, library data, statistics and settings",
+                            RetraNotice.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            },
             onFolderFallbackRequested = { runOnUiThread { requestCloudSyncFolder() } },
-            onAuthRecoveryRequired = { account, intent ->
+            onAuthRecoveryRequired = { account, intent, restoreRemoteFirst ->
                 pendingDriveAuthAccount = account
+                pendingDriveAuthRestore = restoreRemoteFirst
                 driveAuthRecoveryLauncher.launch(intent)
             }
         )
@@ -564,6 +605,7 @@ class MainActivity : AppCompatActivity() {
                     prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
                 }
                 pendingCloudEnable = false
+                pendingCloudRestore = false
                 pendingCloudAccount = null
                 notifyWebSettingsState()
                 return@registerForActivityResult
@@ -576,6 +618,7 @@ class MainActivity : AppCompatActivity() {
                     prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
                 }
                 pendingCloudEnable = false
+                pendingCloudRestore = false
                 pendingCloudAccount = null
                 notifyWebSettingsState()
                 RetraNotice.makeText(this, "Choose a Google account to use Drive sync", RetraNotice.LENGTH_SHORT).show()
@@ -583,8 +626,19 @@ class MainActivity : AppCompatActivity() {
             }
 
             pendingCloudAccount = accountName
-            RetraNotice.makeText(this, "Selected $accountName • connecting Google Drive API", RetraNotice.LENGTH_SHORT).show()
-            cloudSync.connectAccount(accountName, interactive = true, fallbackToFolder = true)
+            val restoreRemoteFirst = pendingCloudRestore
+            RetraNotice.makeText(
+                this,
+                if (restoreRemoteFirst) "Selected $accountName • looking for your Retra recovery data" else "Selected $accountName • connecting Google Drive API",
+                RetraNotice.LENGTH_SHORT
+            ).show()
+            cloudSync.connectAccount(
+                accountName,
+                interactive = true,
+                fallbackToFolder = !restoreRemoteFirst,
+                restoreRemoteFirst = restoreRemoteFirst
+            )
+            pendingCloudRestore = false
             notifyWebSettingsState()
         }
 
@@ -595,6 +649,7 @@ class MainActivity : AppCompatActivity() {
                     prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
                 }
                 pendingCloudEnable = false
+                pendingCloudRestore = false
                 pendingCloudAccount = null
                 notifyWebSettingsState()
                 return@registerForActivityResult
@@ -603,6 +658,7 @@ class MainActivity : AppCompatActivity() {
             val account = pendingCloudAccount ?: prefs.getString(CLOUD_SYNC_ACCOUNT_PREF, null)
             cloudSync.markSafConnected(uri, account)
             pendingCloudEnable = false
+            pendingCloudRestore = false
             pendingCloudAccount = null
             syncCloudAsync(showResult = true)
         }
@@ -610,13 +666,22 @@ class MainActivity : AppCompatActivity() {
     internal val driveAuthRecoveryLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val account = pendingDriveAuthAccount
+            val restoreRemoteFirst = pendingDriveAuthRestore
             pendingDriveAuthAccount = null
+            pendingDriveAuthRestore = false
             if (result.resultCode == RESULT_OK && !account.isNullOrBlank()) {
-                cloudSync.connectAccount(account, interactive = false, fallbackToFolder = true)
-            } else if (!account.isNullOrBlank()) {
+                cloudSync.connectAccount(
+                    account,
+                    interactive = false,
+                    fallbackToFolder = !restoreRemoteFirst,
+                    restoreRemoteFirst = restoreRemoteFirst
+                )
+            } else if (!account.isNullOrBlank() && !restoreRemoteFirst) {
                 pendingCloudAccount = account
                 RetraNotice.makeText(this, "Drive API authorization was not granted • choose a Drive folder instead", RetraNotice.LENGTH_LONG).show()
                 requestCloudSyncFolder()
+            } else if (restoreRemoteFirst) {
+                RetraNotice.makeText(this, "Google Drive recovery was cancelled", RetraNotice.LENGTH_SHORT).show()
             }
         }
 
@@ -886,8 +951,9 @@ class MainActivity : AppCompatActivity() {
             stopEmulation()
             if (romLoaded) commitActiveWorkingSaves()
         }
-        // Also persist settings-only sessions where no ROM was running.
-        syncAppFolderAsync(showResult = false)
+        // Also protect settings-only sessions where no ROM was running. Drive
+        // work is asynchronous/background-priority and never blocks onPause.
+        flushCloudBackupAsync()
         super.onPause()
     }
 
@@ -1038,6 +1104,9 @@ class MainActivity : AppCompatActivity() {
                     put("archived", record.archived)
                     put("fileAvailable", record.fileAvailable)
                     put("playtime", record.playtimeMs)
+                    put("lastPlayedAt", prefs.getLong("last_played_at_v1_${record.romId}", 0L).coerceAtLeast(0L))
+                    put("playCount", prefs.getInt("play_count_v1_${record.romId}", 0).coerceAtLeast(0))
+                    put("completed", prefs.getBoolean("completed_v1_${record.romId}", false))
                     put("categories", runCatching { JSONArray(record.categoriesJson) }.getOrElse { JSONArray() })
                 })
             }
@@ -1056,7 +1125,60 @@ class MainActivity : AppCompatActivity() {
             if (romId.isBlank() || romIdentityStore.getById(romId) == null) return false
             val normalized = runCatching { JSONArray(categoriesJson).toString() }.getOrDefault("[]")
             romIdentityStore.updateLibraryMetadata(romId, favorite, normalized)
+            syncCloudAsync(showResult = false)
             return true
+        }
+
+
+        @JavascriptInterface
+        fun syncRomCompletionState(stateJson: String): Int {
+            val state = runCatching { JSONObject(stateJson) }.getOrNull() ?: return 0
+            val editor = prefs.edit()
+            var synced = 0
+            romIdentityStore.all().forEach { record ->
+                val completed = state.optBoolean(record.romId, false)
+                editor.putBoolean("completed_v1_${record.romId}", completed)
+                synced++
+            }
+            if (synced > 0) {
+                editor.commit()
+                syncCloudAsync(showResult = false)
+            }
+            return synced
+        }
+
+        @JavascriptInterface
+        fun syncRomPlayHistory(historyJson: String): Int {
+            val history = runCatching { JSONArray(historyJson) }.getOrNull() ?: return 0
+            val editor = prefs.edit()
+            val retainedIds = linkedSetOf<String>()
+            var restored = 0
+            val maxEntries = minOf(history.length(), 100)
+            for (index in 0 until maxEntries) {
+                val item = history.optJSONObject(index) ?: continue
+                val romId = item.optString("romId").trim()
+                if (romId.isBlank() || romIdentityStore.getById(romId) == null) continue
+                retainedIds += romId
+                val playedAt = item.optLong("playedAt", 0L).coerceAtLeast(0L)
+                val playCount = item.optInt("playCount", 0).coerceAtLeast(0)
+                if (playedAt > 0L) editor.putLong("last_played_at_v1_$romId", playedAt)
+                else editor.remove("last_played_at_v1_$romId")
+                if (playCount > 0) editor.putInt("play_count_v1_$romId", playCount)
+                else editor.remove("play_count_v1_$romId")
+                restored++
+            }
+
+            // Clearing History must also clear the portable native mirror;
+            // otherwise a later Room hydration would resurrect deleted rows.
+            romIdentityStore.all().forEach { record ->
+                if (record.romId !in retainedIds) {
+                    editor.remove("last_played_at_v1_${record.romId}")
+                    editor.remove("play_count_v1_${record.romId}")
+                }
+            }
+            editor.commit()
+            syncCloudAsync(showResult = false)
+            return restored
         }
 
         @JavascriptInterface
@@ -1113,6 +1235,17 @@ class MainActivity : AppCompatActivity() {
         fun getSettingsState(): String = settingsStateJson()
 
         @JavascriptInterface
+        fun getAppVersionInfo(): String = appUpdateController.versionInfoJson()
+
+        @JavascriptInterface
+        fun checkForUpdates(manual: Boolean) {
+            appUpdateController.checkForUpdates(manual)
+        }
+
+        @JavascriptInterface
+        fun openUpdateUrl(url: String): Boolean = appUpdateController.openOfficialUpdateUrl(url)
+
+        @JavascriptInterface
         fun setSetting(key: String, value: String): Boolean = updateSetting(key, value)
 
         @JavascriptInterface
@@ -1137,6 +1270,11 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun openCloudSyncSettings() {
             runOnUiThread { cloudSync.showSettings({ requestCloudSyncAccount() }, { requestCloudSyncFolder() }) }
+        }
+
+        @JavascriptInterface
+        fun restoreFromGoogleDrive() {
+            runOnUiThread { requestCloudRecoveryAccount() }
         }
 
         @JavascriptInterface

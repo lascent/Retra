@@ -1,12 +1,12 @@
 # Retra
 
-**Retra v1.0.1** is the current stable release of Retra, an open-source Android retro emulator project built around mGBA with a strong focus on GBA gameplay, persistent game data, controller customization, and local/remote GBA link features. **v1.0.0** was the official first stable release; **v1.0.1** adds Create Backup and Restore Backup.
+**Retra v1.0.2** is the current stable release of Retra, an open-source Android retro emulator project built around mGBA with a strong focus on GBA gameplay, persistent game data, controller customization, and local/remote GBA link features. **v1.0.0** was the official first stable release, **v1.0.1** added portable backup/restore, and **v1.0.2** adds in-app update checking plus stronger reinstall recovery.
 
 > Retra does not include commercial ROMs, BIOS files, or copyrighted game assets. Use only content you are legally permitted to use.
 
 ## Release status
 
-- **Current version:** `v1.0.1`
+- **Current version:** `v1.0.2`
 - **Release channel:** Stable
 - **Android:** API 26+ (Android 8.0+)
 - **License:** Mozilla Public License 2.0 (MPL-2.0)
@@ -19,6 +19,7 @@ Public release numbering now follows Semantic Versioning. Earlier project work i
 
 - **Retra v1.0.0** — Official release
 - **Retra v1.0.1** — Added Create Backup and Restore Backup
+- **Retra v1.0.2** — Added in-app update checking and Android reinstall-recovery hardening
 
 ## Highlights
 
@@ -26,6 +27,8 @@ Public release numbering now follows Semantic Versioning. Earlier project work i
 - Persistent ROM identity based on content hashes so compatible saves and metadata can reconnect after a ROM is moved, renamed, removed, or re-imported.
 - Battery saves, save states, automatic resume, cheats, ROM patches, BIOS support, statistics, artwork, and per-ROM configuration.
 - Portable **Create Backup** and **Restore Backup** support using `.retra` backup files.
+- Automatic GitHub Releases update checks with a manual **Check for updates** action in About.
+- Android Auto Backup/device transfer plus the platform **Keep app data** uninstall prompt for stronger reinstall continuity.
 - Screen Editor with independent portrait and landscape layouts, draggable/resizable controls, emulator-screen resizing, and edge-aware editing.
 - GBA Local Link plus Wi-Fi Remote Link and Bluetooth Remote Link for supported normal Link Cable flows.
 - Adaptive 60/90/120 Hz interface presentation while keeping emulation timing independent from display refresh rate.
@@ -46,7 +49,7 @@ Available presets: **Classic**, **Vivid**, **Warm**, and **Muted**.
 
 ## Multiplayer scope
 
-Retra v1.0.1 supports normal GBA Link Cable-style multiplayer through:
+Retra v1.0.2 supports normal GBA Link Cable-style multiplayer through:
 
 - **Local Link** on one Android device;
 - **Wi-Fi Remote Link** between supported devices;
@@ -54,7 +57,7 @@ Retra v1.0.1 supports normal GBA Link Cable-style multiplayer through:
 
 Remote Link includes connection health metrics, heartbeat/timeouts, state-hash validation, jitter-aware input delay, host-authoritative recovery, bounded recovery retries, and deterministic input reseeding.
 
-### Not supported in v1.0.1
+### Not supported in v1.0.2
 
 - GBA Single-Pak / Multiboot
 - GBA Wireless Adapter / RFU emulation
@@ -102,12 +105,12 @@ verifies that the source is the same clean locked revision before configuring th
 The Android release metadata is:
 
 ```text
-versionName = 1.0.1
-versionCode = 448
+versionName = 1.0.2
+versionCode = 449
 minSdk      = 26
 ```
 
-`versionCode 448` makes v1.0.1 upgrade cleanly over the v1.0.0 build (`versionCode 447`).
+`versionCode 449` makes v1.0.2 upgrade cleanly over v1.0.1 (`versionCode 448`) and v1.0.0 (`versionCode 447`).
 
 ## Open and build
 

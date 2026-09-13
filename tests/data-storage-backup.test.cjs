@@ -39,11 +39,12 @@ test('portable backup excludes ROMs and BIOS and protects restore paths', () => 
   assert.match(backup, /MAX_UNCOMPRESSED_BYTES/);
 });
 
-test('restore applies only portable settings and library metadata for existing ROMs', () => {
+test('restore applies portable settings and recreates library metadata placeholders', () => {
   assert.match(prefs, /fun restorePortableSettings\(values: Map<String, Any>\)/);
   assert.match(prefs, /isPortableSettingKey\(key\)/);
-  assert.match(backup, /romIdentityStore\.getById\(romId\) == null/);
-  assert.match(backup, /romIdentityStore\.updateLibraryMetadata/);
+  assert.match(backup, /RomIdentityStore\.Record\(/);
+  assert.match(backup, /fileAvailable = hasLocalFile/);
+  assert.match(backup, /content_hash_\$romId/);
 });
 
 test('Data and Storage exposes create, restore, direct folder, and rounded storage summary actions', () => {

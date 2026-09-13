@@ -84,6 +84,11 @@ internal fun MainActivity.settingsStateJson(): String = JSONObject().apply {
     put("cloudSyncMode", cloudMode)
     put("cloudFolderConnected", if (cloudMode == "api") cloudAccount.isNotBlank() else !prefs.getString(CLOUD_SYNC_URI_PREF, null).isNullOrBlank())
     put("cloudAccount", cloudAccount)
+    put("cloudLastBackupAt", cloudSync.lastSuccessfulSyncAt())
+    put("cloudLastSyncError", cloudSync.lastSyncError())
+    put("cloudLastUploaded", cloudSync.lastUploadedCount())
+    put("cloudLastDownloaded", cloudSync.lastDownloadedCount())
+    put("cloudLastConflicts", cloudSync.lastConflictCount())
     put("enableCheats", prefs.getBoolean(ENABLE_CHEATS_PREF, true))
     put("romPatching", prefs.getBoolean(ROM_PATCHING_PREF, true))
     put("autoSaveLoad", prefs.getBoolean(AUTO_SAVE_LOAD_PREF, true))
@@ -230,7 +235,7 @@ internal fun MainActivity.updateSetting(key: String, value: String): Boolean {
     editor.apply()
     // The preference cache is updated synchronously by RetraPreferences.apply(),
     // so the portable settings snapshot can be queued immediately.
-    syncAppFolderAsync(showResult = false)
+    syncCloudAsync(showResult = false)
     if (key == "automaticArtwork" || key == "artworkWifiOnly") {
         artworkRepository.resumeDeferred()
     }
@@ -309,6 +314,7 @@ internal fun MainActivity.updateRangeSetting(key: String, rawValue: Int, commit:
     // Keep the expensive portable settings.json rewrite/export off the hot drag
     // path. The final change/pointer release always commits the latest value.
     if (commit) syncAppFolderAsync(showResult = false)
+    if (commit) cloudSync.requestAutoSync(urgent = false)
     return true
 }
 
@@ -324,7 +330,7 @@ internal fun MainActivity.resetAdvancedSettingsInternal() {
         .apply()
     applyRuntimeSettingsToNative()
     notifyWebSettingsState()
-    syncAppFolderAsync(showResult = false)
+    syncCloudAsync(showResult = false)
 }
 
 internal fun MainActivity.openImportPicker() {
@@ -337,10 +343,29 @@ internal fun MainActivity.cloudRootUri(): Uri? = prefs.getString(CLOUD_SYNC_URI_
 
 internal fun MainActivity.requestCloudSyncAccount() {
     pendingCloudEnable = true
+    pendingCloudRestore = false
     pendingCloudAccount = null
     cloudSync.launchAccountChooser({ cloudAccountPicker.launch(it) }) {
         if (cloudRootUri() == null) prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
         pendingCloudEnable = false
+        pendingCloudRestore = false
+        notifyWebSettingsState()
+        RetraNotice.makeText(this, "Google account picker is unavailable on this device", RetraNotice.LENGTH_LONG).show()
+    }
+}
+
+internal fun MainActivity.requestCloudRecoveryAccount() {
+    pendingCloudEnable = true
+    pendingCloudRestore = true
+    pendingCloudAccount = null
+    RetraNotice.makeText(
+        this,
+        "Choose the Google account that contains your previous Retra backup",
+        RetraNotice.LENGTH_LONG
+    ).show()
+    cloudSync.launchAccountChooser({ cloudAccountPicker.launch(it) }) {
+        pendingCloudEnable = false
+        pendingCloudRestore = false
         notifyWebSettingsState()
         RetraNotice.makeText(this, "Google account picker is unavailable on this device", RetraNotice.LENGTH_LONG).show()
     }
@@ -402,7 +427,16 @@ internal fun MainActivity.deleteCloudPathsAsync(paths: List<String>) { cloudSync
 internal fun MainActivity.syncCloudAsync(showResult: Boolean) {
     // Keep Retra's provider-backed metadata current independently of optional cloud sync.
     syncAppFolderAsync(showResult = false)
-    cloudSync.sync(showResult)
+    if (showResult) cloudSync.sync(showResult = true)
+    else cloudSync.requestAutoSync(urgent = false)
+}
+
+internal fun MainActivity.flushCloudBackupAsync() {
+    // Lifecycle exit is the last reliable point before Android may kill the
+    // process. Queue metadata first, then place an urgent Drive pass behind it
+    // on the same serialized I/O executor.
+    syncAppFolderAsync(showResult = false)
+    cloudSync.requestAutoSync(urgent = true)
 }
 
 internal fun MainActivity.syncAppFolderAsync(showResult: Boolean) {

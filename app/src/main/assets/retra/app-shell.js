@@ -356,8 +356,15 @@ function nativeHasResumeState(romId){
 
 function updateRomLaunchAction(card = currentRomCard){
   if (!resumeAction || !card) return false;
-  const canResume = nativeHasResumeState(card.dataset.romId || '');
+  const fileAvailable = card.dataset.fileAvailable !== 'false';
+  const canResume = fileAvailable && nativeHasResumeState(card.dataset.romId || '');
   const label = resumeAction.querySelector('span');
+  if (!fileAvailable) {
+    if (label) label.textContent = 'Add ROM to Play';
+    resumeAction.dataset.launchMode = 'locate';
+    resumeAction.setAttribute('aria-label', 'Add matching ROM to play');
+    return false;
+  }
   if (label) label.textContent = canResume ? 'Resume' : 'Play';
   resumeAction.dataset.launchMode = canResume ? 'resume' : 'play';
   resumeAction.setAttribute('aria-label', canResume ? 'Resume game' : 'Play game');
@@ -401,7 +408,8 @@ window.retraNativeFileImported = function(metaJson){
       lastModified: Number(meta.lastModified) || Date.now(),
       system: String(meta.system || 'ROM'),
       addedAt: Date.now(),
-      native: true
+      native: true,
+      fileAvailable: true
     };
 
     const existingIndex = libraryRoms.findIndex(rom => rom.id === incoming.id);
@@ -631,14 +639,26 @@ function syncRomMetadataToNative(rom){
   } catch (_) {}
 }
 
+function syncRomCompletionStateToNative(){
+  if (!(window.AndroidBridge && typeof window.AndroidBridge.syncRomCompletionState === 'function')) return;
+  const state = {};
+  [...libraryRoms, ...archivedLibraryRoms].forEach(rom => {
+    const id = String(rom?.id || '');
+    if (id) state[id] = Boolean(rom.completed);
+  });
+  try { window.AndroidBridge.syncRomCompletionState(JSON.stringify(state)); } catch (_) {}
+}
+
 function saveLibraryRoms(){
   localStorage.setItem(romLibraryStorageKey, JSON.stringify(libraryRoms));
   libraryRoms.forEach(syncRomMetadataToNative);
+  syncRomCompletionStateToNative();
 }
 
 function saveArchivedLibraryRoms(){
   localStorage.setItem(archivedRomLibraryStorageKey, JSON.stringify(archivedLibraryRoms));
   archivedLibraryRoms.forEach(syncRomMetadataToNative);
+  syncRomCompletionStateToNative();
 }
 
 function hydrateLibraryFromNativeRoom(){
@@ -653,6 +673,7 @@ function hydrateLibraryFromNativeRoom(){
       : true;
     const active = [];
     const archived = [];
+    const nativeHistory = [];
     const assignments = {};
     const categoryNames = new Set(readCustomCategories());
 
@@ -678,8 +699,20 @@ function hydrateLibraryFromNativeRoom(){
         contentHash: record.contentHash || previous.contentHash || '',
         native: true,
         favorite,
+        completed: Boolean(record.completed || previous.completed),
         fileAvailable: record.fileAvailable !== false
       };
+      const nativePlayedAt = Math.max(0, Number(record.lastPlayedAt) || 0);
+      if (nativePlayedAt > 0) {
+        nativeHistory.push({
+          romId: id,
+          title: merged.title,
+          fileName: merged.fileName,
+          system: merged.system,
+          playedAt: nativePlayedAt,
+          playCount: Math.max(1, Number(record.playCount) || 1)
+        });
+      }
       (record.archived ? archived : active).push(merged);
 
       if (!migrationComplete && typeof window.AndroidBridge.updateRomLibraryMetadata === 'function') {
@@ -693,6 +726,27 @@ function hydrateLibraryFromNativeRoom(){
     localStorage.setItem(archivedRomLibraryStorageKey, JSON.stringify(archivedLibraryRoms));
     localStorage.setItem('retraRomCategoryAssignments', JSON.stringify(assignments));
     localStorage.setItem('retraCategories', JSON.stringify([...categoryNames]));
+
+    // Rehydrate portable History/statistics metadata from Room/prefs. Restored
+    // missing-ROM placeholders therefore still count as Started/Recent and keep
+    // their History row while waiting for the matching ROM file.
+    const historyById = new Map(playHistory.map(entry => [String(entry?.romId || ''), entry]));
+    nativeHistory.forEach(entry => {
+      const previous = historyById.get(String(entry.romId));
+      if (!previous || Number(entry.playedAt) >= Number(previous.playedAt || 0)) {
+        historyById.set(String(entry.romId), {
+          ...previous,
+          ...entry,
+          playCount: Math.max(Number(previous?.playCount) || 0, Number(entry.playCount) || 0)
+        });
+      }
+    });
+    playHistory = [...historyById.values()]
+      .filter(entry => entry?.romId)
+      .sort((a, b) => Number(b.playedAt || 0) - Number(a.playedAt || 0))
+      .slice(0, 100);
+    localStorage.setItem(playHistoryStorageKey, JSON.stringify(playHistory));
+
     if (!migrationComplete && typeof window.AndroidBridge.markLibraryMetadataRoomMigrationComplete === 'function') {
       try { window.AndroidBridge.markLibraryMetadataRoomMigrationComplete(); } catch (_) {}
     }

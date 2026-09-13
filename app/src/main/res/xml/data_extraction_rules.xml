@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- User data is portable; copyrighted ROM binaries and transient files are not. -->
+        <!-- Portable Retra state only; keep the cloud payload small and useful. -->
+        <include domain="file" path="persistent_data/" />
+        <include domain="file" path="datastore/" />
+        <include domain="database" path="." />
+        <include domain="sharedpref" path="retra_library.xml" />
         <exclude domain="file" path="library_content/" />
         <exclude domain="file" path="save_work/" />
     </cloud-backup>
     <device-transfer>
-        <!-- Device-to-device transfer follows the same data-safety boundary. -->
+        <!-- Device-to-device transfer follows the same portable-data boundary. -->
+        <include domain="file" path="persistent_data/" />
+        <include domain="file" path="datastore/" />
+        <include domain="database" path="." />
+        <include domain="sharedpref" path="retra_library.xml" />
         <exclude domain="file" path="library_content/" />
         <exclude domain="file" path="save_work/" />
     </device-transfer>
