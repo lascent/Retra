@@ -148,6 +148,10 @@ class MainActivity : AppCompatActivity() {
     internal var videoHeight = 160
     internal var framePixels = IntArray(videoWidth * videoHeight)
     internal var displayPixels = IntArray(videoWidth * videoHeight)
+    // Third framebuffer owned by the UI presenter. Keeping this separate from
+    // the emulation write/publish buffers means Bitmap/GL uploads never hold
+    // frameLock and can never stall the mGBA frame thread.
+    internal var presentationPixels = IntArray(videoWidth * videoHeight)
     internal var bitmap: Bitmap? = null
 
     internal val frameLock = Any()
@@ -309,7 +313,10 @@ class MainActivity : AppCompatActivity() {
             onSettingsChanged = { notifyWebSettingsState() },
             latestFrame = {
                 synchronized(frameLock) {
-                    ShaderController.FrameSnapshot(displayPixels.copyOf(), videoWidth, videoHeight)
+                    // Capture what is actually on screen. presentationPixels is
+                    // never written by the emulator until the presenter returns
+                    // it to the free-buffer pool on a later VSync.
+                    ShaderController.FrameSnapshot(presentationPixels.copyOf(), videoWidth, videoHeight)
                 }
             }
         )

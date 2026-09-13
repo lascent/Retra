@@ -500,7 +500,7 @@ internal fun MainActivity.loadStateFromSlot(
 
 internal fun MainActivity.snapshotCurrentFrame(): Bitmap? {
     if (!romLoaded || videoWidth <= 0 || videoHeight <= 0) return null
-    val pixels = synchronized(frameLock) { displayPixels.copyOf() }
+    val pixels = synchronized(frameLock) { presentationPixels.copyOf() }
     return try {
         Bitmap.createBitmap(pixels, videoWidth, videoHeight, Bitmap.Config.ARGB_8888)
     } catch (_: Throwable) {

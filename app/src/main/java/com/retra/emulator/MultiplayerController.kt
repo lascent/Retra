@@ -675,6 +675,7 @@ internal fun MainActivity.configureVideoSurfaceFromNative() {
     videoHeight = getVideoHeight().coerceAtLeast(1)
     framePixels = IntArray(videoWidth * videoHeight)
     displayPixels = IntArray(videoWidth * videoHeight)
+    presentationPixels = IntArray(videoWidth * videoHeight)
     bitmap?.recycle()
     bitmap = Bitmap.createBitmap(videoWidth, videoHeight, Bitmap.Config.ARGB_8888).apply {
         // Treat the emulator framebuffer as raw pixels. Device density must not
@@ -686,22 +687,30 @@ internal fun MainActivity.configureVideoSurfaceFromNative() {
 
 /** Called by GameplayFramePresenter on Android's display VSync. */
 internal fun MainActivity.presentLatestGameplayFrame() {
-    synchronized(frameLock) {
-        if (shaderController.presentIfActive(displayPixels, videoWidth, videoHeight)) return
+    // Claim the newest completed frame with a pointer swap only. The previous
+    // presentation buffer becomes the producer's next free publish buffer.
+    // Crucially, expensive Bitmap.setPixels()/GL upload work happens after the
+    // lock is released, so a slow UI frame cannot block mGBA from advancing.
+    val pixelsToPresent = synchronized(frameLock) {
+        val newest = displayPixels
+        displayPixels = presentationPixels
+        presentationPixels = newest
+        presentationPixels
     }
+
+    if (shaderController.presentIfActive(pixelsToPresent, videoWidth, videoHeight)) return
+
     val targetBitmap = bitmap ?: return
     if (targetBitmap.isRecycled) return
-    synchronized(frameLock) {
-        targetBitmap.setPixels(
-            displayPixels,
-            0,
-            videoWidth,
-            0,
-            0,
-            videoWidth,
-            videoHeight
-        )
-    }
+    targetBitmap.setPixels(
+        pixelsToPresent,
+        0,
+        videoWidth,
+        0,
+        0,
+        videoWidth,
+        videoHeight
+    )
     binding.gameScreen.invalidate()
 }
 

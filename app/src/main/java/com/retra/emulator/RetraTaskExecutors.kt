@@ -1,5 +1,6 @@
 package com.retra.emulator
 
+import android.os.Process
 import java.io.Closeable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -17,7 +18,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * requests cannot create an unbounded number of threads on a low-memory phone.
  */
 class RetraTaskExecutors : Closeable {
-    val serialIo: ExecutorService = Executors.newSingleThreadExecutor(namedFactory("Retra-Storage"))
+    val serialIo: ExecutorService = Executors.newSingleThreadExecutor(
+        namedFactory("Retra-Storage", Process.THREAD_PRIORITY_BACKGROUND, Thread.NORM_PRIORITY - 1)
+    )
 
     val network: ExecutorService = ThreadPoolExecutor(
         NETWORK_CORE_THREADS,
@@ -36,11 +39,20 @@ class RetraTaskExecutors : Closeable {
         serialIo.shutdownNow()
     }
 
-    private fun namedFactory(prefix: String): ThreadFactory {
+    private fun namedFactory(
+        prefix: String,
+        androidPriority: Int? = null,
+        javaPriority: Int = Thread.NORM_PRIORITY
+    ): ThreadFactory {
         val sequence = AtomicInteger(1)
         return ThreadFactory { runnable ->
-            Thread(runnable, "$prefix-${sequence.getAndIncrement()}").apply {
-                priority = Thread.NORM_PRIORITY
+            Thread({
+                if (androidPriority != null) {
+                    runCatching { Process.setThreadPriority(androidPriority) }
+                }
+                runnable.run()
+            }, "$prefix-${sequence.getAndIncrement()}").apply {
+                priority = javaPriority.coerceIn(Thread.MIN_PRIORITY, Thread.MAX_PRIORITY)
                 isDaemon = false
             }
         }

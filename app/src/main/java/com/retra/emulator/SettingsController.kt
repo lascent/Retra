@@ -277,11 +277,17 @@ internal fun MainActivity.updateRangeSetting(key: String, rawValue: Int, commit:
         else -> return false
     }
 
-    when (key) {
-        "buttonsOpacity" -> prefs.edit().putInt(BUTTON_OPACITY_PREF, value).apply()
-        "frameSkip" -> prefs.edit().putInt(FRAME_SKIP_PREF, value).apply()
-        "volume" -> prefs.edit().putInt(VOLUME_PREF, value).apply()
-        "smcCheck" -> prefs.edit().putInt(SMC_CHECK_PREF, value).apply()
+    // Preview events are intentionally transient. Persisting DataStore/portable
+    // preference state for every pointer move creates avoidable allocations and
+    // storage work while the user drags a slider. The native subsystem still
+    // receives the preview immediately; only the final committed value is saved.
+    if (commit) {
+        when (key) {
+            "buttonsOpacity" -> prefs.edit().putInt(BUTTON_OPACITY_PREF, value).apply()
+            "frameSkip" -> prefs.edit().putInt(FRAME_SKIP_PREF, value).apply()
+            "volume" -> prefs.edit().putInt(VOLUME_PREF, value).apply()
+            "smcCheck" -> prefs.edit().putInt(SMC_CHECK_PREF, value).apply()
+        }
     }
 
     runOnUiThread {

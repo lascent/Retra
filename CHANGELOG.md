@@ -1,5 +1,11 @@
 # Changelog
 
+### v1.0.1 performance hardening
+- Triple-buffered gameplay presentation keeps Bitmap/GL upload work off the emulator frame lock.
+- High-frequency range previews persist preferences only on final commit.
+- Serialized storage maintenance now runs at Android background priority during gameplay.
+- Added dedicated regression coverage and performance-hardening documentation.
+
 ## v1.0.1 — 2026-09-13 — Backup, restore, storage, and audio polish
 
 ### Appearance — reference-driven Light mode
