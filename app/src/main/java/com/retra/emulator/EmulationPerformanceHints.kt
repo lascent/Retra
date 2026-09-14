@@ -34,7 +34,9 @@ internal class EmulationPerformanceHints(private val context: Context) {
     }
 
     fun close() {
-        runCatching { session?.close() }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching { session?.close() }
+        }
         session = null
         targetNs = 0L
     }
