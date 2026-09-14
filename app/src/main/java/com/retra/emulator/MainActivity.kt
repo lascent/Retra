@@ -320,6 +320,9 @@ class MainActivity : AppCompatActivity() {
                     // it to the free-buffer pool on a later VSync.
                     ShaderController.FrameSnapshot(presentationPixels.copyOf(), videoWidth, videoHeight)
                 }
+            },
+            isGameplayVisible = {
+                ::binding.isInitialized && binding.emulatorOverlay.visibility == View.VISIBLE
             }
         )
     }
@@ -1491,6 +1494,18 @@ class MainActivity : AppCompatActivity() {
     external fun scheduleLocalLinkKeyMask(player: Int, frame: Long, mask: Int): Boolean
     external fun clearLocalLinkInputSchedule()
     external fun runFrame(pixels: IntArray): Boolean
+    /** Advance one emulated frame without converting/copying the video buffer to Java. */
+    external fun runFrameNoVideo(): Boolean
+    /**
+     * Advance a short turbo slice in one JNI call. Input is sampled on every native
+     * frame; only the final frame is converted when captureVideo is true.
+     */
+    external fun runTurboSlice(
+        pixels: IntArray,
+        frameCount: Int,
+        captureVideo: Boolean,
+        discardAudio: Boolean
+    ): Boolean
     external fun setKey(key: Int, pressed: Boolean)
     external fun clearKeyPressLatches()
     external fun shutdownCore()
@@ -1502,6 +1517,7 @@ class MainActivity : AppCompatActivity() {
     external fun quickLoadState(path: String): Boolean
     external fun setCoreConfigOption(key: String, value: String)
     external fun readAudioSamples(buffer: ShortArray): Int
+    external fun readAudioSamplesAtSpeed(buffer: ShortArray, speed: Double): Int
     external fun resetCore(): Boolean
     external fun clearNativeCheats(): Boolean
     external fun addNativeCheat(name: String, code: String, type: Int, enabled: Boolean): Boolean

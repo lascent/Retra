@@ -754,3 +754,47 @@ body.screen-editor-portrait #screenSizePage .layout-control,
 body.screen-editor-landscape #screenSizePage .layout-control{
   touch-action:none !important;
 }
+
+/* v1.0.2 responsive screen-editor movement/resizing pass.
+   Screen geometry is updated directly by JS once per animation frame so drag
+   and resize gestures do not force a controller relayout on every pointer event. */
+#screenSizePage .preview-screen-surface{
+  touch-action:none !important;
+  user-select:none !important;
+  -webkit-user-select:none !important;
+}
+#screenSizePage .preview-screen-frame{
+  will-change:width, height;
+}
+#screenSizePage .preview-scale-handle.screen-scale-mode{
+  z-index:10 !important;
+  width:44px !important;
+  height:44px !important;
+  border-radius:13px !important;
+}
+/* Smooth Screen Editor live gestures: isolate the moving layer and temporarily
+   drop expensive selection shadows while the finger is down. */
+#screenSizePage .layout-control.is-dragging,
+#screenSizePage .preview-screen-frame.is-dragging{
+  transition:none !important;
+  animation:none !important;
+  will-change:transform !important;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+#screenSizePage .layout-control.is-dragging{
+  filter:none !important;
+}
+#screenSizePage .layout-control.is-dragging .toolbar-icon,
+#screenSizePage .layout-control.is-dragging .extra-control-face{
+  box-shadow:none !important;
+}
+#screenSizePage .emulator-preview.editor-drag-active{
+  cursor:grabbing;
+}
+
+body.landscape-preview-mode .screen-preview-shell[data-size-mode="betterfit"] .preview-screen-frame{
+  right:auto !important;
+  bottom:auto !important;
+  transform:translate(-50%, -50%) !important;
+}

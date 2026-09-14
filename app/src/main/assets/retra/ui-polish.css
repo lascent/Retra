@@ -878,3 +878,15 @@ body[data-resolved-mode="light"] .about-update-button:active{background:rgba(16,
   overscroll-behavior:contain;
 }
 body[data-resolved-mode="light"] .app-update-notes{background:rgba(16,24,40,.025)}
+
+/* Search field: the rounded .search-panel is the visual focus container.
+   Do not draw a second rectangular focus ring around the native text input. */
+.search-panel input:focus,
+.search-panel input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}

@@ -16,11 +16,13 @@ test('v4.45 cloud/save graph uses explicit types to avoid recursive Kotlin infer
   assert.doesNotMatch(main, /(?:private|internal) val cloudSync by lazy/);
 });
 
-test('ShaderRepository sourceFor does not use a prohibited local return in expression body', () => {
-  const start = shader.indexOf('fun sourceFor(id: String): String? = when (id)');
+test('ShaderRepository sourceFor uses a Kotlin-safe block body for built-in and custom shaders', () => {
+  const start = shader.indexOf('fun sourceFor(id: String): String? {');
   const end = shader.indexOf('fun optionFor', start);
   const block = shader.slice(start, end);
   assert.ok(start >= 0 && end > start);
-  assert.doesNotMatch(block, /return\s+null/);
-  assert.match(block, /if \(!id\.startsWith\("custom:"\)\) \{\s*null\s*\} else \{/s);
+  assert.match(block, /val builtIn = BUILT_IN_BY_ID\[id\]/);
+  assert.match(block, /if \(builtIn != null\) return builtIn\.source/);
+  assert.match(block, /if \(!id\.startsWith\("custom:"\)\) return null/);
+  assert.doesNotMatch(block, /String\?\s*=\s*when/);
 });

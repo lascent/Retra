@@ -13,7 +13,8 @@ class ShaderController(
     private val normalView: ImageView,
     private val shaderView: ShaderGameView,
     private val onSettingsChanged: () -> Unit,
-    private val latestFrame: () -> FrameSnapshot?
+    private val latestFrame: () -> FrameSnapshot?,
+    private val isGameplayVisible: () -> Boolean
 ) {
     data class FrameSnapshot(val pixels: IntArray, val width: Int, val height: Int)
 
@@ -35,8 +36,28 @@ class ShaderController(
 
     fun select(id: String, showToast: Boolean = true) {
         repository.select(id)
-        applySelection(showToast)
         onSettingsChanged()
+
+        // Built-in shaders ship with Retra; there is nothing to install. When
+        // selection happens from the normal Settings page the GLSurfaceView is
+        // intentionally hidden and may not own a current EGL context yet. Store
+        // the choice now and compile lazily when native gameplay becomes visible.
+        if (!isGameplayVisible()) {
+            normalView.visibility = View.VISIBLE
+            shaderView.visibility = View.GONE
+            if (showToast) {
+                val label = repository.optionFor(repository.selectedId())?.label ?: "Off"
+                val message = if (repository.selectedId() == "none") {
+                    "Video shader: Off"
+                } else {
+                    "$label selected • applies when game starts"
+                }
+                RetraNotice.makeText(activity, message, RetraNotice.LENGTH_SHORT).show()
+            }
+            return
+        }
+
+        applySelection(showToast)
     }
 
     fun configure(stretch: Boolean, linearFiltering: Boolean) {
@@ -54,6 +75,15 @@ class ShaderController(
 
     fun applySelection(showToast: Boolean) {
         val selected = repository.selectedId()
+
+        // Do not force a shader compile while Retra is on Home/Settings. Some
+        // OEMs destroy the SurfaceView EGL surface while its parent is hidden,
+        // and compiling there can return shader=0 with an empty info log.
+        if (!isGameplayVisible()) {
+            normalView.visibility = View.VISIBLE
+            shaderView.visibility = View.GONE
+            return
+        }
         val source = repository.sourceFor(selected)
         if (selected == "none" || source == null) {
             shaderView.visibility = View.GONE
@@ -70,13 +100,15 @@ class ShaderController(
                 repository.select("none")
                 shaderView.visibility = View.GONE
                 normalView.visibility = View.VISIBLE
-                RetraNotice.makeText(activity, "Shader compile failed: ${error ?: "invalid GLSL"}", RetraNotice.LENGTH_LONG).show()
+                val detail = error?.trim().takeUnless { it.isNullOrEmpty() } ?: "unsupported by this GPU"
+                RetraNotice.makeText(activity, "Shader unavailable on this device: $detail", RetraNotice.LENGTH_LONG).show()
                 onSettingsChanged()
             } else {
                 latestFrame()?.let { shaderView.submitFrame(it.pixels, it.width, it.height) }
                 if (showToast) {
                     val label = repository.optionFor(selected)?.label ?: "Custom"
-                    RetraNotice.makeText(activity, "GLSL shader: $label", RetraNotice.LENGTH_SHORT).show()
+                    val suffix = if (error == "compatibility-mode") " • compatibility mode" else ""
+                    RetraNotice.makeText(activity, "Video shader: $label$suffix", RetraNotice.LENGTH_SHORT).show()
                 }
             }
         }

@@ -222,6 +222,10 @@ internal fun MainActivity.renderGameplayMainMenu(dialog: Dialog) {
     gameplayMenuSubscreen = false
     gameplayMenuBackHandler = null
     val (panel, content) = buildMenuShell("Menu", showBack = false)
+    // Reconcile the Activity mirror with the native mGBA link state before
+    // building the menu. A stale true value used to leave Speed mode showing
+    // "Disabled while linked" after the native link had already ended.
+    val speedRestrictedByLink = isLocalLinkSpeedRestricted()
 
     addMenuAction(
         content,
@@ -242,12 +246,12 @@ internal fun MainActivity.renderGameplayMainMenu(dialog: Dialog) {
     addMenuAction(
         content,
         if (EmulationSpeedPolicy.isNormal(activeEmulationSpeed)) "Speed mode" else "Normal speed",
-        if (localLinkActive) "Disabled while linked"
+        if (speedRestrictedByLink) "Disabled while linked"
         else if (EmulationSpeedPolicy.isNormal(activeEmulationSpeed)) "Uses ${EmulationSpeedPolicy.format(preferredEmulationSpeed)} from Settings"
         else "Currently ${EmulationSpeedPolicy.format(activeEmulationSpeed)}"
     ) {
         toggleFastForward()
-        if (!localLinkActive) dialog.dismiss()
+        if (!isLocalLinkSpeedRestricted()) dialog.dismiss()
     }
     addMenuAction(content, "Cheats", if (localLinkActive) "Unavailable during Local Link" else null) {
         if (localLinkActive) {
@@ -554,8 +558,26 @@ internal fun MainActivity.quickLoad() {
     loadStateFromSlot(0, successMessage = "Loaded", failureMessage = "Could not load")
 }
 
+internal fun MainActivity.isLocalLinkSpeedRestricted(): Boolean {
+    // The native core is authoritative for whether a two-core link session is
+    // actually alive. Keep the Kotlin mirror synchronized so a stale flag can
+    // never leave fast-forward disabled in ordinary single-player gameplay.
+    val nativeActive = if (romLoaded) {
+        runCatching { isNativeLocalLinkActive() }.getOrNull()
+    } else {
+        false
+    }
+
+    if (nativeActive != null) {
+        // Remote Link also runs through the native two-core link session, so
+        // either signal keeps timing changes locked for synchronization safety.
+        localLinkActive = nativeActive || remoteTransport.isActive
+    }
+    return localLinkActive
+}
+
 internal fun MainActivity.toggleFastForward() {
-    if (localLinkActive) {
+    if (isLocalLinkSpeedRestricted()) {
         RetraNotice.makeText(this, "Speed changes are disabled during Local Link", RetraNotice.LENGTH_SHORT).show()
         return
     }

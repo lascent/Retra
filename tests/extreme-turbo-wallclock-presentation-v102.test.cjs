@@ -1,0 +1,16 @@
+const fs = require('fs');
+const assert = require('assert');
+const session = fs.readFileSync('app/src/main/java/com/retra/emulator/EmulationSessionManager.kt', 'utf8');
+const native = fs.readFileSync('app/src/main/cpp/native-lib.cpp', 'utf8');
+const governor = fs.readFileSync('app/src/main/java/com/retra/emulator/TurboThroughputGovernor.kt', 'utf8');
+assert.match(session, /nextVideoDeadlineNs = System\.nanoTime\(\)/);
+assert.match(session, /presentationNowNs = System\.nanoTime\(\)/);
+assert.match(session, /presentationNowNs >= nextVideoDeadlineNs/);
+assert.match(session, /extremeGovernor\.onBatchComplete/);
+assert.match(governor, /Deadlines are cumulative/i);
+assert.doesNotMatch(session, /presentationBudgetNs/);
+const turbo = native.match(/Java_com_retra_emulator_MainActivity_runTurboSlice[\s\S]*?return JNI_TRUE;\n\}/)?.[0] || '';
+assert.ok(turbo.length > 0, 'turbo native function should exist');
+assert.doesNotMatch(turbo, /syncGbaMosaicRenderer\(core\);/);
+assert.match(turbo, /core->runFrame\(core\);/);
+console.log('extreme turbo wall-clock presentation regression passed');

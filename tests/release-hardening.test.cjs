@@ -26,13 +26,14 @@ test('WebView uses appassets HTTPS origin and blocks universal file URL access',
   assert.match(html, /Content-Security-Policy/);
 });
 
-test('GLSL shader installer is functional and exposed through the optimized renderer', () => {
+test('GLSL custom shader importer is functional and exposed through the optimized renderer', () => {
   assert.match(html, /id="glslShaderBtn"/);
   assert.match(html, /id="glslShaderModal"/);
-  assert.match(html, /id="installGlslShaderBtn"[^>]*>INSTALL SHADER</);
+  assert.match(html, /id="installGlslShaderBtn"[^>]*>IMPORT CUSTOM</);
   assert.match(shaderRepo, /fun install\(uri: Uri\): Option/);
-  assert.doesNotMatch(shaderRepo, /lcd-grid|crt-lite|grayscale/);
-  assert.match(shaderRepo, /"none" to "None"/);
+  assert.match(shaderRepo, /id = "lcd-grid"/);
+  assert.match(shaderRepo, /id = "crt-lite"/);
+  assert.match(shaderRepo, /id = "none"[\s\S]*label = "Off"/);
   assert.match(shaderView, /RENDERMODE_WHEN_DIRTY/);
   assert.match(shaderView, /GLUtils\.texSubImage2D/);
 });

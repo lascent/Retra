@@ -8,6 +8,7 @@ const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const session = read('app/src/main/java/com/retra/emulator/EmulationSessionManager.kt');
 const pacer = read('app/src/main/java/com/retra/emulator/EmulationFramePacer.kt');
+const turboPolicy = read('app/src/main/java/com/retra/emulator/TurboFramePolicy.kt');
 const display = read('app/src/main/java/com/retra/emulator/DisplayPerformanceManager.kt');
 const main = read('app/src/main/java/com/retra/emulator/MainActivity.kt');
 const settings = read('app/src/main/java/com/retra/emulator/SettingsController.kt');
@@ -18,12 +19,12 @@ const settingsUi = read('app/src/main/assets/retra/settings-ui.js');
 
 test('native-speed gameplay uses an absolute deadline pacer with bounded precision wait', () => {
   assert.match(session, /EmulationFramePacer\(\)/);
-  assert.match(session, /framePacer\.waitForNext\(cadence, precisionWindow\)/);
+  assert.match(session, /framePacer\.waitForNext\([\s\S]*sliceCadenceNs,[\s\S]*TurboFramePolicy\.precisionWindowNs\(speed, normalPrecisionWindow\)/);
   assert.match(pacer, /nextDeadlineNanos \+= frameDurationNanos/);
   assert.match(pacer, /LockSupport\.parkNanos/);
   assert.match(pacer, /MAX_PRECISION_WINDOW_NS = 300_000L/);
-  assert.match(session, /Process\.THREAD_PRIORITY_DISPLAY/);
-  assert.match(session, /Process\.THREAD_PRIORITY_URGENT_DISPLAY/);
+  assert.match(turboPolicy, /Process\.THREAD_PRIORITY_DISPLAY/);
+  assert.match(turboPolicy, /Process\.THREAD_PRIORITY_URGENT_DISPLAY/);
 });
 
 test('completed GBA frames are published by buffer swap instead of a second full Java copy', () => {

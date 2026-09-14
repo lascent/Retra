@@ -694,7 +694,7 @@
 <div class="detail-range-row"><div class="range-copy"><strong>Frameskip</strong><span>0 = smoothest (~60 FPS); 1 = ~30 FPS. Leave at 0 unless the device struggles.</span></div><div class="range-line"><input id="frameSkipRange" max="10" min="0" type="range" value="0"/><output id="frameSkipValue">0</output></div></div>
 <div class="detail-row"><div><strong>Hardware rendering</strong><span>Use Android GPU compositing for the game screen</span></div><label class="switch"><input checked="" id="hardwareRenderingToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-row"><div><strong>Linear filtering</strong><span>Smooth pixels when scaling</span></div><label class="switch"><input id="linearFilteringToggle" type="checkbox"/><span class="slider"></span></label></div>
-<button class="detail-row tappable" id="glslShaderBtn"><div><strong>GLSL shader</strong><span id="glslShaderLabel">None • no extra GPU cost</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
+<button class="detail-row tappable" id="glslShaderBtn"><div><strong>Video shader</strong><span id="glslShaderLabel">Off • no extra GPU cost</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
 </div>
 </section>
 <!-- SCREEN SIZE PREVIEW -->
@@ -715,11 +715,12 @@
 <div class="preview-screen-surface" id="previewScreenSurface">
 <div aria-hidden="true" class="screen-top-bar"></div>
 <div aria-hidden="true" class="screen-watermark"></div>
-<div class="screen-help-text">Tap screen • Drag screen edges or expand handle • Hold for modes</div>
+<div class="screen-help-text">Tap or drag screen • Drag edges or resize handle • Hold for modes</div>
 </div>
 <div class="screen-context-menu" id="screenContextMenu">
 <button class="screen-context-option" data-size-mode="fullscreen" type="button">Make fullscreen</button>
 <button class="screen-context-option" data-size-mode="centered" type="button">Make centered</button>
+<button class="screen-context-option" data-size-mode="betterfit" type="button">Best Fit</button>
 <button class="screen-context-option active" data-size-mode="best" type="button">Best scaling (4x)</button>
 <button class="screen-context-option" data-size-mode="stretch" type="button">Break aspect ratio</button>
 </div>
@@ -1343,11 +1344,11 @@
 <!-- GLSL SHADER MODAL -->
 <div class="modal-backdrop selection-modal" id="glslShaderModal">
 <div class="selection-modal-card compact">
-<h3>GLSL shader</h3>
-<p class="selection-modal-copy">Shaders run only when selected. None keeps the lightweight default renderer.</p>
+<h3>Video shader</h3>
+<p class="selection-modal-copy">GPU-accelerated visual presets. Off keeps Retra's lightweight default renderer. Performance labels show the expected GPU cost.</p>
 <div class="selection-options" id="glslShaderOptions"></div>
 <div class="selection-actions dual-end">
-<button class="text-action-btn" id="installGlslShaderBtn" type="button">INSTALL SHADER</button>
+<button class="text-action-btn" id="installGlslShaderBtn" type="button">IMPORT CUSTOM</button>
 <button class="text-action-btn" id="closeGlslShaderModal" type="button">CANCEL</button>
 </div>
 </div>

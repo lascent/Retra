@@ -7,14 +7,27 @@ const root = path.resolve(__dirname, '..');
 const settings = fs.readFileSync(path.join(root, 'app/src/main/assets/retra/settings-ui.js'), 'utf8');
 const repo = fs.readFileSync(path.join(root, 'app/src/main/java/com/retra/emulator/ShaderRepository.kt'), 'utf8');
 
-test('GLSL picker ships with None only and no unowned built-in presets', () => {
-  assert.match(settings, /let availableGlslShaders = \[\s*\{ id: 'none', label: 'None', builtIn: true \}\s*\];/s);
-  assert.doesNotMatch(settings, /LCD Grid|CRT Lite|Grayscale|lcd-grid|crt-lite/);
-  assert.match(repo, /private val BUILT_INS = listOf\(\s*"none" to "None"\s*\)/s);
-  assert.doesNotMatch(repo, /LCD_GRID_SHADER|CRT_LITE_SHADER|GRAYSCALE_SHADER|lcd-grid|crt-lite|grayscale/);
+test('Retra ships a curated built-in shader pack with Off as the zero-cost default', () => {
+  for (const label of [
+    'GBA Color Corrected',
+    'Sharp',
+    'Smooth',
+    'Pixel Perfect',
+    'LCD Grid',
+    'LCD Response',
+    'Scanlines',
+    'CRT Lite',
+    'Retro Warm'
+  ]) {
+    assert.match(repo, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(settings, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.match(repo, /id = "none"[\s\S]*label = "Off"[\s\S]*impact = "None"/);
+  assert.match(settings, /Off • no extra GPU cost/);
+  assert.match(repo, /BUILT_IN_BY_ID\.containsKey\(stored\)/);
 });
 
-test('stale shader selections from development builds migrate safely to None', () => {
-  assert.match(repo, /Older development builds exposed built-in shader IDs/);
+test('unknown or stale shader selections migrate safely to Off', () => {
+  assert.match(repo, /Unknown\/stale selections are intentionally reset/);
   assert.match(repo, /prefs\.edit\(\)\.putString\(SELECTED_PREF, "none"\)\.apply\(\)/);
 });

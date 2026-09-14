@@ -168,7 +168,7 @@ function applyLayoutProfileToRuntime(profile){
 
     if (screen) {
       screen.orientation = orientation;
-      const mode = ['fullscreen','centered','best','stretch','custom'].includes(screen.mode) ? screen.mode : 'best';
+      const mode = ['fullscreen','centered','betterfit','best','stretch','custom'].includes(screen.mode) ? screen.mode : 'best';
       screenSizeState[orientation] = mode;
       const custom = screen.customFrame && typeof screen.customFrame === 'object'
         ? deepCloneLayoutValue(screen.customFrame)

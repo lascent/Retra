@@ -1,4 +1,78 @@
+## v1.0.2 — All-ROM Smooth Consistent-Speed Hotfix
+- Fast-forward timing now uses a shared exact emulated-time contract: 2×/4×/8×/16× target the same multiplier for every ROM relative to its own 1× timing.
+- Turbo renderer work is budgeted immediately to the useful 60–120 Hz presentation range (for example 8× uses renderer frameskip 3 at a 120 Hz budget), while CPU/timers/input/game logic still execute every emulated frame.
+
+- Fixed adaptive turbo fallback halving fresh visual states by doubling native batches.
+- 4x/8x/16x now keep their normal short batches even when throughput protection is active.
+- 8x/16x keep fractional high-refresh VSync synchronization during quality fallback instead of dropping to ~60 fresh states/s.
+- Throughput fallback now requires about one second below 88% of target, preventing brief Android scheduling jitter from degrading light ROMs such as FireRed.
+- Recovery is faster once throughput returns to at least 96% of target.
+- Automatic renderer frameskip is much milder and reserved for sustained severe misses; turbo audio is muted only at deeper utilization drops.
+- Selected 2x/4x/8x/16x emulation clocks are unchanged.
+
+## v1.0.2 — All-ROM Consistent Fast-Forward
+- Uses one cumulative timing governor for 2x, 4x, 8x and 16x across normal ROMs and ROM hacks.
+- Adds measured throughput adaptation at every turbo multiplier.
+- Heavy ROMs can temporarily use larger native batches (up to 16 frames) and adaptive renderer skipping before speed is sacrificed.
+- Preserves turbo audio unless a severe measured throughput miss threatens the selected multiplier.
+- Retains 8x/16x high-refresh VSync-aligned presentation.
+
+### Turbo video + audio 10/10 pass
+- Generalized fractional VSync-aligned batching to both 8x and 16x, allowing 8x to feed fresh states to 144/165 Hz panels while preserving the exact cumulative emulation-speed target.
+- Publishes a completed turbo frame before audio/performance bookkeeping so ready images are less likely to miss the next VSync.
+- Replaced turbo resample-then-average audio with one native speed-aware 32-tap band-limited FIR pass and low-latency AudioTrack output.
+- Keeps 8x/16x audio enabled by default, coalesces small PCM packets, and only mutes/drains audio after a measured severe throughput miss to protect game speed.
+- Added dedicated regression coverage for the new high-refresh and turbo-audio paths.
+
+### My Boy-style 8×/16× throughput correction
+- Reworked 8× to run 4 core frames per native batch and 16× to run 8, cutting JNI/locking overhead while keeping input sampled every emulated frame.
+- Moved extreme-turbo PCM discard inside the same native batch so 8×/16× bypass the expensive 16-tap audio resampler/conditioner and avoid a second JNI hop.
+- Explicitly disables mGBA video/audio sync for the direct-core frontend so Retra alone controls wall-clock pacing.
+- Keeps Android presentation independent on continuous VSync, always displaying the newest completed frame instead of throttling emulation to screen refresh.
+- Added real throughput monitoring; extra mGBA renderer frameskip is applied only when a ROM/device is measurably below the selected 8×/16× target.
+- Added Android 12+ PerformanceHintManager workload hints for the long-lived mGBA worker.
+- Full regression + release gate: 325/325 tests passing.
+
+
+### True 16x turbo follow-up
+- Rebuilt 8x/16x pacing around a cumulative throughput governor so 16x is not slowed by scheduler oversleep.
+- Added 8-frame native 16x batches, an 8192-frame audio ring, and turbo-only mGBA renderer frameskip.
+- Kept visible extreme-turbo presentation independent at a stable 60 Hz using the newest completed frame.
 # Changelog
+### Extreme 8×/16× turbo rendering hardening
+- Batched each short turbo slice behind one native JNI call instead of crossing Kotlin/JNI once per hidden emulated frame.
+- Kept input sampling on every emulated frame inside the native batch while converting only the final frame when a display update is actually due.
+- Drains and speed-transforms mGBA audio once per safe short slice; the native 4096-frame ring and four-frame slice cap keep audio bounded while reducing resampler/JNI overhead.
+- High turbo dynamically lowers the emulation worker's Android scheduler priority so the UI, RenderThread, GL thread, and audio writer are not starved by near-continuous 8×/16× CPU work.
+- Removed turbo busy-spin precision waits at 4×+ so CPU time is available for presentation and audio instead of being burned between deadlines.
+- On 120 Hz panels, 8×/16× now use a stable 60 Hz presentation cadence (an exact divisor of 120 Hz) while the core continues advancing at the requested turbo speed.
+- Normal 1× emulation cadence and accuracy remain unchanged.
+
+### Professional built-in shader pack
+- Added nine curated GPU shader presets: GBA Color Corrected, Sharp, Smooth, Pixel Perfect, LCD Grid, LCD Response, Scanlines, CRT Lite, and Retro Warm.
+- Added Low/Medium GPU-impact labels and per-preset descriptions in Video settings while keeping Off as the zero-cost default renderer.
+- Preserved custom GLSL installation and automatic fallback to Off if a shader fails to compile.
+- Cached OpenGL shader attribute/uniform locations and avoided redundant texture-filter state changes to reduce per-frame shader overhead.
+- Kept shader rendering opt-in and presentation-bound so fast-forward hidden core frames do not waste GPU shader work.
+
+### Screen Editor drag smoothness hardening
+- Reworked live controller dragging so only the active control is moved per animation frame instead of recalculating every controller.
+- Reworked direct screen dragging so the frame follows the finger without re-running full responsive layout/resize-handle geometry until release.
+- Removed expensive selection shadows during active drag and kept persistence outside the live pointer loop for lighter, more professional movement.
+- Renamed the visible **Better Fit** preset to **Best Fit** while preserving the internal `betterfit` key for existing saved layouts.
+
+### Screen Editor responsive layout hardening
+- Added a **Best Fit** screen-size preset matched to the supplied landscape reference: full usable height at the GBA 3:2 aspect with balanced controller zones.
+- The emulator screen itself can now be dragged directly to reposition it; custom coordinates stay normalized so the layout remains responsive across device sizes.
+- Screen dragging, edge resizing, and resize-handle scaling are coalesced to animation frames to reduce WebView jank.
+- The screen resize handle now chooses an adaptive corner and keeps the opposite corner anchored for more natural expand/minimize behavior.
+
+### Fast-forward smoothness hardening
+- Reworked 2×/4×/8×/16× execution into short paced turbo slices instead of one large burst per normal GBA frame.
+- Added a native no-video frame path so intermediate turbo frames skip JNI pixel conversion while still processing core input and audio.
+- Caps Android framebuffer publication to the useful 60/90/120 Hz presentation cadence, reducing wasted work and improving frame pacing on high-refresh displays.
+- Keeps normal-speed emulation timing unchanged.
+
 
 ## v1.0.2 — 2026-09-13 — Update checking and reinstall recovery
 
@@ -272,3 +346,9 @@ For detailed engineering notes from development, see [`docs/README.md`](docs/REA
 - Reduced Android WebView scroll-time blur/raster work.
 - Expanded off-screen list/card rendering containment and earlier Home virtualization.
 - Added lazy/async low-priority statistics artwork decoding.
+- Fixed built-in shader selection on devices that destroy hidden GLSurfaceView contexts: presets now compile lazily when gameplay is visible, retry with a GLES2 compatibility path, and reserve file import for custom shaders only.
+
+### 16x frame-pacing refinement
+- Added display-synchronized fractional 16x batching to remove fixed-batch beat/judder on 120/144/165 Hz panels without changing emulation speed.
+- Added VSync phase anchoring, adaptive renderer fallback/recovery, and high-refresh extreme-turbo mode selection.
+

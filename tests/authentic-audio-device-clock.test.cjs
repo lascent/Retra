@@ -31,7 +31,7 @@ test('audio buffering adapts upward only after real underruns and relaxes after 
 });
 
 test('authentic path uses saturating band-limited resampling and 16-bit PCM without enhancement DSP', () => {
-  assert.match(native, /RETRA_RESAMPLER_TAPS = 16/);
+  assert.match(native, /RETRA_RESAMPLER_TAPS = 32/);
   assert.match(native, /retraNormalizedSinc/);
   assert.match(native, /retraClampPcm16/);
   assert.match(native, /sourceRate == destinationRate[\s\S]*mAudioBufferRead/);

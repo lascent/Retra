@@ -85,7 +85,7 @@ test('mGBA exclusively owns frame-skip so presentation does not double-skip fram
   assert.doesNotMatch(activity, /renderFrameCounter/);
   assert.doesNotMatch(session, /activeFrameSkip/);
   assert.doesNotMatch(session, /renderFrameCounter/);
-  assert.match(session, /mGBA owns the configured frameskip policy/);
+  assert.match(session, /runTurboSlice\([\s\S]*discardAudio = turboAudioMuted[\s\S]*\)/);
 });
 
 test('adaptive display policy protects low-end, battery-saver and thermal-constrained devices', () => {

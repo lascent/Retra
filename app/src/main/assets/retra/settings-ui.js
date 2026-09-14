@@ -646,7 +646,16 @@ const installGlslShaderBtn = document.getElementById('installGlslShaderBtn');
 const closeGlslShaderModal = document.getElementById('closeGlslShaderModal');
 let selectedGlslShader = 'none';
 let availableGlslShaders = [
-  { id: 'none', label: 'None', builtIn: true }
+  { id: 'none', label: 'Off', builtIn: true, impact: 'None', description: 'Default renderer • no extra GPU cost' },
+  { id: 'gba-color', label: 'GBA Color Corrected', builtIn: true, impact: 'Low', description: 'Balanced handheld-style color response' },
+  { id: 'sharp', label: 'Sharp', builtIn: true, impact: 'Low', description: 'Crisp pixels with subtle edge detail' },
+  { id: 'smooth', label: 'Smooth', builtIn: true, impact: 'Low', description: 'Soft multi-sample scaling for uneven sizes' },
+  { id: 'pixel-perfect', label: 'Pixel Perfect', builtIn: true, impact: 'Low', description: 'Locks sampling to original pixel centers' },
+  { id: 'lcd-grid', label: 'LCD Grid', builtIn: true, impact: 'Medium', description: 'Subtle handheld LCD cell structure' },
+  { id: 'lcd-response', label: 'LCD Response', builtIn: true, impact: 'Medium', description: 'Gentle LCD-style pixel response softness' },
+  { id: 'scanlines', label: 'Scanlines', builtIn: true, impact: 'Low', description: 'Light retro horizontal scanline texture' },
+  { id: 'crt-lite', label: 'CRT Lite', builtIn: true, impact: 'Medium', description: 'Light curvature, scanlines and vignette' },
+  { id: 'retro-warm', label: 'Retro Warm', builtIn: true, impact: 'Low', description: 'Warm palette with restrained contrast' }
 ];
 
 let selectedScreenOrientation = localStorage.getItem('retraScreenOrientation') || 'Auto rotate';
@@ -676,14 +685,28 @@ function renderGlslShaderOptions(){
   glslShaderOptionsEl.replaceChildren();
   availableGlslShaders.forEach(option => {
     const button = document.createElement('button');
-    button.className = `selection-option${option.id === selectedGlslShader ? ' active' : ''}`;
+    button.className = `selection-option shader-option${option.id === selectedGlslShader ? ' active' : ''}`;
     button.type = 'button';
     button.dataset.shaderValue = option.id;
+
     const radio = document.createElement('span');
     radio.className = 'selection-radio';
+
     const copy = document.createElement('span');
-    copy.textContent = option.builtIn ? option.label : `${option.label} • Installed`;
-    button.append(radio, copy);
+    copy.className = 'shader-option-copy';
+    const title = document.createElement('span');
+    title.className = 'shader-option-title';
+    title.textContent = option.builtIn ? option.label : `${option.label} • Installed`;
+    const description = document.createElement('span');
+    description.className = 'shader-option-description';
+    description.textContent = option.description || (option.builtIn ? 'Built-in Retra shader' : 'Installed GLSL shader');
+    copy.append(title, description);
+
+    const impact = document.createElement('span');
+    impact.className = `shader-impact shader-impact-${String(option.impact || 'Custom').toLowerCase()}`;
+    impact.textContent = option.impact === 'None' ? 'No cost' : `${option.impact || 'Custom'} GPU`;
+
+    button.append(radio, copy, impact);
     button.addEventListener('click', () => {
       selectedGlslShader = option.id;
       renderGlslShaderOptions();
@@ -694,11 +717,15 @@ function renderGlslShaderOptions(){
     });
     glslShaderOptionsEl.appendChild(button);
   });
+
   const selected = availableGlslShaders.find(option => option.id === selectedGlslShader);
   if (glslShaderLabel) {
-    glslShaderLabel.textContent = selectedGlslShader === 'none'
-      ? 'None • no extra GPU cost'
-      : (selected?.label || 'Custom shader');
+    if (!selected || selectedGlslShader === 'none') {
+      glslShaderLabel.textContent = 'Off • no extra GPU cost';
+    } else {
+      const impact = selected.impact && selected.impact !== 'None' ? ` • ${selected.impact} GPU` : '';
+      glslShaderLabel.textContent = `${selected.label}${impact}`;
+    }
   }
 }
 

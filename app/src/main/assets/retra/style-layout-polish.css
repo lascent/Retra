@@ -1841,3 +1841,66 @@ body[data-translucent="true"] .selection-modal .myboy-dialog-card:not(.import-sa
   width:122px !important;
   height:58px !important;
 }
+
+/* v1.0.2 professional built-in shader picker */
+#glslShaderModal .selection-modal-card{
+  width:min(94vw, 440px);
+}
+#glslShaderOptions .shader-option{
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  min-height:58px;
+}
+#glslShaderOptions .shader-option-copy{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  min-width:0;
+  text-align:left;
+}
+#glslShaderOptions .shader-option-title{
+  width:100%;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.2;
+  color:var(--text);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#glslShaderOptions .shader-option-description{
+  width:100%;
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.35;
+  white-space:normal;
+}
+#glslShaderOptions .shader-impact{
+  align-self:center;
+  padding:4px 7px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  color:var(--muted);
+  background:var(--card);
+  font-size:9px;
+  font-weight:700;
+  line-height:1;
+  white-space:nowrap;
+}
+#glslShaderOptions .shader-option.active .shader-impact{
+  border-color:color-mix(in srgb, var(--accent) 48%, var(--border));
+  color:var(--text);
+}
+@media (max-width:360px){
+  #glslShaderOptions .shader-option{
+    grid-template-columns:22px minmax(0,1fr);
+  }
+  #glslShaderOptions .shader-impact{
+    grid-column:2;
+    justify-self:start;
+    margin-top:2px;
+  }
+}

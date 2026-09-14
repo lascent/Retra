@@ -48,11 +48,13 @@ class ShaderGameView @JvmOverloads constructor(
     }
 
     fun setFragmentShader(source: String, onResult: (Boolean, String?) -> Unit) {
-        queueEvent {
-            val result = rendererImpl.replaceFragmentShader(source)
-            post { onResult(result.first, result.second) }
-            requestRender()
+        // Stage the request and let onDrawFrame compile it. onDrawFrame is only
+        // called with a current EGL context, unlike queueEvent while a hidden
+        // SurfaceView is between surface-destroy/create transitions on some OEMs.
+        rendererImpl.stageFragmentShader(source) { ok, detail ->
+            post { onResult(ok, detail) }
         }
+        requestRender()
     }
 
     private class GameRenderer : GLSurfaceView.Renderer {
@@ -72,6 +74,18 @@ class ShaderGameView @JvmOverloads constructor(
         private var textureHeight = 0
         private var program = 0
         private var fragmentSource = PASSTHROUGH_FRAGMENT
+        private val shaderRequestLock = Any()
+        private var pendingFragmentSource: String? = null
+        private var pendingFragmentResult: ((Boolean, String?) -> Unit)? = null
+        private var positionLocation = -1
+        private var texCoordLocation = -1
+        private var textureLocation = -1
+        private var textureSizeLocation = -1
+        private var outputSizeLocation = -1
+        private var timeLocation = -1
+        private var colorMatrixLocation = -1
+        private var colorOffsetLocation = -1
+        private var appliedTextureFilter = -1
         private val colorMatrix = floatArrayOf(
             1f, 0f, 0f, 0f,
             0f, 1f, 0f, 0f,
@@ -99,7 +113,10 @@ class ShaderGameView @JvmOverloads constructor(
 
         fun configure(stretch: Boolean, linearFiltering: Boolean) {
             this.stretch = stretch
-            this.linearFiltering = linearFiltering
+            if (this.linearFiltering != linearFiltering) {
+                this.linearFiltering = linearFiltering
+                appliedTextureFilter = -1
+            }
         }
 
         fun setColorTransform(androidMatrix: FloatArray) {
@@ -131,7 +148,8 @@ class ShaderGameView @JvmOverloads constructor(
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             GLES20.glClearColor(0f, 0f, 0f, 1f)
             textureId = createTexture()
-            program = buildProgram(VERTEX_SHADER, decorateFragmentShader(fragmentSource)).first
+            program = buildCompatibleProgram(fragmentSource).first
+            cacheProgramLocations()
         }
 
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -142,6 +160,7 @@ class ShaderGameView @JvmOverloads constructor(
 
         override fun onDrawFrame(gl: GL10?) {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            applyPendingFragmentShaderIfNeeded()
             if (program == 0 || textureId == 0) return
 
             uploadLatestFrameIfNeeded()
@@ -151,8 +170,11 @@ class ShaderGameView @JvmOverloads constructor(
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
             val filter = if (linearFiltering) GLES20.GL_LINEAR else GLES20.GL_NEAREST
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter)
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter)
+            if (filter != appliedTextureFilter) {
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter)
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter)
+                appliedTextureFilter = filter
+            }
 
             val xScale: Float
             val yScale: Float
@@ -179,24 +201,29 @@ class ShaderGameView @JvmOverloads constructor(
             vertexBuffer.put(vertexData)
             vertexBuffer.position(0)
             val stride = 4 * 4
-            val pos = GLES20.glGetAttribLocation(program, "aPosition")
-            val tex = GLES20.glGetAttribLocation(program, "aTexCoord")
+            val pos = positionLocation
+            val tex = texCoordLocation
+            if (pos < 0 || tex < 0) return
             GLES20.glEnableVertexAttribArray(pos)
             GLES20.glVertexAttribPointer(pos, 2, GLES20.GL_FLOAT, false, stride, vertexBuffer)
             vertexBuffer.position(2)
             GLES20.glEnableVertexAttribArray(tex)
             GLES20.glVertexAttribPointer(tex, 2, GLES20.GL_FLOAT, false, stride, vertexBuffer)
 
-            GLES20.glUniform1i(GLES20.glGetUniformLocation(program, "uTexture"), 0)
-            GLES20.glUniform2f(GLES20.glGetUniformLocation(program, "uTextureSize"), bitmap.width.toFloat(), bitmap.height.toFloat())
-            GLES20.glUniform2f(GLES20.glGetUniformLocation(program, "uOutputSize"), viewportWidth.toFloat(), viewportHeight.toFloat())
-            val elapsed = (System.nanoTime() - startedAtNanos) / 1_000_000_000f
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uTime"), elapsed)
-            val colorMatrixLocation = GLES20.glGetUniformLocation(program, "uRetraColorMatrix")
+            if (textureLocation >= 0) GLES20.glUniform1i(textureLocation, 0)
+            if (textureSizeLocation >= 0) {
+                GLES20.glUniform2f(textureSizeLocation, bitmap.width.toFloat(), bitmap.height.toFloat())
+            }
+            if (outputSizeLocation >= 0) {
+                GLES20.glUniform2f(outputSizeLocation, viewportWidth.toFloat(), viewportHeight.toFloat())
+            }
+            if (timeLocation >= 0) {
+                val elapsed = (System.nanoTime() - startedAtNanos) / 1_000_000_000f
+                GLES20.glUniform1f(timeLocation, elapsed)
+            }
             if (colorMatrixLocation >= 0) {
                 GLES20.glUniformMatrix4fv(colorMatrixLocation, 1, false, colorMatrix, 0)
             }
-            val colorOffsetLocation = GLES20.glGetUniformLocation(program, "uRetraColorOffset")
             if (colorOffsetLocation >= 0) {
                 GLES20.glUniform4fv(colorOffsetLocation, 1, colorOffset, 0)
             }
@@ -205,27 +232,122 @@ class ShaderGameView @JvmOverloads constructor(
             GLES20.glDisableVertexAttribArray(tex)
         }
 
-        fun replaceFragmentShader(source: String): Pair<Boolean, String?> {
-            val (newProgram, error) = buildProgram(VERTEX_SHADER, decorateFragmentShader(source))
-            if (newProgram == 0) return false to error
+        fun stageFragmentShader(source: String, onResult: (Boolean, String?) -> Unit) {
+            synchronized(shaderRequestLock) {
+                // Only the most recent selection matters. Settings closes the
+                // picker immediately, so replacing an older uncompiled request
+                // prevents unnecessary GPU work when users tap presets quickly.
+                pendingFragmentSource = source
+                pendingFragmentResult = onResult
+            }
+        }
+
+        private fun applyPendingFragmentShaderIfNeeded() {
+            val request = synchronized(shaderRequestLock) {
+                val source = pendingFragmentSource ?: return
+                val callback = pendingFragmentResult
+                pendingFragmentSource = null
+                pendingFragmentResult = null
+                source to callback
+            }
+
+            val result = replaceFragmentShader(request.first)
+            request.second?.invoke(result.first, result.second)
+        }
+
+        private fun replaceFragmentShader(source: String): Pair<Boolean, String?> {
+            val result = buildCompatibleProgram(source)
+            val newProgram = result.first
+            if (newProgram == 0) {
+                return false to (result.second?.trim().takeUnless { it.isNullOrEmpty() }
+                    ?: "shader compiler rejected this preset")
+            }
+
             val old = program
             program = newProgram
             fragmentSource = source
+            cacheProgramLocations()
             if (old != 0) GLES20.glDeleteProgram(old)
-            return true to null
+            return true to result.second
+        }
+
+        private fun buildCompatibleProgram(source: String): Pair<Int, String?> {
+            val safeSource = ensureFragmentPrecision(source)
+            val decorated = decorateFragmentShader(safeSource)
+            val primary = buildProgram(VERTEX_SHADER, decorated)
+            if (primary.first != 0) return primary.first to null
+
+            // Retra's color-transform wrapper is standards-compliant GLES2, but
+            // a small number of vendor compilers are stricter around rewritten
+            // entry points. Retry the original preset verbatim before rejecting
+            // it. Built-in presets are authored as standalone GLES2 shaders, so
+            // this is a safe device-compatibility path. The same path is used
+            // after EGL/context recreation, not only on the first selection.
+            if (decorated != safeSource) {
+                val fallback = buildProgram(VERTEX_SHADER, safeSource)
+                if (fallback.first != 0) return fallback.first to COMPATIBILITY_MODE
+
+                val primaryDetail = primary.second?.trim().orEmpty()
+                val fallbackDetail = fallback.second?.trim().orEmpty()
+                val detail = listOf(primaryDetail, fallbackDetail).firstOrNull { it.isNotEmpty() }
+                    ?: "shader compiler rejected this preset"
+                return 0 to detail
+            }
+
+            return 0 to (primary.second?.trim().takeUnless { it.isNullOrEmpty() }
+                ?: "shader compiler rejected this preset")
+        }
+
+        private fun cacheProgramLocations() {
+            if (program == 0) {
+                positionLocation = -1
+                texCoordLocation = -1
+                textureLocation = -1
+                textureSizeLocation = -1
+                outputSizeLocation = -1
+                timeLocation = -1
+                colorMatrixLocation = -1
+                colorOffsetLocation = -1
+                return
+            }
+            positionLocation = GLES20.glGetAttribLocation(program, "aPosition")
+            texCoordLocation = GLES20.glGetAttribLocation(program, "aTexCoord")
+            textureLocation = GLES20.glGetUniformLocation(program, "uTexture")
+            textureSizeLocation = GLES20.glGetUniformLocation(program, "uTextureSize")
+            outputSizeLocation = GLES20.glGetUniformLocation(program, "uOutputSize")
+            timeLocation = GLES20.glGetUniformLocation(program, "uTime")
+            colorMatrixLocation = GLES20.glGetUniformLocation(program, "uRetraColorMatrix")
+            colorOffsetLocation = GLES20.glGetUniformLocation(program, "uRetraColorOffset")
+        }
+
+        private fun ensureFragmentPrecision(source: String): String {
+            if (PRECISION_LINE.containsMatchIn(source)) return source
+            val version = VERSION_LINE.find(source)
+            return if (version != null) {
+                val end = version.range.last + 1
+                source.substring(0, end) + "\nprecision mediump float;\n" + source.substring(end)
+            } else {
+                "precision mediump float;\n" + source
+            }
         }
 
         private fun decorateFragmentShader(source: String): String {
-            if ("uRetraColorMatrix" in source || "retraUserMain" in source) return source
-            val match = MAIN_FUNCTION.find(source) ?: return source
-            val renamed = source.replaceRange(
+            val safeSource = ensureFragmentPrecision(source)
+            if ("uRetraColorMatrix" in safeSource || "retraUserMain" in safeSource) return safeSource
+            val match = MAIN_FUNCTION.find(safeSource) ?: return safeSource
+            val renamed = safeSource.replaceRange(
                 match.range,
                 match.value.replaceFirst(Regex("main\\s*\\("), "retraUserMain(")
             )
             val uniforms = "\nuniform mat4 uRetraColorMatrix;\nuniform vec4 uRetraColorOffset;\n"
-            val withUniforms = VERSION_LINE.find(renamed)?.let { version ->
-                renamed.substring(0, version.range.last + 1) + uniforms + renamed.substring(version.range.last + 1)
-            } ?: (uniforms + renamed)
+            val precision = PRECISION_LINE.findAll(renamed).lastOrNull()
+            val version = VERSION_LINE.find(renamed)
+            val insertionEnd = precision?.range?.last ?: version?.range?.last
+            val withUniforms = if (insertionEnd != null) {
+                renamed.substring(0, insertionEnd + 1) + uniforms + renamed.substring(insertionEnd + 1)
+            } else {
+                uniforms + renamed
+            }
             return withUniforms + """
 
                 void main() {
@@ -280,12 +402,12 @@ class ShaderGameView @JvmOverloads constructor(
             GLES20.glLinkProgram(p)
             val status = IntArray(1)
             GLES20.glGetProgramiv(p, GLES20.GL_LINK_STATUS, status, 0)
-            val error = if (status[0] == 0) GLES20.glGetProgramInfoLog(p) else null
+            val error = if (status[0] == 0) GLES20.glGetProgramInfoLog(p)?.trim().takeUnless { it.isNullOrEmpty() } else null
             GLES20.glDeleteShader(v.first)
             GLES20.glDeleteShader(f.first)
             if (status[0] == 0) {
                 GLES20.glDeleteProgram(p)
-                return 0 to (error ?: "Shader link failed")
+                return 0 to (error ?: "Shader link failed on this GPU")
             }
             return p to null
         }
@@ -297,16 +419,18 @@ class ShaderGameView @JvmOverloads constructor(
             val status = IntArray(1)
             GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status, 0)
             if (status[0] == 0) {
-                val error = GLES20.glGetShaderInfoLog(shader)
+                val error = GLES20.glGetShaderInfoLog(shader)?.trim().takeUnless { it.isNullOrEmpty() }
                 GLES20.glDeleteShader(shader)
-                return 0 to (error ?: "Shader compile failed")
+                return 0 to (error ?: "Shader compile failed on this GPU")
             }
             return shader to null
         }
 
         companion object {
+            private const val COMPATIBILITY_MODE = "compatibility-mode"
             private val MAIN_FUNCTION = Regex("""void\s+main\s*\(\s*(?:void)?\s*\)\s*\{""")
             private val VERSION_LINE = Regex("""(?m)^\s*#version[^\n]*""")
+            private val PRECISION_LINE = Regex("""(?m)^\s*precision\s+\w+\s+\w+\s*;\s*$""")
 
             private const val VERTEX_SHADER = """
                 attribute vec2 aPosition;

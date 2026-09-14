@@ -22,6 +22,7 @@ const previewLayoutStorageKeyBase = 'retraPreviewButtonsLayoutV390';
 const screenSizeLabels = {
   fullscreen: 'Make fullscreen',
   centered: 'Make centered',
+  betterfit: 'Best Fit',
   best: 'Best scaling (4x)',
   stretch: 'Break aspect ratio',
   custom: 'Custom resize'
@@ -59,7 +60,7 @@ try {
   if (savedState && typeof savedState === 'object') {
     ['landscape', 'portrait'].forEach(orientation => {
       const savedMode = savedState[orientation] || 'best';
-      screenSizeState[orientation] = ['fullscreen','centered','best','stretch','custom'].includes(savedMode) ? savedMode : 'best';
+      screenSizeState[orientation] = ['fullscreen','centered','betterfit','best','stretch','custom'].includes(savedMode) ? savedMode : 'best';
       const custom = savedState.customFrames?.[orientation] || null;
       if (custom && typeof custom === 'object') {
         const left = Number(custom.left);
@@ -117,7 +118,7 @@ function hydrateEditorOrientationFromNative(orientation = currentEditorOrientati
 
     if (bundle.screen && typeof bundle.screen === 'object') {
       const mode = bundle.screen.mode;
-      screenSizeState[orientation] = ['fullscreen','centered','best','stretch','custom'].includes(mode) ? mode : 'best';
+      screenSizeState[orientation] = ['fullscreen','centered','betterfit','best','stretch','custom'].includes(mode) ? mode : 'best';
       const custom = bundle.screen.customFrame;
       if (custom && typeof custom === 'object') {
         const left = Number(custom.left);
@@ -207,21 +208,33 @@ function updateResponsiveScreenFrame(){
     top = 0;
     transform = 'none';
   } else if (orientation === 'portrait') {
-    // Portrait reference: the emulator display sits at the top and uses
-    // essentially the full available width. Back/+ are editor-only overlays.
-    const widthRatio = mode === 'centered' ? 0.78 : 0.985;
+    // Portrait keeps the screen wide and near the top. Best Fit keeps a
+    // little more vertical room for controls while preserving the GBA ratio.
+    const widthRatio =
+      mode === 'centered' ? 0.78 :
+      mode === 'betterfit' ? 0.965 :
+      0.985;
+    const heightRatio = mode === 'betterfit' ? 0.46 : 0.42;
     ({ width, height } = fitGbaScreen(
       previewWidth * widthRatio,
-      previewHeight * 0.42,
+      previewHeight * heightRatio,
       3 / 2
     ));
     left = (previewWidth - width) / 2;
     top = mode === 'centered' ? previewHeight * 0.035 : 0;
     transform = 'none';
   } else {
-    // Landscape reference: almost full vertical height at 3:2, centered.
-    const widthRatio = mode === 'centered' ? 0.60 : 0.90;
-    const heightRatio = mode === 'centered' ? 0.64 : 0.90;
+    // Best Fit mirrors the supplied landscape reference: the 3:2 game
+    // image occupies almost the full usable height and about 68% of the
+    // landscape width, leaving balanced controller zones on both sides.
+    const widthRatio =
+      mode === 'centered' ? 0.60 :
+      mode === 'betterfit' ? 0.68 :
+      0.90;
+    const heightRatio =
+      mode === 'centered' ? 0.64 :
+      mode === 'betterfit' ? 1.00 :
+      0.90;
     ({ width, height } = fitGbaScreen(
       previewWidth * widthRatio,
       previewHeight * heightRatio,
@@ -851,15 +864,23 @@ function updateScaleHandle(){
   if (screenFrameSelected && previewScreenFrame) {
     const frameRect = previewScreenFrame.getBoundingClientRect();
     const handleSize = previewScaleHandle.offsetWidth || 42;
-    const desiredLeft = frameRect.right - previewRect.left - handleSize * 0.35;
-    const desiredTop = frameRect.bottom - previewRect.top - handleSize * 0.35;
-    const left = clampPreviewValue(desiredLeft, 0, Math.max(0, previewRect.width - handleSize));
-    const top = clampPreviewValue(desiredTop, 0, Math.max(0, previewRect.height - handleSize));
+    const scalingScreen = Boolean(activeScreenScale);
+    const placement = adaptiveControlScaleHandlePlacement(
+      frameRect,
+      previewRect,
+      handleSize,
+      scalingScreen ? activeScreenScale.xDirection : 0,
+      scalingScreen ? activeScreenScale.yDirection : 0
+    );
 
-    previewScaleHandle.style.left = `${left}px`;
-    previewScaleHandle.style.top = `${top}px`;
+    previewScaleHandle.style.left = `${placement.left}px`;
+    previewScaleHandle.style.top = `${placement.top}px`;
+    previewScaleHandle.dataset.scaleDirectionX = String(placement.xDirection);
+    previewScaleHandle.dataset.scaleDirectionY = String(placement.yDirection);
+    previewScaleHandle.dataset.scaleCorner = placement.corner;
+    previewScaleHandle.style.cursor = placement.xDirection === placement.yDirection ? 'nwse-resize' : 'nesw-resize';
     previewScaleHandle.classList.add('visible', 'screen-scale-mode');
-    previewScaleHandle.setAttribute('aria-label', 'Expand or minimize emulator screen');
+    previewScaleHandle.setAttribute('aria-label', 'Resize emulator screen');
 
     if (previewScaleValue) {
       const best = fitGbaScreen(previewRect.width * 0.82, previewRect.height * 0.88, 3 / 2);
@@ -1036,10 +1057,23 @@ let activePreviewScale = null;
 function stopPreviewDrag(event){
   if (!activePreviewDrag) return;
   if (event?.pointerId !== undefined && activePreviewDrag.pointerId !== undefined && event.pointerId !== activePreviewDrag.pointerId) return;
-
   flushPendingPreviewDrag();
   const drag = activePreviewDrag;
+  const state = previewLayoutState.controls[drag.controlId];
+  // Commit compositor-only movement once after the gesture.
+  if (state && drag.element) {
+    const finalLeft = Number.isFinite(drag.lastLeft) ? drag.lastLeft : drag.startLeft;
+    const finalTop = Number.isFinite(drag.lastTop) ? drag.lastTop : drag.startTop;
+    state.x = finalLeft / Math.max(1, drag.previewWidth);
+    state.y = finalTop / Math.max(1, drag.previewHeight);
+    drag.element.style.setProperty('left', `${finalLeft}px`, 'important');
+    drag.element.style.setProperty('top', `${finalTop}px`, 'important');
+    drag.element.style.setProperty('right', 'auto', 'important'); drag.element.style.setProperty('bottom', 'auto', 'important');
+    drag.element.style.setProperty('transform', `scale(${drag.scale})`, 'important');
+  }
   activePreviewDrag = null;
+  drag.element?.classList.remove('is-dragging');
+  emulatorPreview?.classList.remove('editor-drag-active');
   try { if (drag.element?.hasPointerCapture?.(drag.pointerId)) drag.element.releasePointerCapture(drag.pointerId); } catch (_) {}
   window.removeEventListener('pointermove', handlePreviewDragMove);
   window.removeEventListener('pointerup', stopPreviewDrag);
@@ -1060,68 +1094,73 @@ function handlePreviewDragMove(event){
     if (next) applyPreviewDragMove(next);
   });
 }
-
 function applyPreviewDragMove(event){
-  if (!activePreviewDrag || !emulatorPreview) return;
-  if (activePreviewDrag.pointerId !== undefined && event.pointerId !== undefined && event.pointerId !== activePreviewDrag.pointerId) return;
-
-  if (previewControlLongPressState?.controlId === activePreviewDrag.controlId) {
+  const drag = activePreviewDrag;
+  if (!drag || !emulatorPreview) return;
+  if (drag.pointerId !== undefined && event.pointerId !== undefined && event.pointerId !== drag.pointerId) return;
+  if (previewControlLongPressState?.controlId === drag.controlId) {
     const moveX = event.clientX - previewControlLongPressState.startX;
     const moveY = event.clientY - previewControlLongPressState.startY;
     if (Math.hypot(moveX, moveY) > 8) clearPreviewControlLongPress();
   }
-
-  const previewRect = emulatorPreview.getBoundingClientRect();
-  const state = previewLayoutState.controls[activePreviewDrag.controlId];
-  const element = previewControlElements.get(activePreviewDrag.controlId);
+  const state = previewLayoutState.controls[drag.controlId];
+  const element = drag.element || previewControlElements.get(drag.controlId);
   if (!state || !element) return;
-
-  const baseWidth = Number(element.dataset.baseWidth) || element.offsetWidth || 44;
-  const baseHeight = Number(element.dataset.baseHeight) || element.offsetHeight || 44;
-  const scaledWidth = baseWidth * state.scale;
-  const scaledHeight = baseHeight * state.scale;
-
   const nextLeft = clampPreviewValue(
-    activePreviewDrag.startLeft + (event.clientX - activePreviewDrag.startX),
+    drag.startLeft + (event.clientX - drag.startX),
     0,
-    Math.max(0, previewRect.width - scaledWidth)
+    Math.max(0, drag.previewWidth - drag.scaledWidth)
   );
   const nextTop = clampPreviewValue(
-    activePreviewDrag.startTop + (event.clientY - activePreviewDrag.startY),
+    drag.startTop + (event.clientY - drag.startY),
     0,
-    Math.max(0, previewRect.height - scaledHeight)
+    Math.max(0, drag.previewHeight - drag.scaledHeight)
   );
-
-  state.x = nextLeft / previewRect.width;
-  state.y = nextTop / previewRect.height;
-  applyPreviewLayoutControls();
+  drag.lastLeft = nextLeft;
+  drag.lastTop = nextTop;
+  // Compositor-only hot path; normalized X/Y is committed on pointerup.
+  const translateX = nextLeft - drag.startLeft;
+  const translateY = nextTop - drag.startTop;
+  element.style.setProperty('transform',
+    `translate3d(${translateX}px, ${translateY}px, 0) scale(${drag.scale})`, 'important');
 }
 function beginPreviewControlDrag(controlId, event){
   if (!ensurePreviewLayoutInitialized() || !emulatorPreview) return;
-
   const state = previewLayoutState.controls[controlId];
   const element = previewControlElements.get(controlId);
   if (!state || !element) return;
-
   selectPreviewControl(controlId);
   const previewRect = emulatorPreview.getBoundingClientRect();
   const elementRect = element.getBoundingClientRect();
+  const scale = clampPreviewValue(Number(state.scale) || 1, 0.65, 1.7);
+  const baseWidth = Number(element.dataset.baseWidth) || element.offsetWidth || 44;
+  const baseHeight = Number(element.dataset.baseHeight) || element.offsetHeight || 44;
+  const startLeft = elementRect.left - previewRect.left;
+  const startTop = elementRect.top - previewRect.top;
   activePreviewDrag = {
     controlId,
     element,
     pointerId: event.pointerId,
     startX: event.clientX,
     startY: event.clientY,
-    // Start from the exact rendered position. If a previously saved coordinate
-    // is temporarily clamped by the current viewport, there is no jump when
-    // the user begins an explicit drag; only this drag updates the saved X/Y.
-    startLeft: elementRect.left - previewRect.left,
-    startTop: elementRect.top - previewRect.top
+    // Use the exact rendered position so drag never jumps at gesture start.
+    startLeft,
+    startTop,
+    lastLeft: startLeft,
+    lastTop: startTop,
+    previewWidth: previewRect.width,
+    previewHeight: previewRect.height,
+    scaledWidth: baseWidth * scale,
+    scaledHeight: baseHeight * scale,
+    scale
   };
-
-  // Keep Android/WebView drag ownership even when the finger leaves the control.
+  // Hide geometry-heavy affordances until release.
+  element.classList.add('is-dragging');
+  emulatorPreview.classList.add('editor-drag-active');
+  previewScaleHandle?.classList.remove('visible');
+  previewScaleValue?.classList.remove('visible');
+  // Keep drag ownership when the finger leaves the control.
   try { element.setPointerCapture?.(event.pointerId); } catch (_) {}
-
   window.addEventListener('pointermove', handlePreviewDragMove);
   window.addEventListener('pointerup', stopPreviewDrag);
   window.addEventListener('pointercancel', stopPreviewDrag);
@@ -1189,7 +1228,16 @@ function applyPreviewScaleMove(event){
   state.scale = nextScale;
   state.x = nextLeft / Math.max(1, activePreviewScale.previewWidth);
   state.y = nextTop / Math.max(1, activePreviewScale.previewHeight);
-  applyPreviewLayoutControls();
+
+  const element = activePreviewScale.element || previewControlElements.get(activePreviewScale.controlId);
+  if (element) {
+    element.style.setProperty('left', `${nextLeft}px`, 'important');
+    element.style.setProperty('top', `${nextTop}px`, 'important');
+    element.style.setProperty('right', 'auto', 'important');
+    element.style.setProperty('bottom', 'auto', 'important');
+    element.style.setProperty('transform', `scale(${nextScale})`, 'important');
+  }
+  updateScaleHandle();
 }
 function beginPreviewScale(event){
   if (!ensurePreviewLayoutInitialized() || !emulatorPreview) return;
@@ -1214,6 +1262,7 @@ function beginPreviewScale(event){
 
   activePreviewScale = {
     controlId,
+    element,
     pointerId: event.pointerId,
     startX: event.clientX,
     startY: event.clientY,
@@ -1321,8 +1370,6 @@ function closeAddControlModal(){
 }
 
 let screenFrameSelected = false;
-let activeScreenScale = null;
-
 function clearScreenFrameSelection(){
   screenFrameSelected = false;
   previewScreenFrame?.classList.remove('is-selected');
@@ -1339,83 +1386,11 @@ function selectScreenFrame(){
   updateScaleHandle();
 }
 
-function stopScreenScale(){
-  if (!activeScreenScale) return;
-  const editedOrientation = activeScreenScale.orientation || currentEditorOrientation();
-  activeScreenScale = null;
-  window.removeEventListener('pointermove', handleScreenScaleMove);
-  window.removeEventListener('pointerup', stopScreenScale);
-  window.removeEventListener('pointercancel', stopScreenScale);
-  persistScreenSizeState(editedOrientation);
-  updateScaleHandle();
-}
-
-function handleScreenScaleMove(event){
-  if (!activeScreenScale || !emulatorPreview) return;
-
-  const previewRect = emulatorPreview.getBoundingClientRect();
-  const dx = event.clientX - activeScreenScale.startX;
-  const dy = event.clientY - activeScreenScale.startY;
-  const diagonal = Math.max(1, Math.hypot(activeScreenScale.startWidth, activeScreenScale.startHeight));
-  const projected = (dx * activeScreenScale.startWidth + dy * activeScreenScale.startHeight) / diagonal;
-
-  const minWidth = Math.max(96, previewRect.width * 0.20);
-  const minHeight = Math.max(72, previewRect.height * 0.20);
-  const minScale = Math.max(minWidth / activeScreenScale.startWidth, minHeight / activeScreenScale.startHeight);
-
-  // Keep the frame centered on its current position while scaling and prevent
-  // any edge from leaving the emulator preview.
-  const maxWidthFromCenter = Math.max(1, 2 * Math.min(activeScreenScale.centerX, previewRect.width - activeScreenScale.centerX));
-  const maxHeightFromCenter = Math.max(1, 2 * Math.min(activeScreenScale.centerY, previewRect.height - activeScreenScale.centerY));
-  const maxScale = Math.max(1, minScale, Math.min(
-    maxWidthFromCenter / activeScreenScale.startWidth,
-    maxHeightFromCenter / activeScreenScale.startHeight
-  ));
-
-  const scale = clampPreviewValue(1 + projected / diagonal, minScale, maxScale);
-  const width = activeScreenScale.startWidth * scale;
-  const height = activeScreenScale.startHeight * scale;
-  const left = activeScreenScale.centerX - width / 2;
-  const top = activeScreenScale.centerY - height / 2;
-
+function enterCustomScreenGestureMode(){
   setCurrentScreenMode('custom');
-  setCurrentCustomFrame({
-    left: left / previewRect.width,
-    top: top / previewRect.height,
-    width: width / previewRect.width,
-    height: height / previewRect.height
-  });
-
-  applyScreenSizePreview();
-}
-
-function beginScreenScale(event){
-  if (!emulatorPreview || !previewScreenFrame || !screenFrameSelected) return;
-  event.preventDefault();
-  event.stopPropagation();
-  clearPreviewLongPress();
-  hideControlRemoveMenu();
-
-  const frameRect = previewScreenFrame.getBoundingClientRect();
-  const previewRect = emulatorPreview.getBoundingClientRect();
-  const startLeft = frameRect.left - previewRect.left;
-  const startTop = frameRect.top - previewRect.top;
-
-  activeScreenScale = {
-    orientation: currentEditorOrientation(),
-    startX: event.clientX,
-    startY: event.clientY,
-    startLeft,
-    startTop,
-    startWidth: frameRect.width,
-    startHeight: frameRect.height,
-    centerX: startLeft + frameRect.width / 2,
-    centerY: startTop + frameRect.height / 2
-  };
-
-  window.addEventListener('pointermove', handleScreenScaleMove);
-  window.addEventListener('pointerup', stopScreenScale);
-  window.addEventListener('pointercancel', stopScreenScale);
+  if (screenPreviewShell) screenPreviewShell.dataset.sizeMode = 'custom';
+  screenSizeModeButtons.forEach(button => button.classList.remove('active'));
+  updateScreenSizeSummary();
 }
 
 function applyScreenSizePreview(){
@@ -1475,7 +1450,7 @@ function syncScreenEditorOrientation(){
   // saved by drag/resize/add/remove actions. If the phone rotates in the middle
   // of an active gesture, preserve only that explicit in-progress edit.
   if (previewLayoutInitialized && previous && previous !== next &&
-      (activePreviewDrag || activePreviewScale || activeScreenScale || activeScreenEdgeResize)) {
+      (activePreviewDrag || activePreviewScale || activeScreenScale || activeScreenDrag || activeScreenEdgeResize)) {
     persistPreviewLayoutState(previous);
     persistScreenSizeState(previous);
   }
@@ -1494,6 +1469,17 @@ function syncScreenEditorOrientation(){
   activePreviewDrag = null;
   activePreviewScale = null;
   activeScreenScale = null;
+  if (activeScreenDrag) {
+    window.removeEventListener('pointermove', handleScreenDragMove);
+    window.removeEventListener('pointerup', stopScreenDrag);
+    window.removeEventListener('pointercancel', stopScreenDrag);
+  }
+  activeScreenDrag = null;
+  pendingScreenDragSample = null;
+  if (screenDragAnimationFrame) {
+    cancelAnimationFrame(screenDragAnimationFrame);
+    screenDragAnimationFrame = 0;
+  }
   if (activeScreenEdgeResize) {
     window.removeEventListener('pointermove', handleScreenEdgeResizeMove);
     window.removeEventListener('pointerup', stopScreenEdgeResize);
@@ -1552,6 +1538,8 @@ if (window.visualViewport) {
 }
 
 let activeScreenEdgeResize = null;
+let pendingScreenEdgeResizeSample = null;
+let screenEdgeResizeAnimationFrame = 0;
 
 function hitTestScreenResizeEdge(event){
   if (!previewScreenFrame) return null;
@@ -1595,7 +1583,7 @@ function beginScreenEdgeResize(event, edge){
   return true;
 }
 
-function handleScreenEdgeResizeMove(event){
+function applyScreenEdgeResizeMove(event){
   const state = activeScreenEdgeResize;
   if (!state || !emulatorPreview) return;
   const previewRect = emulatorPreview.getBoundingClientRect();
@@ -1650,20 +1638,38 @@ function handleScreenEdgeResizeMove(event){
     left = clampPreviewValue(centerX - width / 2, 0, maxW - width);
   }
 
-  setCurrentScreenMode('custom');
+  enterCustomScreenGestureMode();
   setCurrentCustomFrame({
     left: left / maxW,
     top: top / maxH,
     width: width / maxW,
     height: height / maxH
   });
-  applyScreenSizePreview();
+  updateResponsiveScreenFrame();
+  updateScaleHandle();
+}
+
+function handleScreenEdgeResizeMove(event){
+  if (!activeScreenEdgeResize) return;
+  pendingScreenEdgeResizeSample = latestPointerSample(event);
+  if (screenEdgeResizeAnimationFrame) return;
+  screenEdgeResizeAnimationFrame = requestAnimationFrame(() => {
+    screenEdgeResizeAnimationFrame = 0;
+    const sample = pendingScreenEdgeResizeSample;
+    pendingScreenEdgeResizeSample = null;
+    if (sample) applyScreenEdgeResizeMove(sample);
+  });
 }
 
 function stopScreenEdgeResize(){
   if (!activeScreenEdgeResize) return;
   const orientation = activeScreenEdgeResize.orientation || currentEditorOrientation();
   activeScreenEdgeResize = null;
+  pendingScreenEdgeResizeSample = null;
+  if (screenEdgeResizeAnimationFrame) {
+    cancelAnimationFrame(screenEdgeResizeAnimationFrame);
+    screenEdgeResizeAnimationFrame = 0;
+  }
   window.removeEventListener('pointermove', handleScreenEdgeResizeMove);
   window.removeEventListener('pointerup', stopScreenEdgeResize);
   window.removeEventListener('pointercancel', stopScreenEdgeResize);
@@ -1677,9 +1683,10 @@ screenPreviewSurface?.addEventListener('pointerdown', event => {
   if (beginScreenEdgeResize(event, edge)) event.stopImmediatePropagation();
 }, true);
 
-screenPreviewSurface?.addEventListener('pointerdown', () => {
+screenPreviewSurface?.addEventListener('pointerdown', event => {
   longPressTriggered = false;
   clearPreviewLongPress();
+  beginScreenDrag(event);
   longPressTimer = setTimeout(openScreenContextMenu, 380);
 });
 
@@ -1701,7 +1708,7 @@ screenPreviewSurface?.addEventListener('click', (event) => {
   screenContextMenu?.classList.remove('open');
   selectScreenFrame();
   persistScreenSizeState();
-  showToast('Screen selected — drag the expand handle outward or inward');
+  showToast('Screen selected — drag it to move, or use the resize handle');
 });
 
 screenPreviewSurface?.addEventListener('contextmenu', (event) => {

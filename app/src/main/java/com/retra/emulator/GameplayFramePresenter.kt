@@ -6,13 +6,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Presents the newest completed emulator frame on the display's next VSync.
+ * Presents the newest completed emulator frame on Android VSync.
  *
- * The emulator core remains at its native cadence (~59.73 FPS for GBA). On
- * 90/120 Hz panels this shortens the wait between a completed emulator frame
- * and the next display refresh without fabricating frames or changing game
- * speed. A callback is scheduled only when a new emulator frame exists, so
- * low-end/60 Hz devices do not pay for a continuous high-frequency render loop.
+ * The emulation worker may run hundreds of GBA frames per second. The presenter
+ * deliberately samples only the latest completed snapshot at panel cadence so
+ * display work never throttles the selected game-speed multiplier.
  */
 class GameplayFramePresenter(
     private val targetView: View,
@@ -20,6 +18,8 @@ class GameplayFramePresenter(
 ) : Choreographer.FrameCallback {
     private val pendingGeneration = AtomicLong(0L)
     private val callbackScheduled = AtomicBoolean(false)
+    private val continuousVsync = AtomicBoolean(false)
+    private val latestVsyncTimeNs = AtomicLong(0L)
 
     @Volatile
     private var active = false
@@ -32,11 +32,22 @@ class GameplayFramePresenter(
 
     fun stop() {
         active = false
+        continuousVsync.set(false)
         callbackScheduled.set(false)
+        latestVsyncTimeNs.set(0L)
         targetView.post {
             Choreographer.getInstance().removeFrameCallback(this)
         }
     }
+
+    fun setContinuousVsync(enabled: Boolean) {
+        val changed = continuousVsync.getAndSet(enabled) != enabled
+        if (enabled && active && changed) scheduleNextVsync()
+        if (!enabled) latestVsyncTimeNs.set(0L)
+    }
+
+    /** Last real Choreographer VSync timestamp, readable by the emulation worker. */
+    fun latestVsyncNanos(): Long = latestVsyncTimeNs.get()
 
     /** May be called from the emulator thread. */
     fun requestPresent() {
@@ -56,9 +67,16 @@ class GameplayFramePresenter(
         }
     }
 
+    /** Called only from Choreographer's UI-thread callback; avoids another View.post. */
+    private fun scheduleNextVsyncDirect() {
+        if (!callbackScheduled.compareAndSet(false, true)) return
+        Choreographer.getInstance().postFrameCallback(this)
+    }
+
     override fun doFrame(frameTimeNanos: Long) {
         callbackScheduled.set(false)
         if (!active) return
+        latestVsyncTimeNs.set(frameTimeNanos)
 
         val generation = pendingGeneration.get()
         if (generation != presentedGeneration) {
@@ -66,10 +84,8 @@ class GameplayFramePresenter(
             presentedGeneration = generation
         }
 
-        // If the emulator finished another frame while we were presenting,
-        // schedule exactly one more VSync rather than spinning continuously.
-        if (active && pendingGeneration.get() != presentedGeneration) {
-            scheduleNextVsync()
+        if (active && (continuousVsync.get() || pendingGeneration.get() != presentedGeneration)) {
+            scheduleNextVsyncDirect()
         }
     }
 }

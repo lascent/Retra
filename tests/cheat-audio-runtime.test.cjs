@@ -13,14 +13,17 @@ const gameplay = read('app/src/main/java/com/retra/emulator/GameplayController.k
 const native = read('app/src/main/cpp/native-lib.cpp');
 
 test('gameplay actively drains mGBA PCM and speed-syncs it into AudioTrack', () => {
-  assert.match(session, /audioController\.pump\([\s\S]*speed = speed,[\s\S]*flushOutput = \(i == loops - 1\)/);
+  assert.match(session, /audioController\.pump\([\s\S]*speed = speed,[\s\S]*flushOutput = !turbo \|\| captureVideo/);
   assert.match(audio, /readSamples\(nativeScratch\)/);
   assert.match(audio, /Thread\(::audioWriterLoop, "Retra-Audio"\)/);
   assert.match(audio, /Process\.THREAD_PRIORITY_AUDIO/);
   assert.match(audio, /AudioTrack\.WRITE_BLOCKING/);
   assert.match(audio, /flushPendingOutput\(\)[\s\S]*enqueueOutput\(packet\)/);
+  assert.match(audio, /readSamples\(nativeScratch\)/);
+  assert.match(audio, /appendSpeedAdjusted\(nativeScratch, count\)/);
   assert.match(audio, /appendTurboAveraged/);
   assert.match(audio, /appendSlowInterpolated/);
+  assert.doesNotMatch(audio, /readSamplesAtSpeed\(nativeScratch/);
 });
 
 test('audio pipeline prevents crackle from dropped partial writes and smooths speed transitions', () => {
@@ -30,7 +33,7 @@ test('audio pipeline prevents crackle from dropped partial writes and smooths sp
   assert.match(audio, /track\.flush\(\)/);
   assert.match(audio, /requestFadeIn\(\)/);
   assert.match(audio, /applyFadeIn\(pendingOutput, appendedFrom, pendingCount - appendedFrom\)/);
-  assert.match(audio, /turboAccumFrames >= factor/);
+  assert.doesNotMatch(audio, /setPerformanceMode\(AudioTrack\.PERFORMANCE_MODE_LOW_LATENCY\)/);
   assert.match(audio, /ERROR_DEAD_OBJECT/);
   assert.match(audio, /MAX_PENDING_AUDIO_MS = 200/);
 });

@@ -21,22 +21,32 @@ import kotlin.math.abs
  */
 class DisplayPerformanceManager(
     private val activity: Activity,
-    private val maxUiRefreshRateHz: Float = 120f
+    private val maxUiRefreshRateHz: Float = 120f,
+    private val maxTurboRefreshRateHz: Float = 165f
 ) {
     private var originalModeId: Int? = null
     private var originalRefreshRate: Float? = null
     private var lastAppliedModeId: Int = 0
     private var lastAppliedCapHz: Float = 0f
     private var gameplayModeRequested = false
+    private var extremeTurboModeRequested = false
 
     fun applyPreferredMode() {
         gameplayModeRequested = false
-        applyAdaptiveMode("ui", gameplay = false)
+        extremeTurboModeRequested = false
+        applyAdaptiveMode("ui", gameplay = false, extremeTurbo = false)
     }
 
-    fun applyGameplayMode() {
+    fun applyGameplayMode() = applyGameplayMode(extremeTurbo = false)
+
+    fun applyGameplayMode(extremeTurbo: Boolean) {
         gameplayModeRequested = true
-        applyAdaptiveMode("gameplay", gameplay = true)
+        extremeTurboModeRequested = extremeTurbo
+        applyAdaptiveMode(
+            if (extremeTurbo) "extreme-turbo" else "gameplay",
+            gameplay = true,
+            extremeTurbo = extremeTurbo
+        )
     }
 
     fun reapplyAfterConfigurationChange() {
@@ -44,9 +54,29 @@ class DisplayPerformanceManager(
             applyAttachedDisplayMode(
                 activity.window.decorView.display,
                 "configuration",
-                gameplayModeRequested
+                gameplayModeRequested,
+                extremeTurboModeRequested
             )
         }
+    }
+
+    /**
+     * Refresh cadence the gameplay presenter should target.  This is queried on
+     * the UI thread before the emulation worker starts; the worker can then
+     * avoid producing Android frame copies faster than the selected panel mode.
+     */
+    fun preferredGameplayRefreshRateHz(): Float = preferredGameplayRefreshRateHz(extremeTurbo = false)
+
+    fun preferredGameplayRefreshRateHz(extremeTurbo: Boolean): Float {
+        val display = activity.window.decorView.display ?: return 60f
+        val capHz = adaptiveRefreshCapHz(gameplay = true, extremeTurbo = extremeTurbo)
+        val selected = if (extremeTurbo) {
+            selectBestExtremeTurboMode(display.supportedModes, display.mode, capHz)
+        } else {
+            selectBestGameplayMode(display.supportedModes, display.mode, capHz)
+        }
+        val ceiling = if (extremeTurbo) maxTurboRefreshRateHz else maxUiRefreshRateHz
+        return selected?.refreshRate?.coerceIn(60f, ceiling) ?: 60f
     }
 
     fun restoreSystemDefault() {
@@ -61,9 +91,10 @@ class DisplayPerformanceManager(
         lastAppliedModeId = 0
         lastAppliedCapHz = 0f
         gameplayModeRequested = false
+        extremeTurboModeRequested = false
     }
 
-    internal fun adaptiveRefreshCapHz(gameplay: Boolean = false): Float {
+    internal fun adaptiveRefreshCapHz(gameplay: Boolean = false, extremeTurbo: Boolean = false): Float {
         val activityManager = activity.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val powerManager = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
 
@@ -74,15 +105,17 @@ class DisplayPerformanceManager(
         runCatching { activityManager?.getMemoryInfo(memoryInfo) }
         val totalRamBytes = memoryInfo.totalMem
 
+        val highRefreshCeiling = if (extremeTurbo) maxTurboRefreshRateHz else maxUiRefreshRateHz
+
         var cap = when {
             totalRamBytes in 1 until FOUR_GIB -> 60f
             // Gameplay benefits from a clean 2:1 120 Hz presentation cadence.
             // Keep the more conservative 90 Hz cap for the general UI on
             // 4-6 GiB devices, but do not force ~60 FPS game content into the
             // uneven 90 Hz cadence when the panel can expose 120 Hz.
-            gameplay -> maxUiRefreshRateHz
+            gameplay -> highRefreshCeiling
             totalRamBytes in FOUR_GIB until SIX_GIB -> 90f
-            else -> maxUiRefreshRateHz
+            else -> highRefreshCeiling
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && powerManager != null) {
@@ -94,33 +127,34 @@ class DisplayPerformanceManager(
             }
         }
 
-        return cap.coerceIn(60f, maxUiRefreshRateHz)
+        return cap.coerceIn(60f, highRefreshCeiling)
     }
 
-    private fun applyAdaptiveMode(reason: String, gameplay: Boolean) {
+    private fun applyAdaptiveMode(reason: String, gameplay: Boolean, extremeTurbo: Boolean) {
         val decor = activity.window.decorView
-        activity.window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
-        // Hardware acceleration is a window property. Forcing the entire
-        // DecorView into a cached hardware layer makes a changing game screen
-        // rebuild that off-screen layer every frame, so keep the root on the
-        // normal hardware-accelerated display-list path instead.
-        decor.setLayerType(View.LAYER_TYPE_NONE, null)
-        decor.post { applyAttachedDisplayMode(decor.display, reason, gameplay) }
+        // This method may be requested by the emulation worker when the user
+        // changes speed. Keep all Window/View mutation on the UI thread.
+        decor.post {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
+            // Do not cache the changing game screen into an extra hardware layer.
+            decor.setLayerType(View.LAYER_TYPE_NONE, null)
+            applyAttachedDisplayMode(decor.display, reason, gameplay, extremeTurbo)
+        }
     }
 
-    private fun applyAttachedDisplayMode(display: Display?, reason: String, gameplay: Boolean) {
+    private fun applyAttachedDisplayMode(display: Display?, reason: String, gameplay: Boolean, extremeTurbo: Boolean) {
         if (display == null || activity.isFinishing || activity.isDestroyed) return
 
         val attrs = activity.window.attributes
         if (originalModeId == null) originalModeId = attrs.preferredDisplayModeId
         if (originalRefreshRate == null) originalRefreshRate = attrs.preferredRefreshRate
 
-        val capHz = adaptiveRefreshCapHz(gameplay)
+        val capHz = adaptiveRefreshCapHz(gameplay, extremeTurbo)
         val currentMode = display.mode
-        val target = if (gameplay) {
-            selectBestGameplayMode(display.supportedModes, currentMode, capHz)
-        } else {
-            selectBestMode(display.supportedModes, currentMode, capHz)
+        val target = when {
+            gameplay && extremeTurbo -> selectBestExtremeTurboMode(display.supportedModes, currentMode, capHz)
+            gameplay -> selectBestGameplayMode(display.supportedModes, currentMode, capHz)
+            else -> selectBestMode(display.supportedModes, currentMode, capHz)
         } ?: return
         if (
             target.modeId == lastAppliedModeId &&
@@ -137,7 +171,7 @@ class DisplayPerformanceManager(
         Log.d(
             TAG,
             "$reason refresh requested: ${target.refreshRate} Hz " +
-                "(adaptive cap $capHz Hz, mode ${target.modeId}, gameplay=$gameplay)"
+                "(adaptive cap $capHz Hz, mode ${target.modeId}, gameplay=$gameplay, extreme=$extremeTurbo)"
         )
     }
 
@@ -180,6 +214,30 @@ class DisplayPerformanceManager(
         } else {
             selectBestMode(modes, currentMode, capHz)
         }
+    }
+
+
+    /**
+     * 8x/16x are no longer a ~59.73 FPS source from the display's perspective:
+     * Retra has hundreds of distinct emulated states available each second. Prefer
+     * the panel's highest same-resolution refresh mode so 144/165 Hz devices can
+     * show more unique turbo states instead of being artificially capped at 120 Hz.
+     */
+    internal fun selectBestExtremeTurboMode(
+        modes: Array<Display.Mode>,
+        currentMode: Display.Mode,
+        capHz: Float = maxTurboRefreshRateHz
+    ): Display.Mode? {
+        if (modes.isEmpty()) return null
+        val sameResolution = modes.filter {
+            it.physicalWidth == currentMode.physicalWidth &&
+                it.physicalHeight == currentMode.physicalHeight
+        }
+        val candidates = if (sameResolution.isNotEmpty()) sameResolution else modes.toList()
+        val effectiveCap = minOf(capHz, maxTurboRefreshRateHz)
+        val capped = candidates.filter { it.refreshRate <= effectiveCap + RATE_TOLERANCE_HZ }
+        return (if (capped.isNotEmpty()) capped else candidates)
+            .maxByOrNull { it.refreshRate }
     }
 
     internal fun selectBestMode(

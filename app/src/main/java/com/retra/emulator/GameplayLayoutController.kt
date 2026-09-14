@@ -425,20 +425,33 @@ internal fun MainActivity.applyNativeScreenFrame(parentWidth: Int, parentHeight:
         left = 0f
         top = 0f
     } else if (portrait) {
-        // Target portrait reference: screen is at the very top and uses
-        // almost the entire available width at the console's real aspect.
-        val widthRatio = if (mode == "centered") 0.78f else 0.985f
-        val fit = fitted(parentWidth * widthRatio, parentHeight * 0.42f)
+        // Portrait keeps the screen wide and near the top. Best Fit leaves
+        // a little more room for touch controls while preserving 3:2.
+        val widthRatio = when (mode) {
+            "centered" -> 0.78f
+            "betterfit" -> 0.965f
+            else -> 0.985f
+        }
+        val heightRatio = if (mode == "betterfit") 0.46f else 0.42f
+        val fit = fitted(parentWidth * widthRatio, parentHeight * heightRatio)
         width = fit.first
         height = fit.second
         left = (parentWidth - width) / 2f
         top = if (mode == "centered") parentHeight * 0.035f else 0f
     } else {
-        // Target landscape reference: screen is centered and almost fills
-        // the viewport vertically. At 3:2 this naturally creates the two
-        // translucent side controller zones visible in the reference.
-        val widthRatio = if (mode == "centered") 0.60f else 0.90f
-        val heightRatio = if (mode == "centered") 0.64f else 0.90f
+        // Best Fit matches the Screen Editor reference: the 3:2 image uses
+        // almost the full usable height and about 68% of landscape width,
+        // leaving balanced controller zones on both sides.
+        val widthRatio = when (mode) {
+            "centered" -> 0.60f
+            "betterfit" -> 0.68f
+            else -> 0.90f
+        }
+        val heightRatio = when (mode) {
+            "centered" -> 0.64f
+            "betterfit" -> 1.00f
+            else -> 0.90f
+        }
         val fit = fitted(parentWidth * widthRatio, parentHeight * heightRatio)
         width = fit.first
         height = fit.second
@@ -1080,7 +1093,7 @@ internal fun MainActivity.bindEmulatorChrome() {
             .equals("Hold down to activate", ignoreCase = true)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                if (holdMode) {
+                if (holdMode && !isLocalLinkSpeedRestricted()) {
                     activeEmulationSpeed = preferredEmulationSpeed
                     updateFastForwardUi()
                 }

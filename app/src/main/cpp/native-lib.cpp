@@ -63,10 +63,10 @@ static std::unordered_map<std::string, std::string> runtimeConfigOptions;
 // music. Retra keeps its own small polyphase FIR table, normalizes every phase
 // for unity DC gain, applies an anti-alias cutoff while downsampling, and clamps
 // the final accumulator to int16. The mGBA mixer itself remains untouched.
-static constexpr int RETRA_RESAMPLER_TAPS = 16;
-static constexpr int RETRA_RESAMPLER_LEFT_TAPS = 7;
-static constexpr int RETRA_RESAMPLER_RIGHT_TAPS = 8;
-static constexpr int RETRA_RESAMPLER_HISTORY = 8;
+static constexpr int RETRA_RESAMPLER_TAPS = 32;
+static constexpr int RETRA_RESAMPLER_LEFT_TAPS = 15;
+static constexpr int RETRA_RESAMPLER_RIGHT_TAPS = 16;
+static constexpr int RETRA_RESAMPLER_HISTORY = 16;
 static constexpr int RETRA_RESAMPLER_PHASES = 1024;
 static constexpr double RETRA_PI = 3.14159265358979323846264338327950288;
 
@@ -74,6 +74,7 @@ struct RetraAudioResamplerState {
     mAudioBuffer* source = nullptr;
     unsigned sourceRate = 0;
     unsigned destinationRate = 0;
+    double speedFactor = 1.0;
     double position = 0.0;
     std::array<float, RETRA_RESAMPLER_PHASES * RETRA_RESAMPLER_TAPS> coefficients{};
 };
@@ -142,11 +143,14 @@ static double retraNormalizedSinc(double x) {
 
 static void rebuildRetraAudioResamplerCoefficientsLocked(
         unsigned sourceRate,
-        unsigned destinationRate) {
+        unsigned destinationRate,
+        double speedFactor) {
     // When reducing the sample rate, lower the FIR cutoff slightly below the
     // new Nyquist edge to keep GBA high-frequency energy from folding back as
     // gritty aliasing. Upsampling needs no spectral cut, only interpolation.
-    const double ratio = static_cast<double>(destinationRate) / sourceRate;
+    const double effectiveSourceRate = static_cast<double>(sourceRate) *
+            std::max(1.0, speedFactor);
+    const double ratio = static_cast<double>(destinationRate) / effectiveSourceRate;
     const double cutoff = ratio < 1.0 ? std::max(0.05, ratio * 0.94) : 1.0;
     constexpr double TWO_PI = 2.0 * RETRA_PI;
 
@@ -158,7 +162,7 @@ static void rebuildRetraAudioResamplerCoefficientsLocked(
             const int relative = tap - RETRA_RESAMPLER_LEFT_TAPS;
             const double distance = static_cast<double>(relative) - fraction;
 
-            // 16-tap Blackman-windowed low-pass sinc. The fixed window and a
+            // 32-tap Blackman-windowed low-pass sinc. The fixed window and a
             // phase-normalization pass below keep the output stable and free of
             // gain pumping as the fractional source position advances.
             const double n = static_cast<double>(tap);
@@ -186,21 +190,30 @@ static void rebuildRetraAudioResamplerCoefficientsLocked(
 static bool ensureRetraAudioResamplerLocked(
         mAudioBuffer* source,
         unsigned sourceRate,
-        unsigned destinationRate) {
+        unsigned destinationRate,
+        double speedFactor) {
     if (!source || !sourceRate || !destinationRate) return false;
 
     const bool sourceChanged = retraAudioResampler.source != source;
+    const double normalizedSpeed = std::max(1.0, std::min(16.0, speedFactor));
     const bool ratesChanged = retraAudioResampler.sourceRate != sourceRate ||
-            retraAudioResampler.destinationRate != destinationRate;
+            retraAudioResampler.destinationRate != destinationRate ||
+            std::abs(retraAudioResampler.speedFactor - normalizedSpeed) > 1e-9;
 
     if (sourceChanged) {
         retraAudioResampler.position = 0.0;
         retraAudioResampler.source = source;
     }
     if (sourceChanged || ratesChanged) {
-        rebuildRetraAudioResamplerCoefficientsLocked(sourceRate, destinationRate);
+        rebuildRetraAudioResamplerCoefficientsLocked(
+                sourceRate, destinationRate, normalizedSpeed);
         retraAudioResampler.sourceRate = sourceRate;
         retraAudioResampler.destinationRate = destinationRate;
+        retraAudioResampler.speedFactor = normalizedSpeed;
+        // A time-scale/rate transition changes the spectrum presented to the
+        // output conditioner. Reset its one-pole history and let AudioController's
+        // short fade-in bridge the transition instead of carrying stale filter state.
+        resetRetraAudioConditionerLocked();
     }
     return true;
 }
@@ -274,21 +287,24 @@ static size_t resampleRetraAudioLocked(
         unsigned sourceRate,
         unsigned destinationRate,
         int16_t* output,
-        size_t maxFrames) {
+        size_t maxFrames,
+        double speedFactor = 1.0) {
     if (!source || !output || !maxFrames || !sourceRate || !destinationRate) return 0;
-    if (!ensureRetraAudioResamplerLocked(source, sourceRate, destinationRate)) return 0;
+    const double normalizedSpeed = std::max(1.0, std::min(16.0, speedFactor));
+    if (!ensureRetraAudioResamplerLocked(
+            source, sourceRate, destinationRate, normalizedSpeed)) return 0;
 
     // Exact-rate path is bit-transparent: no filter, no gain change, no extra
     // interpolation. This matters on devices/routes whose AudioTrack clock
     // already matches the emulated stream.
-    if (sourceRate == destinationRate) {
+    if (sourceRate == destinationRate && std::abs(normalizedSpeed - 1.0) < 1e-9) {
         retraAudioResampler.position = 0.0;
         return mAudioBufferRead(source, output, maxFrames);
     }
 
     size_t produced = 0;
     size_t available = mAudioBufferAvailable(source);
-    const double step = static_cast<double>(sourceRate) / destinationRate;
+    const double step = (static_cast<double>(sourceRate) * normalizedSpeed) / destinationRate;
 
     while (produced < maxFrames) {
         const double position = retraAudioResampler.position;
@@ -808,10 +824,14 @@ static bool loadRomLocked(const char* romPath, const char* patchPath, const char
         }
     }
     mCoreLoadConfig(core);
+    // Retra owns all wall-clock pacing. Never let mGBA's frontend sync options
+    // throttle direct core->runFrame() turbo execution back toward real time.
+    core->opts.videoSync = false;
+    core->opts.audioSync = false;
     installGbaVideoHook(core);
     applyGbaSaveTypeOverride(core);
     if (core->setAudioBufferSize) {
-        core->setAudioBufferSize(core, 4096);
+        core->setAudioBufferSize(core, 8192);
     }
     // Retra owns battery saves by permanent romId, not by the ROM filename.
     // mCoreLoadSaveFile creates/attaches this file only when the game starts;
@@ -993,7 +1013,7 @@ static bool prepareLocalPlayer(
     installGbaVideoHook(player.core);
     applyGbaSaveTypeOverride(player.core);
     if (player.core->setAudioBufferSize) {
-        player.core->setAudioBufferSize(player.core, 4096);
+        player.core->setAudioBufferSize(player.core, 8192);
     }
     // Retra supplies explicit persistent save paths for each linked core.
     // savePlayerId remains as a fallback for legacy callers only.
@@ -1735,6 +1755,139 @@ Java_com_retra_emulator_MainActivity_getPlatform(
 
 extern "C"
 JNIEXPORT jboolean JNICALL
+Java_com_retra_emulator_MainActivity_runFrameNoVideo(
+        JNIEnv*,
+        jobject) {
+
+    std::lock_guard<std::mutex> lock(coreMutex);
+
+    // Speed changes are disabled while Local Link is active.  Its two native
+    // cores already advance on their own worker threads, so there is no single
+    // core frame to step here.
+    if (localLinkActive.load(std::memory_order_acquire)) {
+        return JNI_TRUE;
+    }
+    if (!core) {
+        return JNI_FALSE;
+    }
+
+    const uint32_t heldKeys = keyMask.load(std::memory_order_relaxed);
+    const uint32_t tappedKeys = keyPressLatch.exchange(0, std::memory_order_relaxed);
+    core->setKeys(core, heldKeys | tappedKeys);
+    syncGbaMosaicRenderer(core);
+    core->runFrame(core);
+    return JNI_TRUE;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_retra_emulator_MainActivity_runTurboSlice(
+        JNIEnv* env,
+        jobject,
+        jintArray outputPixels,
+        jint frameCount,
+        jboolean captureVideo,
+        jboolean discardAudio) {
+
+    std::lock_guard<std::mutex> lock(coreMutex);
+
+    // Fast-forward is disabled during Local Link. Treat a stray call as a
+    // successful no-op rather than fighting the two dedicated link workers.
+    if (localLinkActive.load(std::memory_order_acquire)) {
+        return JNI_TRUE;
+    }
+    if (!core) {
+        return JNI_FALSE;
+    }
+
+    // Smooth turbo batches. Android keeps 1/2/4/8-frame slices for
+    // 2x/4x/8x/16x even under quality fallback so fresh visual states are not
+    // accidentally halved. The native cap remains defensive only. Input is
+    // sampled every emulated frame, so controls remain responsive.
+    const int frames = std::max(1, std::min(16, static_cast<int>(frameCount)));
+    for (int i = 0; i < frames; ++i) {
+        // Sample held and edge-latched input on every emulated frame so batching
+        // JNI calls never makes 8x/16x controls less responsive.
+        const uint32_t heldKeys = keyMask.load(std::memory_order_relaxed);
+        const uint32_t tappedKeys = keyPressLatch.exchange(0, std::memory_order_relaxed);
+        core->setKeys(core, heldKeys | tappedKeys);
+        // The installed GBA video-register hook already applies Retra's mosaic
+        // policy whenever the game writes MOSAIC, and changing the setting
+        // explicitly resynchronizes it. Re-writing that renderer register on
+        // every hidden 8x/16x frame is redundant hot-path work.
+        core->runFrame(core);
+    }
+
+    if (discardAudio == JNI_TRUE && core->getAudioBuffer) {
+        // Extreme turbo intentionally has no audible PCM. Drain mGBA's audio ring
+        // under the same native lock/JNI call as the core batch, bypassing Retra's
+        // 24-tap resampler and conditioner and avoiding a second JNI transition.
+        if (mAudioBuffer* audio = core->getAudioBuffer(core)) {
+            const size_t available = mAudioBufferAvailable(audio);
+            if (available) mAudioBufferRead(audio, nullptr, available);
+        }
+        resetRetraAudioResamplerLocked();
+    }
+
+    if (captureVideo != JNI_TRUE) {
+        return JNI_TRUE;
+    }
+    if (!outputPixels) {
+        return JNI_FALSE;
+    }
+
+    const unsigned width = videoWidth;
+    const unsigned height = videoHeight;
+    const size_t requiredPixels = static_cast<size_t>(width) * static_cast<size_t>(height);
+    if (width == 0 || height == 0 ||
+        static_cast<size_t>(env->GetArrayLength(outputPixels)) < requiredPixels) {
+        return JNI_FALSE;
+    }
+
+    // Convert only the final frame in the turbo slice. The hidden frames above
+    // never cross JNI as pixels, which is the key rendering win at 8x/16x.
+    jint* destination = static_cast<jint*>(
+            env->GetPrimitiveArrayCritical(outputPixels, nullptr));
+    if (!destination) {
+        return JNI_FALSE;
+    }
+
+    for (unsigned y = 0; y < height; ++y) {
+        const mColor* sourceRow = videoBuffer + static_cast<size_t>(y) * VIDEO_STRIDE;
+        jint* destinationRow = destination + static_cast<size_t>(y) * width;
+        for (unsigned x = 0; x < width; ++x) {
+#ifndef COLOR_16_BIT
+            const uint32_t color = static_cast<uint32_t>(sourceRow[x]);
+            const uint32_t red = (color & 0x000000FFu) << 16;
+            const uint32_t green = color & 0x0000FF00u;
+            const uint32_t blue = (color & 0x00FF0000u) >> 16;
+            destinationRow[x] = static_cast<jint>(
+                    0xFF000000u | red | green | blue
+            );
+#else
+            const uint32_t color = static_cast<uint32_t>(sourceRow[x]);
+#ifdef COLOR_5_6_5
+            const uint32_t red = ((color >> 11) & 0x1Fu) * 255u / 31u;
+            const uint32_t green = ((color >> 5) & 0x3Fu) * 255u / 63u;
+            const uint32_t blue = (color & 0x1Fu) * 255u / 31u;
+#else
+            const uint32_t red = (color & 0x1Fu) * 255u / 31u;
+            const uint32_t green = ((color >> 5) & 0x1Fu) * 255u / 31u;
+            const uint32_t blue = ((color >> 10) & 0x1Fu) * 255u / 31u;
+#endif
+            destinationRow[x] = static_cast<jint>(
+                    0xFF000000u | (red << 16) | (green << 8) | blue
+            );
+#endif
+        }
+    }
+
+    env->ReleasePrimitiveArrayCritical(outputPixels, destination, 0);
+    return JNI_TRUE;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
 Java_com_retra_emulator_MainActivity_runFrame(
         JNIEnv* env,
         jobject,
@@ -2067,6 +2220,58 @@ Java_com_retra_emulator_MainActivity_readAudioSamples(
 }
 
 extern "C"
+JNIEXPORT jint JNICALL
+Java_com_retra_emulator_MainActivity_readAudioSamplesAtSpeed(
+        JNIEnv* env,
+        jobject,
+        jshortArray output,
+        jdouble speed) {
+    if (!output) return 0;
+    std::lock_guard<std::mutex> lock(coreMutex);
+
+    mCore* audioCore = core;
+    if (localLinkActive.load(std::memory_order_acquire)) {
+        const int playerIndex = activeLocalPlayer.load(std::memory_order_relaxed);
+        if (playerIndex >= 0 && playerIndex < LOCAL_LINK_PLAYERS) {
+            audioCore = localPlayers[playerIndex].core;
+        }
+    }
+    if (!audioCore || !audioCore->getAudioBuffer || !audioCore->audioSampleRate) return 0;
+
+    mAudioBuffer* source = audioCore->getAudioBuffer(audioCore);
+    if (!source) return 0;
+    const unsigned sourceRate = audioCore->audioSampleRate(audioCore);
+    const unsigned destinationRate = requestedAudioOutputRateLocked();
+    const double normalizedSpeed = std::max(1.0, std::min(16.0, static_cast<double>(speed)));
+
+    const jsize shortCapacity = env->GetArrayLength(output);
+    if (shortCapacity < 2) return 0;
+    const size_t maxFrames = static_cast<size_t>(shortCapacity) / 2;
+
+    jshort* samples = env->GetShortArrayElements(output, nullptr);
+    if (!samples) return 0;
+    // One speed-aware FIR pass performs sample-rate conversion and fast-forward
+    // time compression together. At 8x/16x this generates only the PCM Android
+    // will actually play, avoiding the old resample-then-discard workload.
+    const size_t produced = resampleRetraAudioLocked(
+            source,
+            sourceRate,
+            destinationRate,
+            reinterpret_cast<int16_t*>(samples),
+            maxFrames,
+            normalizedSpeed);
+    if (produced > 0) {
+        conditionRetraAudioLocked(
+                source,
+                destinationRate,
+                reinterpret_cast<int16_t*>(samples),
+                produced);
+    }
+    env->ReleaseShortArrayElements(output, samples, 0);
+    return static_cast<jint>(produced * 2);
+}
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_retra_emulator_MainActivity_setCoreConfigOption(
         JNIEnv* env,
@@ -2108,6 +2313,8 @@ Java_com_retra_emulator_MainActivity_setCoreConfigOption(
     if (core && configInitialized && !isRetraPrivateConfigKey(keyValue)) {
         mCoreConfigSetOverrideValue(&core->config, key, value);
         mCoreLoadConfig(core);
+        core->opts.videoSync = false;
+        core->opts.audioSync = false;
     }
 
     env->ReleaseStringUTFChars(keyString, key);
