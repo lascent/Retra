@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
-const layout = read('app/src/main/java/com/retra/emulator/GameplayLayoutController.kt');
+const layout = read('app/src/main/java/com/retra/emulator/GameplayTouchController.kt');
 const activity = read('app/src/main/java/com/retra/emulator/MainActivity.kt');
 const gameplay = read('app/src/main/java/com/retra/emulator/GameplayController.kt');
 const multiplayer = read('app/src/main/java/com/retra/emulator/MultiplayerController.kt');

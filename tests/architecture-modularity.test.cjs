@@ -40,6 +40,7 @@ test('activity-scale subsystems are split into focused controller modules', () =
     'AudioController',
     'GameplayController',
     'GameplayLayoutController',
+    'GameplayTouchController',
     'MultiplayerController',
     'SettingsController',
     'RomUiController',

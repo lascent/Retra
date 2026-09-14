@@ -563,6 +563,24 @@ internal fun MainActivity.establishRemoteLink(
     }
 }
 
+internal fun MainActivity.setGameplayKeyHeld(key: Int, pressed: Boolean) {
+    if (key !in 0..9) return
+
+    val previousCount = gameplayKeyHoldCounts[key]
+    val nextCount = if (pressed) {
+        (previousCount + 1).coerceAtMost(32)
+    } else {
+        (previousCount - 1).coerceAtLeast(0)
+    }
+    if (previousCount == nextCount) return
+
+    gameplayKeyHoldCounts[key] = nextCount
+    // Only cross JNI / Remote Link on the effective 0 <-> 1 transition.
+    if (previousCount == 0 || nextCount == 0) {
+        setGameplayKey(key, nextCount > 0)
+    }
+}
+
 internal fun MainActivity.setGameplayKey(key: Int, pressed: Boolean) {
     if (key !in 0..9) return
 

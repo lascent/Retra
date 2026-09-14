@@ -1143,6 +1143,11 @@ internal fun MainActivity.closeInGameSettings() {
 }
 
 internal fun MainActivity.releaseAllKeys() {
+    // Invalidate every in-flight touch stream / delayed turbo callback before
+    // clearing effective state. Old-generation callbacks may still arrive, but
+    // their listeners will abandon locally without touching new key holds.
+    controllerInputGeneration++
+
     // Only emit releases for keys that Android currently considers held. This
     // avoids up to ten unnecessary JNI calls / Remote Link packets on every
     // menu open, pause or lifecycle transition.
@@ -1152,9 +1157,9 @@ internal fun MainActivity.releaseAllKeys() {
         try { setGameplayKey(key, false) } catch (_: Throwable) {}
     }
     activeGameplayKeyMask = 0
+    gameplayKeyHoldCounts.fill(0)
     activeDpadMask = 0
     activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
-    dpadTouchGeometryValid = false
 
     // A sub-frame tap is latched natively so mGBA cannot miss it. When controls
     // are intentionally cancelled (menu/background/close), discard any latch

@@ -44,226 +44,6 @@ import com.retra.emulator.MainActivity.Companion.PLATFORM_GBA
  * application extracted from MainActivity. Layout persistence stays in
  * GameplayLayoutRepository; this module only coordinates Android views.
  */
-internal fun MainActivity.bindControls() {
-    bindKey(binding.buttonA, KEY_A)
-    bindKey(binding.buttonB, KEY_B)
-    bindDpad()
-    bindKey(binding.buttonL, KEY_L)
-    bindKey(binding.buttonR, KEY_R)
-    bindKey(binding.buttonStart, KEY_START)
-    bindKey(binding.buttonSelect, KEY_SELECT)
-}
-
-/**
- * Low-latency continuous D-pad tracking.
- *
- * Touch geometry is sampled once at the beginning of a gesture and reused for
- * every MOVE. That keeps 120/240 Hz touch streams allocation-free and avoids
- * repeated getLocationOnScreen() work on the UI thread. A dedicated pointer
- * id also prevents another finger from stealing movement during multi-touch.
- */
-internal fun MainActivity.bindDpad() {
-    val handler = View.OnTouchListener { view, event ->
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                activeDpadPointerId = event.getPointerId(event.actionIndex)
-                refreshDpadTouchGeometry()
-                view.parent?.requestDisallowInterceptTouchEvent(true)
-                updateDpadFromMotionEvent(event)
-                true
-            }
-
-            MotionEvent.ACTION_MOVE -> {
-                updateDpadFromMotionEvent(event)
-                true
-            }
-
-            MotionEvent.ACTION_POINTER_UP -> {
-                // Never transfer movement to another finger implicitly. If the
-                // controlling pointer leaves, release immediately so no input
-                // can remain latched.
-                if (event.getPointerId(event.actionIndex) == activeDpadPointerId) {
-                    finishDpadGesture(view)
-                }
-                true
-            }
-
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_CANCEL -> {
-                finishDpadGesture(view)
-                true
-            }
-
-            // Extra pointers are ignored here; Android can route them to A/B
-            // and other sibling controls without disturbing the D-pad finger.
-            MotionEvent.ACTION_POINTER_DOWN -> true
-            else -> true
-        }
-    }
-
-    // The container covers the gaps/centre, while assigning the same handler
-    // to each visible direction keeps movement tracking alive after a child
-    // receives ACTION_DOWN and the thumb slides outside that child.
-    binding.dpadContainer.setOnTouchListener(handler)
-    binding.buttonUp.setOnTouchListener(handler)
-    binding.buttonDown.setOnTouchListener(handler)
-    binding.buttonLeft.setOnTouchListener(handler)
-    binding.buttonRight.setOnTouchListener(handler)
-}
-
-internal fun MainActivity.finishDpadGesture(view: View? = null) {
-    activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
-    dpadTouchGeometryValid = false
-    setActiveDpadMask(0)
-    view?.parent?.requestDisallowInterceptTouchEvent(false)
-}
-
-internal fun MainActivity.refreshDpadTouchGeometry() {
-    val pad = binding.dpadContainer
-    if (pad.width <= 0 || pad.height <= 0) {
-        dpadTouchGeometryValid = false
-        return
-    }
-
-    // Reuse one IntArray for the lifetime of the Activity. Screen Editor scale
-    // does not change measured width/height, so include scaleX/scaleY to keep
-    // the touch map exactly aligned with resized D-pads.
-    pad.getLocationOnScreen(dpadScreenLocation)
-    val scaledWidth = pad.width * kotlin.math.abs(pad.scaleX)
-    val scaledHeight = pad.height * kotlin.math.abs(pad.scaleY)
-    dpadTouchCenterX = dpadScreenLocation[0] + scaledWidth / 2f
-    dpadTouchCenterY = dpadScreenLocation[1] + scaledHeight / 2f
-    dpadTouchRadius = (minOf(scaledWidth, scaledHeight) / 2f).coerceAtLeast(1f)
-    dpadTouchGeometryValid = true
-}
-
-internal fun MainActivity.updateDpadFromMotionEvent(event: MotionEvent) {
-    if (activeDpadPointerId == MotionEvent.INVALID_POINTER_ID) return
-    val pointerIndex = event.findPointerIndex(activeDpadPointerId)
-    if (pointerIndex < 0) {
-        // Defensive release for interrupted/malformed pointer streams.
-        finishDpadGesture()
-        return
-    }
-
-    // Per-pointer raw coordinates arrived in API 29. Retra keeps minSdk 26,
-    // so derive them from pointer 0 on older Android releases.
-    val rawX = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-        event.getRawX(pointerIndex)
-    } else {
-        event.rawX + (event.getX(pointerIndex) - event.getX(0))
-    }
-    val rawY = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-        event.getRawY(pointerIndex)
-    } else {
-        event.rawY + (event.getY(pointerIndex) - event.getY(0))
-    }
-
-    updateDpadFromRawPoint(rawX, rawY)
-}
-
-internal fun MainActivity.updateDpadFromRawPoint(rawX: Float, rawY: Float) {
-    if (!dpadTouchGeometryValid) refreshDpadTouchGeometry()
-    if (!dpadTouchGeometryValid) return
-
-    val nx = (rawX - dpadTouchCenterX) / dpadTouchRadius
-    val ny = (rawY - dpadTouchCenterY) / dpadTouchRadius
-    val absX = kotlin.math.abs(nx)
-    val absY = kotlin.math.abs(ny)
-    val radialDistance = kotlin.math.hypot(nx.toDouble(), ny.toDouble()).toFloat()
-
-    // Centre dead-zone hysteresis: entering a direction needs 15% radius,
-    // while an already-held direction releases only inside 10%. This removes
-    // centre jitter without making direction changes feel sticky.
-    val deadZone = if (activeDpadMask == 0) 0.15f else 0.10f
-    if (radialDistance < deadZone) {
-        setActiveDpadMask(0)
-        return
-    }
-
-    // Diagonal hysteresis: enter at 0.44, remain diagonal down to 0.35.
-    // Tiny thumb jitter can no longer flap RIGHT <-> UP+RIGHT every frame.
-    val maxAxis = maxOf(absX, absY).coerceAtLeast(0.0001f)
-    val axisRatio = minOf(absX, absY) / maxAxis
-    val wasDiagonal = activeDpadMask != 0 &&
-        (activeDpadMask and (activeDpadMask - 1)) != 0
-    val diagonalThreshold = if (wasDiagonal) 0.35f else 0.44f
-    val diagonal = axisRatio >= diagonalThreshold
-
-    var nextMask = 0
-    if (diagonal || absX > absY) {
-        nextMask = nextMask or (1 shl (if (nx < 0f) KEY_LEFT else KEY_RIGHT))
-    }
-    if (diagonal || absY >= absX) {
-        nextMask = nextMask or (1 shl (if (ny < 0f) KEY_UP else KEY_DOWN))
-    }
-
-    setActiveDpadMask(nextMask)
-}
-
-internal fun MainActivity.setActiveDpadMask(nextMask: Int) {
-    if (activeDpadMask == nextMask) return
-
-    // Only changed directions cross JNI or touch View state. Duplicate MOVE
-    // events for the same direction therefore do essentially no work.
-    fun syncDirection(key: Int, view: View) {
-        val bit = 1 shl key
-        val wasPressed = activeDpadMask and bit != 0
-        val isPressed = nextMask and bit != 0
-        if (wasPressed == isPressed) return
-        setGameplayKey(key, isPressed)
-        view.isPressed = isPressed
-    }
-
-    syncDirection(KEY_UP, binding.buttonUp)
-    syncDirection(KEY_DOWN, binding.buttonDown)
-    syncDirection(KEY_LEFT, binding.buttonLeft)
-    syncDirection(KEY_RIGHT, binding.buttonRight)
-    activeDpadMask = nextMask
-}
-
-/** Low-latency pointer-owned binding for A/B, L/R, Start and Select. */
-internal fun MainActivity.bindKey(view: View, key: Int) {
-    var activePointerId = MotionEvent.INVALID_POINTER_ID
-    val retentionSlopPx = maxOf(ViewConfiguration.get(view.context).scaledTouchSlop.toFloat(), dp(10f))
-    fun applyPressedState(v: View, pressed: Boolean) {
-        if (v.isPressed == pressed) return
-        setGameplayKey(key, pressed) // input first; visual redraw second
-        v.isPressed = pressed
-    }
-    fun finishGesture(v: View) {
-        activePointerId = MotionEvent.INVALID_POINTER_ID
-        applyPressedState(v, false)
-        v.parent?.requestDisallowInterceptTouchEvent(false)
-    }
-    view.setOnTouchListener { v, event ->
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                activePointerId = event.getPointerId(event.actionIndex)
-                v.parent?.requestDisallowInterceptTouchEvent(true)
-                applyPressedState(v, true)
-                true
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val pointerIndex = event.findPointerIndex(activePointerId)
-                if (pointerIndex < 0) finishGesture(v) else {
-                    val slop = if (v.isPressed) retentionSlopPx else 0f
-                    val x = event.getX(pointerIndex); val y = event.getY(pointerIndex)
-                    applyPressedState(v, x >= -slop && x <= v.width + slop && y >= -slop && y <= v.height + slop)
-                }
-                true
-            }
-            MotionEvent.ACTION_POINTER_UP -> {
-                if (event.getPointerId(event.actionIndex) == activePointerId) finishGesture(v)
-                true
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { finishGesture(v); true }
-            MotionEvent.ACTION_POINTER_DOWN -> true // never transfer ownership implicitly
-            else -> true
-        }
-    }
-}
-
 internal fun MainActivity.enterEmulatorPresentation() {
     preferredOrientationValue = prefs.getString(ORIENTATION_PREF, preferredOrientationValue) ?: preferredOrientationValue
     applyPreferredOrientation(preferredOrientationValue)
@@ -876,19 +656,76 @@ internal fun MainActivity.makeExtraActionTextView(label: String): TextView {
 }
 
 internal fun MainActivity.bindMultiKeyControl(view: View, keys: IntArray) {
+    var activePointerId = MotionEvent.INVALID_POINTER_ID
+    var gestureGeneration = -1L
+    var pressed = false
+    val retentionSlopPx = maxOf(ViewConfiguration.get(view.context).scaledTouchSlop.toFloat(), dp(10f))
+
+    fun applyPressedState(v: View, nextPressed: Boolean) {
+        if (pressed == nextPressed) return
+        pressed = nextPressed
+        keys.forEach { setGameplayKeyHeld(it, nextPressed) }
+        v.isPressed = nextPressed
+    }
+
+    fun abandonGesture(v: View) {
+        activePointerId = MotionEvent.INVALID_POINTER_ID
+        gestureGeneration = -1L
+        pressed = false
+        v.isPressed = false
+        v.parent?.requestDisallowInterceptTouchEvent(false)
+    }
+
+    fun finishGesture(v: View) {
+        if (gestureGeneration == controllerInputGeneration) {
+            applyPressedState(v, false)
+        } else {
+            pressed = false
+            v.isPressed = false
+        }
+        activePointerId = MotionEvent.INVALID_POINTER_ID
+        gestureGeneration = -1L
+        v.parent?.requestDisallowInterceptTouchEvent(false)
+    }
+
     view.setOnTouchListener { v, event ->
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                v.isPressed = true
-                keys.forEach { setGameplayKey(it, true) }
+                if (activePointerId != MotionEvent.INVALID_POINTER_ID || pressed) {
+                    if (gestureGeneration == controllerInputGeneration) finishGesture(v) else abandonGesture(v)
+                }
+                activePointerId = event.getPointerId(event.actionIndex)
+                gestureGeneration = controllerInputGeneration
+                v.parent?.requestDisallowInterceptTouchEvent(true)
+                applyPressedState(v, true)
                 true
             }
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_CANCEL -> {
-                v.isPressed = false
-                keys.forEach { setGameplayKey(it, false) }
+            MotionEvent.ACTION_MOVE -> {
+                if (gestureGeneration != controllerInputGeneration) {
+                    abandonGesture(v)
+                    true
+                } else {
+                    val pointerIndex = event.findPointerIndex(activePointerId)
+                    if (pointerIndex < 0) {
+                        finishGesture(v)
+                    } else {
+                        val slop = if (pressed) retentionSlopPx else 0f
+                        val x = event.getX(pointerIndex)
+                        val y = event.getY(pointerIndex)
+                        applyPressedState(v, x >= -slop && x <= v.width + slop && y >= -slop && y <= v.height + slop)
+                    }
+                    true
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (event.getPointerId(event.actionIndex) == activePointerId) finishGesture(v)
                 true
             }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_OUTSIDE -> {
+                finishGesture(v)
+                true
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> true
             else -> true
         }
     }
@@ -896,37 +733,88 @@ internal fun MainActivity.bindMultiKeyControl(view: View, keys: IntArray) {
 
 internal fun MainActivity.bindTurboAbControl(view: View) {
     val handler = Handler(Looper.getMainLooper())
+    var activePointerId = MotionEvent.INVALID_POINTER_ID
+    var gestureGeneration = -1L
     var active = false
-    var pressed = false
+    var pulsePressed = false
+
+    fun setPulsePressed(nextPressed: Boolean) {
+        if (pulsePressed == nextPressed) return
+        pulsePressed = nextPressed
+        setGameplayKeyHeld(KEY_A, nextPressed)
+        setGameplayKeyHeld(KEY_B, nextPressed)
+    }
+
+    fun abandonGesture(v: View) {
+        active = false
+        activePointerId = MotionEvent.INVALID_POINTER_ID
+        gestureGeneration = -1L
+        pulsePressed = false
+        v.isPressed = false
+        v.parent?.requestDisallowInterceptTouchEvent(false)
+    }
+
     val pulse = object : Runnable {
         override fun run() {
             if (!active) return
-            pressed = !pressed
-            setGameplayKey(KEY_A, pressed)
-            setGameplayKey(KEY_B, pressed)
+            if (gestureGeneration != controllerInputGeneration) {
+                // releaseAllKeys() invalidated this callback. Do not emit an UP
+                // transition here: its old-generation hold was already cleared.
+                abandonGesture(view)
+                return
+            }
+            setPulsePressed(!pulsePressed)
             handler.postDelayed(this, 65L)
         }
     }
+
+    fun finishGesture(v: View) {
+        active = false
+        activePointerId = MotionEvent.INVALID_POINTER_ID
+        handler.removeCallbacks(pulse)
+        if (gestureGeneration == controllerInputGeneration) {
+            setPulsePressed(false)
+        } else {
+            pulsePressed = false
+        }
+        gestureGeneration = -1L
+        v.isPressed = false
+        v.parent?.requestDisallowInterceptTouchEvent(false)
+    }
+
     view.setOnTouchListener { v, event ->
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if (active || activePointerId != MotionEvent.INVALID_POINTER_ID || pulsePressed) {
+                    if (gestureGeneration == controllerInputGeneration) finishGesture(v) else abandonGesture(v)
+                }
+                activePointerId = event.getPointerId(event.actionIndex)
+                gestureGeneration = controllerInputGeneration
                 active = true
-                pressed = false
                 v.isPressed = true
+                v.parent?.requestDisallowInterceptTouchEvent(true)
                 handler.removeCallbacks(pulse)
                 handler.post(pulse)
                 true
             }
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_CANCEL -> {
-                active = false
-                v.isPressed = false
-                handler.removeCallbacks(pulse)
-                setGameplayKey(KEY_A, false)
-                setGameplayKey(KEY_B, false)
-                pressed = false
+            MotionEvent.ACTION_MOVE -> {
+                if (gestureGeneration != controllerInputGeneration) {
+                    handler.removeCallbacks(pulse)
+                    abandonGesture(v)
+                } else if (event.findPointerIndex(activePointerId) < 0) {
+                    finishGesture(v)
+                }
                 true
             }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (event.getPointerId(event.actionIndex) == activePointerId) finishGesture(v)
+                true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_OUTSIDE -> {
+                finishGesture(v)
+                true
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> true
             else -> true
         }
     }

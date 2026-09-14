@@ -182,11 +182,14 @@ class MainActivity : AppCompatActivity() {
     // Logical Android-side key state. It suppresses duplicate JNI / Remote Link
     // transitions and makes releaseAllKeys proportional to keys actually held.
     internal var activeGameplayKeyMask = 0
-    internal val dpadScreenLocation = IntArray(2)
-    internal var dpadTouchCenterX = 0f
-    internal var dpadTouchCenterY = 0f
-    internal var dpadTouchRadius = 1f
-    internal var dpadTouchGeometryValid = false
+    // Number of independent on-screen control sources currently holding each key.
+    // This prevents one control (for example A) from releasing a key that is still
+    // held by another source such as AB / LA / RA / Turbo AB.
+    internal val gameplayKeyHoldCounts = IntArray(10)
+    // Incremented whenever gameplay input is force-released (pause/menu/close).
+    // Touch streams captured under an older generation are abandoned locally
+    // and are never allowed to alter the new generation's key holds.
+    internal var controllerInputGeneration = 0L
     internal var screenEditorPresentationActive = false
 
     // Controller coordinates are persisted independently for portrait and landscape.

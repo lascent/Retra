@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const layout = fs.readFileSync(path.join(root, 'app/src/main/java/com/retra/emulator/GameplayLayoutController.kt'), 'utf8');
+const layout = fs.readFileSync(path.join(root, 'app/src/main/java/com/retra/emulator/GameplayTouchController.kt'), 'utf8');
 const activity = fs.readFileSync(path.join(root, 'app/src/main/java/com/retra/emulator/MainActivity.kt'), 'utf8');
 
 function bodyBetween(start, end) {
@@ -15,13 +15,25 @@ function bodyBetween(start, end) {
   return layout.slice(a, b);
 }
 
-test('D-pad caches geometry instead of querying screen position on every MOVE', () => {
-  const update = bodyBetween('internal fun MainActivity.updateDpadFromRawPoint', 'internal fun MainActivity.setActiveDpadMask');
-  assert.doesNotMatch(update, /getLocationOnScreen/);
-  assert.match(layout, /internal fun MainActivity.refreshDpadTouchGeometry/);
-  assert.match(layout, /pad\.getLocationOnScreen\(dpadScreenLocation\)/);
-  assert.match(layout, /scaledWidth = pad\.width \* kotlin\.math\.abs\(pad\.scaleX\)/);
-  assert.match(layout, /scaledHeight = pad\.height \* kotlin\.math\.abs\(pad\.scaleY\)/);
+test('D-pad has one touch owner so A/B pointers cannot corrupt direction', () => {
+  const bind = bodyBetween('internal fun MainActivity.bindDpad()', 'internal fun MainActivity.finishDpadGesture');
+  assert.match(bind, /binding\.dpadContainer\.setOnTouchListener/);
+  assert.match(bind, /direction\.setOnTouchListener\(null\)/);
+  assert.match(bind, /direction\.isClickable = false/);
+  assert.doesNotMatch(bind, /binding\.button(?:Up|Down|Left|Right)\.setOnTouchListener\(handler\)/);
+});
+
+test('D-pad derives direction only from the owned pointer local coordinates', () => {
+  const update = bodyBetween('internal fun MainActivity.updateDpadFromMotionEvent', 'internal fun MainActivity.updateDpadFromLocalPoint');
+  assert.match(update, /event\.findPointerIndex\(activeDpadPointerId\)/);
+  assert.match(update, /event\.getX\(pointerIndex\)/);
+  assert.match(update, /event\.getY\(pointerIndex\)/);
+  assert.doesNotMatch(update, /rawX|getRawX|getLocationOnScreen/);
+
+  const local = bodyBetween('internal fun MainActivity.updateDpadFromLocalPoint', 'internal fun MainActivity.setActiveDpadMask');
+  assert.match(local, /val centerX = pad\.width \/ 2f/);
+  assert.match(local, /val centerY = pad\.height \/ 2f/);
+  assert.match(local, /minOf\(pad\.width, pad\.height\) \/ 2f/);
 });
 
 test('D-pad uses pointer ownership and releases safely on cancellation', () => {
