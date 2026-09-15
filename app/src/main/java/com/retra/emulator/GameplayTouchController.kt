@@ -2,12 +2,7 @@ package com.retra.emulator
 
 import android.content.Context
 import android.media.AudioManager
-import android.os.Build
 import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import android.view.HapticFeedbackConstants
 import android.view.SoundEffectConstants
 import android.view.MotionEvent
 import android.view.View
@@ -22,7 +17,6 @@ import com.retra.emulator.MainActivity.Companion.KEY_UP
 import com.retra.emulator.MainActivity.Companion.KEY_DOWN
 import com.retra.emulator.MainActivity.Companion.KEY_R
 import com.retra.emulator.MainActivity.Companion.KEY_L
-import com.retra.emulator.MainActivity.Companion.CONTROLLER_HAPTICS_PREF
 import com.retra.emulator.MainActivity.Companion.CONTROLLER_SOUND_PREF
 
 /**
@@ -31,66 +25,6 @@ import com.retra.emulator.MainActivity.Companion.CONTROLLER_SOUND_PREF
  * Kept separate from layout/presentation code so multi-touch correctness can be
  * hardened independently without growing GameplayLayoutController.
  */
-@Suppress("UNUSED_PARAMETER")
-internal fun MainActivity.performControllerHaptic(view: View, directional: Boolean = false) {
-    if (prefs.getBoolean(CONTROLLER_HAPTICS_PREF, true)) {
-        performUnifiedControllerHaptic(view)
-    }
-    performControllerSound(view)
-}
-
-/**
- * Immediate feedback for a fresh D-pad press.
- *
- * The D-pad and every other on-screen controller now share exactly the same
- * tactile and sound profile. A fresh D-pad touch bypasses the tiny debounce so
- * even a press that begins in the centre dead zone still feels identical to A/B.
- */
-internal fun MainActivity.performDpadPressFeedback(view: View) {
-    if (prefs.getBoolean(CONTROLLER_HAPTICS_PREF, true)) {
-        performUnifiedControllerHaptic(view, force = true)
-    }
-    performControllerSound(view)
-}
-
-/**
- * Shared Retra UI haptic used by WebView menus and native gameplay menus.
- * It intentionally reuses the exact gameplay pulse so taps feel consistent
- * across controller buttons, D-pad transitions, sheets, toggles and menus.
- */
-internal fun MainActivity.performUiTapHaptic(view: View, force: Boolean = false) {
-    if (!prefs.getBoolean(CONTROLLER_HAPTICS_PREF, true)) return
-    performUnifiedControllerHaptic(view, force)
-}
-
-/**
- * One unified low-intensity controller haptic profile.
- *
- * D-pad, A/B, L/R, Start/Select, combo/turbo controls, Menu, Quick Save/Load,
- * Screenshot and Speed all use the same 16 ms responsive medium-strong pulse. Keeping one
- * profile avoids the D-pad feeling heavier or lighter than the face buttons.
- */
-internal fun MainActivity.performUnifiedControllerHaptic(view: View, force: Boolean = false) {
-    val now = SystemClock.uptimeMillis()
-    if (!force && now - lastControllerHapticAtMs < 20L) return
-    lastControllerHapticAtMs = now
-
-    val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        getSystemService(VibratorManager::class.java)?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-    }
-
-    if (vibrator?.hasVibrator() == true) {
-        val amplitude = if (vibrator.hasAmplitudeControl()) 150 else VibrationEffect.DEFAULT_AMPLITUDE
-        vibrator.vibrate(VibrationEffect.createOneShot(16L, amplitude))
-    } else {
-        // Fallback for devices that expose touch haptics but not a vibrator service.
-        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-    }
-}
-
 /**
  * One shared low-volume click profile for every gameplay control.
  *
@@ -157,10 +91,8 @@ internal fun MainActivity.bindDpad() {
                 }
                 activeDpadPointerId = event.getPointerId(event.actionIndex)
                 view.parent?.requestDisallowInterceptTouchEvent(true)
-                // Give every fresh D-pad touch immediate feedback. The direction
-                // update may land in the centre dead zone, so it must not be the
-                // only trigger for vibration/sound.
-                performDpadPressFeedback(view)
+                // Give a fresh D-pad touch the same optional controller click sound.
+                performControllerSound(view)
                 updateDpadFromMotionEvent(event)
                 true
             }
@@ -283,7 +215,7 @@ internal fun MainActivity.setActiveDpadMask(nextMask: Int) {
     syncDirection(KEY_DOWN, binding.buttonDown)
     syncDirection(KEY_LEFT, binding.buttonLeft)
     syncDirection(KEY_RIGHT, binding.buttonRight)
-    if (nextMask != 0) performControllerHaptic(binding.dpadContainer, directional = true)
+    if (nextMask != 0) performControllerSound(binding.dpadContainer)
     activeDpadMask = nextMask
 }
 
@@ -297,8 +229,8 @@ internal fun MainActivity.bindKey(view: View, key: Int) {
     fun applyPressedState(v: View, nextPressed: Boolean) {
         if (pressed == nextPressed) return
         pressed = nextPressed
-        setGameplayKeyHeld(key, nextPressed) // input first; haptic/visual feedback second
-        if (nextPressed) performControllerHaptic(v)
+        setGameplayKeyHeld(key, nextPressed) // input first; optional sound/visual feedback second
+        if (nextPressed) performControllerSound(v)
         v.isPressed = nextPressed
     }
 

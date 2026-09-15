@@ -52,7 +52,7 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 - Draggable and resizable on-screen controls.
 - Emulator-screen resizing and edge-aware layout editing.
 - Controller opacity controls.
-- Controller sound and vibration controls under **Sound & Haptics**.
+- Optional controller tap sound under **Sound**.
 - Automatic artwork with persistent manual cover and background overrides.
 - Lightweight gameplay color presets: **Classic**, **Vivid**, **Warm**, and **Muted**.
 

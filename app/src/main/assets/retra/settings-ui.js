@@ -986,7 +986,6 @@ const cloudBackupNowSummary = document.getElementById('cloudBackupNowSummary');
 const syncSettingsBtn = document.getElementById('syncSettingsBtn');
 const syncSettingsSummary = document.getElementById('syncSettingsSummary');
 const enableCheatsToggle = document.getElementById('enableCheatsToggle');
-const controllerHapticsToggle = document.getElementById('controllerHapticsToggle');
 const controllerSoundToggle = document.getElementById('controllerSoundToggle');
 const romPatchingToggle = document.getElementById('romPatchingToggle');
 const automaticArtworkToggle = document.getElementById('automaticArtworkToggle');
@@ -1051,7 +1050,6 @@ function applyNativeSettingsState(state){
   const bool = (el, key, fallback) => { if (el) el.checked = key in state ? !!state[key] : fallback; };
   bool(cloudSyncToggle, 'cloudSync', false);
   bool(enableCheatsToggle, 'enableCheats', true);
-  bool(controllerHapticsToggle, 'controllerHaptics', true);
   bool(controllerSoundToggle, 'controllerSound', true);
   bool(romPatchingToggle, 'romPatching', true);
   bool(automaticArtworkToggle, 'automaticArtwork', true);
@@ -1300,7 +1298,6 @@ syncSettingsBtn?.addEventListener('click', () => {
 
 [
   [enableCheatsToggle, 'enableCheats'],
-  [controllerHapticsToggle, 'controllerHaptics'],
   [controllerSoundToggle, 'controllerSound'],
   [romPatchingToggle, 'romPatching'],
   [automaticArtworkToggle, 'automaticArtwork'],
