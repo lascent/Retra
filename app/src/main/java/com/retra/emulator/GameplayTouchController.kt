@@ -3,7 +3,6 @@ package com.retra.emulator
 import android.content.Context
 import android.media.AudioManager
 import android.os.SystemClock
-import android.view.SoundEffectConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -40,7 +39,7 @@ internal fun MainActivity.performControllerSound(view: View) {
     lastControllerSoundAtMs = now
 
     val audio = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-    audio.playSoundEffect(SoundEffectConstants.CLICK, 0.060f)
+    audio.playSoundEffect(AudioManager.FX_KEY_CLICK, 0.060f)
 }
 
 internal fun MainActivity.bindControls() {
