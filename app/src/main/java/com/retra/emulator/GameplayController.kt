@@ -131,6 +131,7 @@ internal fun MainActivity.buildMenuShell(title: String, showBack: Boolean, trail
             contentDescription = uiText("Back")
             setPadding(0, 0, dpInt(12), 0)
             setOnClickListener { tapped ->
+                performUiTapHaptic(tapped)
                 gameplayMenuBackHandler?.invoke() ?: gameplayMenuDialog?.let(::renderGameplayMainMenu)
             }
         }
@@ -189,6 +190,7 @@ internal fun MainActivity.addMenuAction(
         isFocusable = true
         setPadding(dpInt(14), dpInt(12), dpInt(14), dpInt(12))
         setOnClickListener { tapped ->
+            performUiTapHaptic(tapped)
             onClick()
         }
     }
@@ -355,6 +357,7 @@ internal fun MainActivity.renderStateScreen(dialog: Dialog, saveMode: Boolean) {
         row.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
         row.setOnClickListener { tapped ->
+            performUiTapHaptic(tapped)
             if (saveMode) {
                 if (state.exists()) {
                     AlertDialog.Builder(this)
@@ -657,6 +660,7 @@ internal fun MainActivity.renderCheatsScreen(dialog: Dialog) {
             }
             row.addView(enabledSwitch)
             row.setOnClickListener { tapped ->
+                performUiTapHaptic(tapped)
                 renderCheatEditor(dialog, cheat)
             }
             content.addView(row)
@@ -680,6 +684,7 @@ internal fun MainActivity.renderCheatsScreen(dialog: Dialog) {
         }
         elevation = dp(8f)
         setOnClickListener { tapped ->
+            performUiTapHaptic(tapped)
             renderCheatEditor(dialog, null)
         }
     }
@@ -701,6 +706,7 @@ internal fun MainActivity.renderCheatEditor(dialog: Dialog, existing: CheatEntry
     val header = panel.getChildAt(0) as? LinearLayout
     val overflow = header?.getChildAt(header.childCount - 1) as? TextView
     overflow?.setOnClickListener { tapped ->
+        performUiTapHaptic(tapped)
         val choices = if (existing == null) arrayOf("Discard") else arrayOf("Delete cheat")
         AlertDialog.Builder(this)
             .setItems(choices) { _, which ->
@@ -730,6 +736,7 @@ internal fun MainActivity.renderCheatEditor(dialog: Dialog, existing: CheatEntry
             isClickable = true
             isFocusable = true
             setOnClickListener { tapped ->
+                performUiTapHaptic(tapped)
                 onClick()
             }
         }
@@ -791,6 +798,7 @@ internal fun MainActivity.renderCheatEditor(dialog: Dialog, existing: CheatEntry
             setColor(Color.rgb(132, 213, 207))
         }
         setOnClickListener { tapped ->
+            performUiTapHaptic(tapped)
             if (draft.name.isBlank()) {
                 RetraNotice.makeText(this@renderCheatEditor, "Enter a cheat name", RetraNotice.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -902,6 +910,7 @@ internal fun MainActivity.showTextEntryDialog(title: String, initial: String, mu
             setColor(if (primary) Color.rgb(132, 213, 207) else Color.rgb(43, 50, 51))
         }
         setOnClickListener { tapped ->
+            performUiTapHaptic(tapped)
             action()
         }
     }
@@ -968,6 +977,7 @@ internal fun MainActivity.showCheatTypeDialog(current: Int, onSelected: (Int) ->
                 setColor(if (selected) Color.rgb(42, 64, 64) else Color.TRANSPARENT)
             }
             setOnClickListener { tapped ->
+                performUiTapHaptic(tapped)
                 dialog.dismiss()
                 onSelected(index)
             }

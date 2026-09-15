@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         internal const val ROM_PATCHING_PREF = "rom_patching_v1"
         internal const val ENABLE_CHEATS_PREF = "enable_cheats_v1"
         internal const val CONFIRM_CLOSE_RESET_PREF = "confirm_close_reset_v1"
+        internal const val CONTROLLER_HAPTICS_PREF = "controller_haptics_v1"
         internal const val CONTROLLER_SOUND_PREF = "controller_sound_v1"
         internal const val FULLSCREEN_PREF = "fullscreen_mode_v1"
         internal const val IMMERSIVE_PREF = "immersive_mode_v1"
@@ -182,6 +183,7 @@ class MainActivity : AppCompatActivity() {
     internal var activeDpadMask = 0
     internal var activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
     internal var lastControllerSoundAtMs = 0L
+    internal var lastControllerHapticAtMs = 0L
     // Logical Android-side key state. It suppresses duplicate JNI / Remote Link
     // transitions and makes releaseAllKeys proportional to keys actually held.
     internal var activeGameplayKeyMask = 0
@@ -979,6 +981,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class RetraBridge {
+        @JavascriptInterface
+        fun performUiHaptic() {
+            runOnUiThread {
+                if (!::binding.isInitialized) return@runOnUiThread
+                performUiTapHaptic(binding.webView)
+            }
+        }
 
         @JavascriptInterface
         fun launchRom(id: String, title: String, fileName: String, system: String) {

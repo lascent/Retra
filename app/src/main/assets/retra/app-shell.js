@@ -1384,6 +1384,7 @@ function bindRomCardLongPress(article, rom){
       article.classList.remove('holding');
       article.classList.add('long-pressed');
       enterLibrarySelection(rom.id);
+      if (navigator.vibrate) navigator.vibrate(10);
     }, libraryCardLongPressMs);
   });
 
@@ -1463,3 +1464,40 @@ function escapeXmlText(value){
 }
 
 
+
+// Unified Retra menu haptics -------------------------------------------------
+// Native gameplay controls already vibrate directly in Kotlin. The WebView UI
+// forwards only real interactive taps so scrolling never causes vibration.
+(() => {
+  let lastUiHapticAt = 0;
+  const selector = [
+    'button:not([disabled])',
+    'a[href]',
+    'input[type="checkbox"]:not([disabled])',
+    'input[type="radio"]:not([disabled])',
+    'input[type="range"]:not([disabled])',
+    'select:not([disabled])',
+    '[role="button"]',
+    '[data-open-page]',
+    '[data-action]',
+    '.tappable',
+    '.switch',
+    '.backup-check-row'
+  ].join(',');
+
+  document.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const target = event.target instanceof Element ? event.target.closest(selector) : null;
+    if (!target || target.matches('[disabled]') || target.closest('.disabled-row,[aria-disabled="true"]')) return;
+
+    const now = performance.now();
+    if (now - lastUiHapticAt < 24) return;
+    lastUiHapticAt = now;
+
+    try {
+      if (window.AndroidBridge && typeof window.AndroidBridge.performUiHaptic === 'function') {
+        window.AndroidBridge.performUiHaptic();
+      }
+    } catch (_) {}
+  }, { capture: true, passive: true });
+})();

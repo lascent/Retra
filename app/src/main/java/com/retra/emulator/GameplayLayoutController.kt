@@ -688,7 +688,7 @@ internal fun MainActivity.bindMultiKeyControl(view: View, keys: IntArray) {
         if (pressed == nextPressed) return
         pressed = nextPressed
         keys.forEach { setGameplayKeyHeld(it, nextPressed) }
-        if (nextPressed) performControllerSound(v)
+        if (nextPressed) performControllerHaptic(v)
         v.isPressed = nextPressed
     }
 
@@ -815,7 +815,7 @@ internal fun MainActivity.bindTurboAbControl(view: View) {
                 activePointerId = event.getPointerId(event.actionIndex)
                 gestureGeneration = controllerInputGeneration
                 active = true
-                performControllerSound(v)
+                performControllerHaptic(v)
                 v.isPressed = true
                 v.parent?.requestDisallowInterceptTouchEvent(true)
                 handler.removeCallbacks(pulse)
@@ -874,7 +874,7 @@ internal fun MainActivity.makeScreenshotControl(): ImageButton {
         scaleType = ImageView.ScaleType.CENTER_INSIDE
         contentDescription = "Screenshot"
         setOnClickListener {
-            performControllerSound(this)
+            performControllerHaptic(this)
             val saved = saveGameplayScreenshot()
             RetraNotice.makeText(
                 activity,
@@ -997,7 +997,7 @@ internal fun MainActivity.bindEmulatorChrome() {
     binding.speedButton.visibility = View.GONE
 
     binding.menuButton.setOnClickListener {
-        performControllerSound(binding.menuButton)
+        performControllerHaptic(binding.menuButton)
         showGameplayMenu()
     }
 
@@ -1008,7 +1008,7 @@ internal fun MainActivity.bindEmulatorChrome() {
             .equals("Hold down to activate", ignoreCase = true)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                performControllerSound(view)
+                performControllerHaptic(view)
                 if (holdMode && !isLocalLinkSpeedRestricted()) {
                     activeEmulationSpeed = preferredEmulationSpeed
                     updateFastForwardUi()
@@ -1036,11 +1036,11 @@ internal fun MainActivity.bindEmulatorChrome() {
         }
     }
     binding.quickSaveButton.setOnClickListener {
-        performControllerSound(binding.quickSaveButton)
+        performControllerHaptic(binding.quickSaveButton)
         quickSave()
     }
     binding.quickLoadButton.setOnClickListener {
-        performControllerSound(binding.quickLoadButton)
+        performControllerHaptic(binding.quickLoadButton)
         quickLoad()
     }
 }

@@ -296,6 +296,7 @@ class RetraPreferences(context: Context) {
             "rom_patching_v1",
             "enable_cheats_v1",
             "confirm_close_reset_v1",
+            "controller_haptics_v1",
             "controller_sound_v1",
             "fullscreen_mode_v1",
             "immersive_mode_v1",
