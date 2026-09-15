@@ -16,8 +16,8 @@ android {
         applicationId = "com.retra.emulator"
         minSdk = 26
         targetSdk = 37
-        versionCode = 449
-        versionName = "1.0.2"
+        versionCode = 450
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     ksp(libs.androidx.room.compiler)
     implementation("androidx.documentfile:documentfile:1.1.0")
+    implementation("com.google.android.gms:play-services-auth:21.6.0")
     implementation(libs.material)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

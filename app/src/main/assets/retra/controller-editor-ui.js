@@ -2,6 +2,16 @@
 // Loaded before screen-editor.js; functions resolve the editor's global lexical
 // state when invoked after screen-editor.js has initialized its bindings.
 
+const DEFAULT_CONTROLLER_SCALE_LANDSCAPE_PRIMARY = 1.05;
+const landscapePrimaryBaseControls = new Set(['shoulderLeft', 'shoulderRight', 'dpad', 'ab']);
+
+function defaultBaseControllerScale(controlId, orientation = currentEditorOrientation()){
+  if (orientation === 'landscape' && landscapePrimaryBaseControls.has(controlId)) {
+    return DEFAULT_CONTROLLER_SCALE_LANDSCAPE_PRIMARY;
+  }
+  return defaultControllerScale(orientation);
+}
+
 // A control type can exist only once in each orientation-specific layout.
 // The built-in A/B cluster also owns the A and B gameplay actions, so the
 // individual A/B add-items are hidden while that cluster is present.

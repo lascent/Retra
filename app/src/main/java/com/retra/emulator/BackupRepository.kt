@@ -10,6 +10,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,6 +77,30 @@ class BackupRepository(
         SimpleDateFormat("'Retra_'yyyyMMdd_HHmm'.retra'", Locale.US).format(now)
 
     fun create(uri: Uri, selection: Selection): Result {
+        val output = context.contentResolver.openOutputStream(uri, "w")
+            ?: throw IOException("Could not open the selected backup destination")
+        return output.use { createToStream(it, selection) }
+    }
+
+    /** Create a validated portable Retra archive for direct cloud upload. */
+    fun create(file: File, selection: Selection = Selection()): Result {
+        file.parentFile?.mkdirs()
+        val temp = File(file.parentFile ?: context.cacheDir, ".${file.name}.${UUID.randomUUID()}.tmp")
+        try {
+            val result = FileOutputStream(temp).use { createToStream(it, selection) }
+            validate(temp)
+            if (file.exists() && !file.delete()) throw IOException("Could not replace temporary backup")
+            if (!temp.renameTo(file)) {
+                temp.copyTo(file, overwrite = true)
+                if (!temp.delete()) temp.deleteOnExit()
+            }
+            return result
+        } finally {
+            if (temp.exists()) temp.delete()
+        }
+    }
+
+    private fun createToStream(raw: OutputStream, selection: Selection): Result {
         require(selection.anySelected()) { "Choose at least one item to back up" }
         preparePortableMetadata()
 
@@ -82,82 +108,151 @@ class BackupRepository(
         var fileCount = 0
         var byteCount = 0L
 
-        val output = context.contentResolver.openOutputStream(uri, "w")
-            ?: throw IOException("Could not open the selected backup destination")
+        ZipOutputStream(BufferedOutputStream(raw, BUFFER_SIZE)).use { zip ->
+            val manifest = JSONObject()
+                .put("format", FORMAT)
+                .put("schemaVersion", SCHEMA_VERSION)
+                .put("createdAt", System.currentTimeMillis())
+                .put("selection", selection.toJson())
+                .put("note", "Retra portable backup; ROM and BIOS files are not included")
 
-        output.use { raw ->
-            ZipOutputStream(BufferedOutputStream(raw, BUFFER_SIZE)).use { zip ->
-                val manifest = JSONObject()
-                    .put("format", FORMAT)
-                    .put("schemaVersion", SCHEMA_VERSION)
-                    .put("createdAt", System.currentTimeMillis())
-                    .put("selection", selection.toJson())
-                    .put("note", "Retra portable backup; ROM and BIOS files are not included")
+            putTextEntry(zip, MANIFEST_ENTRY, manifest.toString(2))
+            fileCount++
 
-                putTextEntry(zip, MANIFEST_ENTRY, manifest.toString(2))
-                fileCount++
-
-                fun addCategory(name: String) {
-                    val dir = File(fileOps.persistentDataRoot(), name)
-                    if (!dir.exists()) return
-                    included += name
-                    val result = addDirectory(zip, dir, "data/$name")
-                    fileCount += result.first
-                    byteCount += result.second
-                }
-
-                if (selection.saves) addCategory("Saves")
-                if (selection.saveStates) addCategory("SaveStates")
-                if (selection.cheats) addCategory("Cheats")
-                if (selection.layouts) addCategory("Layouts")
-                if (selection.artwork) {
-                    addCategory("Covers")
-                    addCategory("Backgrounds")
-                }
-                if (selection.settings) addCategory("Config")
-
-                val metadataDir = fileOps.persistentCategoryDir("Metadata")
-                if (selection.library) {
-                    included += "Library"
-                    listOf("library.json", "unmatched_legacy.json").forEach { name ->
-                        val file = File(metadataDir, name)
-                        if (file.isFile) {
-                            addFile(zip, file, "data/Metadata/$name")
-                            fileCount++
-                            byteCount += file.length()
-                        }
-                    }
-                }
-                if (selection.settings) {
-                    included += "Settings"
-                    val file = File(metadataDir, "settings.json")
-                    if (file.isFile) {
-                        addFile(zip, file, "data/Metadata/settings.json")
-                        fileCount++
-                        byteCount += file.length()
-                    }
-                }
-
-                // Write a compact inventory last so interrupted writes are easy
-                // to distinguish from fully completed Retra backups.
-                putTextEntry(
-                    zip,
-                    INVENTORY_ENTRY,
-                    JSONObject()
-                        .put("complete", true)
-                        .put("files", fileCount)
-                        .put("bytes", byteCount)
-                        .put("included", JSONArray(included.toList()))
-                        .toString(2)
-                )
-                fileCount++
+            fun addCategory(name: String) {
+                val dir = File(fileOps.persistentDataRoot(), name)
+                if (!dir.exists()) return
+                included += name
+                val result = addDirectory(zip, dir, "data/$name")
+                fileCount += result.first
+                byteCount += result.second
             }
+
+            if (selection.saves) addCategory("Saves")
+            if (selection.saveStates) addCategory("SaveStates")
+            if (selection.cheats) addCategory("Cheats")
+            if (selection.layouts) addCategory("Layouts")
+            if (selection.artwork) {
+                addCategory("Covers")
+                addCategory("Backgrounds")
+            }
+            if (selection.settings) addCategory("Config")
+
+            val metadataDir = fileOps.persistentCategoryDir("Metadata")
+            if (selection.library) {
+                included += "Library"
+                listOf("library.json", "unmatched_legacy.json").forEach { name ->
+                    val metadataFile = File(metadataDir, name)
+                    if (metadataFile.isFile) {
+                        addFile(zip, metadataFile, "data/Metadata/$name")
+                        fileCount++
+                        byteCount += metadataFile.length()
+                    }
+                }
+            }
+            if (selection.settings) {
+                included += "Settings"
+                val settingsFile = File(metadataDir, "settings.json")
+                if (settingsFile.isFile) {
+                    addFile(zip, settingsFile, "data/Metadata/settings.json")
+                    fileCount++
+                    byteCount += settingsFile.length()
+                }
+            }
+
+            putTextEntry(
+                zip,
+                INVENTORY_ENTRY,
+                JSONObject()
+                    .put("complete", true)
+                    .put("files", fileCount)
+                    .put("bytes", byteCount)
+                    .put("included", JSONArray(included.toList()))
+                    .toString(2)
+            )
+            fileCount++
         }
 
         return Result(fileCount, byteCount, included)
     }
 
     fun restore(uri: Uri): Result {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: throw IOException("Could not open this backup")
+        return input.use { restoreFromStream(it) }
+    }
+
+    /** Restore a cloud-downloaded Retra archive without routing through SAF. */
+    fun restore(file: File): Result = FileInputStream(file).use { restoreFromStream(it) }
+
+    /**
+     * Validate a complete .retra archive before it is uploaded or applied.
+     * This is deliberately non-mutating: it parses the entire ZIP, enforces the
+     * same path/size limits as restore, and requires both manifest + final inventory.
+     */
+    fun validate(file: File): Result = FileInputStream(file).use { raw ->
+        var manifest: JSONObject? = null
+        var complete = false
+        var fileCount = 0
+        var byteCount = 0L
+        var entries = 0
+        ZipInputStream(BufferedInputStream(raw, BUFFER_SIZE)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries++
+                if (entries > MAX_ENTRIES) throw IOException("Backup contains too many files")
+                val safeName = sanitizeEntryName(entry.name)
+                when (safeName) {
+                    MANIFEST_ENTRY -> manifest = JSONObject(readEntryText(zip, MAX_METADATA_BYTES))
+                    INVENTORY_ENTRY -> complete = JSONObject(readEntryText(zip, MAX_METADATA_BYTES)).optBoolean("complete", false)
+                    else -> {
+                        if (safeName.startsWith("data/") && !entry.isDirectory) {
+                            validateDataEntry(safeName)
+                            val buffer = ByteArray(BUFFER_SIZE)
+                            while (true) {
+                                val read = zip.read(buffer)
+                                if (read <= 0) break
+                                byteCount += read
+                                if (byteCount > MAX_UNCOMPRESSED_BYTES) throw IOException("Backup is too large")
+                            }
+                            fileCount++
+                        }
+                    }
+                }
+                zip.closeEntry()
+            }
+        }
+        val header = manifest ?: throw IOException("This is not a Retra backup")
+        if (header.optString("format") != FORMAT || header.optInt("schemaVersion", 0) !in 1..SCHEMA_VERSION) {
+            throw IOException("Unsupported Retra backup format")
+        }
+        if (!complete) throw IOException("This backup is incomplete or damaged")
+        val selection = parseSelection(header.optJSONObject("selection")?.toString() ?: "{}")
+        val included = linkedSetOf<String>()
+        if (selection.saves) included += "Saves"
+        if (selection.saveStates) included += "SaveStates"
+        if (selection.cheats) included += "Cheats"
+        if (selection.layouts) included += "Layouts"
+        if (selection.artwork) { included += "Covers"; included += "Backgrounds" }
+        if (selection.library) included += "Library"
+        if (selection.settings) included += "Settings"
+        Result(fileCount, byteCount, included)
+    }
+
+    /**
+     * Used by automatic Drive backup to keep a just-installed empty app from
+     * creating a useless snapshot before Retra checks for an existing cloud copy.
+     */
+    fun hasMeaningfulUserData(): Boolean {
+        if (runCatching { romIdentityStore.all().isNotEmpty() }.getOrDefault(false)) return true
+        val categories = listOf("Saves", "SaveStates", "Cheats", "Layouts", "Covers", "Backgrounds")
+        return categories.any { name ->
+            val dir = File(fileOps.persistentDataRoot(), name)
+            dir.exists() && dir.walkTopDown().any { it.isFile && it.length() > 0L }
+        }
+    }
+
+    private fun restoreFromStream(raw: InputStream): Result {
         val staging = File(context.cacheDir, "retra-restore-${UUID.randomUUID()}")
         staging.mkdirs()
 
@@ -167,54 +262,42 @@ class BackupRepository(
         var complete = false
 
         try {
-            val input = context.contentResolver.openInputStream(uri)
-                ?: throw IOException("Could not open this backup")
-            input.use { raw ->
-                ZipInputStream(BufferedInputStream(raw, BUFFER_SIZE)).use { zip ->
-                    var entries = 0
-                    while (true) {
-                        val entry = zip.nextEntry ?: break
-                        entries++
-                        if (entries > MAX_ENTRIES) throw IOException("Backup contains too many files")
-                        val safeName = sanitizeEntryName(entry.name)
+            ZipInputStream(BufferedInputStream(raw, BUFFER_SIZE)).use { zip ->
+                var entries = 0
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    entries++
+                    if (entries > MAX_ENTRIES) throw IOException("Backup contains too many files")
+                    val safeName = sanitizeEntryName(entry.name)
 
-                        when (safeName) {
-                            MANIFEST_ENTRY -> {
-                                val text = readEntryText(zip, MAX_METADATA_BYTES)
-                                manifest = JSONObject(text)
+                    when (safeName) {
+                        MANIFEST_ENTRY -> manifest = JSONObject(readEntryText(zip, MAX_METADATA_BYTES))
+                        INVENTORY_ENTRY -> complete = JSONObject(readEntryText(zip, MAX_METADATA_BYTES)).optBoolean("complete", false)
+                        else -> {
+                            if (!safeName.startsWith("data/") || entry.isDirectory) {
+                                zip.closeEntry()
+                                continue
                             }
-                            INVENTORY_ENTRY -> {
-                                val text = readEntryText(zip, MAX_METADATA_BYTES)
-                                complete = JSONObject(text).optBoolean("complete", false)
-                            }
-                            else -> {
-                                if (!safeName.startsWith("data/") || entry.isDirectory) {
-                                    zip.closeEntry()
-                                    continue
+                            validateDataEntry(safeName)
+                            val relative = safeName.removePrefix("data/")
+                            val target = safeChild(staging, relative)
+                            target.parentFile?.mkdirs()
+                            FileOutputStream(target).use { output ->
+                                val buffer = ByteArray(BUFFER_SIZE)
+                                while (true) {
+                                    val read = zip.read(buffer)
+                                    if (read <= 0) break
+                                    byteCount += read
+                                    if (byteCount > MAX_UNCOMPRESSED_BYTES) throw IOException("Backup is too large")
+                                    output.write(buffer, 0, read)
                                 }
-                                validateDataEntry(safeName)
-                                val relative = safeName.removePrefix("data/")
-                                val target = safeChild(staging, relative)
-                                target.parentFile?.mkdirs()
-                                FileOutputStream(target).use { output ->
-                                    val buffer = ByteArray(BUFFER_SIZE)
-                                    while (true) {
-                                        val read = zip.read(buffer)
-                                        if (read <= 0) break
-                                        byteCount += read
-                                        if (byteCount > MAX_UNCOMPRESSED_BYTES) {
-                                            throw IOException("Backup is too large")
-                                        }
-                                        output.write(buffer, 0, read)
-                                    }
-                                    output.flush()
-                                    runCatching { output.fd.sync() }
-                                }
-                                fileCount++
+                                output.flush()
+                                runCatching { output.fd.sync() }
                             }
+                            fileCount++
                         }
-                        zip.closeEntry()
                     }
+                    zip.closeEntry()
                 }
             }
 

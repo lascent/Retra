@@ -104,6 +104,96 @@ function triggerCoverChange(){
   coverFileInput.click();
 }
 
+const romRenameModal = document.getElementById('romRenameModal');
+const romRenameInput = document.getElementById('romRenameInput');
+const cancelRomRename = document.getElementById('cancelRomRename');
+const saveRomRename = document.getElementById('saveRomRename');
+
+function closeRomRenameModal(){
+  romRenameModal?.classList.remove('open');
+  romRenameModal?.setAttribute('aria-hidden', 'true');
+}
+
+function openRomRenameModal(event){
+  event?.preventDefault();
+  event?.stopPropagation();
+  const rom = currentRomCard ? getRomById(currentRomCard.dataset.romId) : null;
+  if (!currentRomCard || !rom) {
+    showToast('ROM is unavailable');
+    return;
+  }
+  setRomOverflowOpen(false);
+  if (romRenameInput) {
+    romRenameInput.value = String(rom.title || currentRomCard.dataset.title || 'ROM');
+  }
+  romRenameModal?.classList.add('open');
+  romRenameModal?.setAttribute('aria-hidden', 'false');
+  window.setTimeout(() => {
+    romRenameInput?.focus();
+    romRenameInput?.select();
+  }, 80);
+}
+
+function commitRomRename(){
+  const romId = String(currentRomCard?.dataset?.romId || '');
+  const rom = getRomById(romId);
+  const nextTitle = String(romRenameInput?.value || '').trim().replace(/\s+/g, ' ').slice(0, 64);
+  if (!romId || !rom) {
+    showToast('ROM is unavailable');
+    closeRomRenameModal();
+    return;
+  }
+  if (!nextTitle) {
+    showToast('Enter a ROM name');
+    romRenameInput?.focus();
+    return;
+  }
+
+  if (window.AndroidBridge && typeof window.AndroidBridge.renameRomTitle === 'function') {
+    let saved = false;
+    try { saved = Boolean(window.AndroidBridge.renameRomTitle(romId, nextTitle)); } catch (_) {}
+    if (!saved) {
+      showToast('Could not rename ROM');
+      return;
+    }
+  }
+
+  rom.title = nextTitle;
+  currentRomCard.dataset.title = nextTitle;
+  currentRomCard.setAttribute('aria-label', `${nextTitle}, ${rom.system || 'ROM'}`);
+  const cardTitle = currentRomCard.querySelector('.cover-info > strong');
+  if (cardTitle) cardTitle.textContent = nextTitle;
+  const cardImage = currentRomCard.querySelector(':scope > img');
+  if (cardImage) cardImage.alt = `${nextTitle} cover`;
+  detailTitle.textContent = nextTitle;
+  if (detailCover && !detailCover.hidden) detailCover.alt = `${nextTitle} cover`;
+
+  let historyChanged = false;
+  playHistory.forEach(entry => {
+    if (String(entry?.romId || '') === romId && entry.title !== nextTitle) {
+      entry.title = nextTitle;
+      historyChanged = true;
+    }
+  });
+  if (historyChanged) savePlayHistory();
+
+  saveLibraryRoms();
+  renderHistory();
+  closeRomRenameModal();
+  showToast(`Renamed to ${nextTitle}`);
+}
+
+menuEditNameBtn?.addEventListener('click', openRomRenameModal);
+cancelRomRename?.addEventListener('click', closeRomRenameModal);
+saveRomRename?.addEventListener('click', commitRomRename);
+romRenameModal?.addEventListener('click', event => {
+  if (event.target === romRenameModal) closeRomRenameModal();
+});
+romRenameInput?.addEventListener('keydown', event => {
+  if (event.key === 'Enter') commitRomRename();
+  if (event.key === 'Escape') closeRomRenameModal();
+});
+
 menuChangeBgBtn?.addEventListener('click', (event) => {
   event.preventDefault();
   event.stopPropagation();

@@ -34,21 +34,20 @@ test('custom GLSL shaders install, validate, compile and render only on demand',
   assert.match(settings, /AndroidBridge\.setGlslShader/);
 });
 
-test('Google Drive API sync is conflict-safe and retains SAF as a compatibility fallback', () => {
-  assert.match(cloud, /oauth2:https:\/\/www\.googleapis\.com\/auth\/drive\.file/);
+test('Google Drive backup uses OAuth Drive API snapshots while SAF remains local-only', () => {
+  assert.match(cloud, /https:\/\/www\.googleapis\.com\/auth\/drive\.file/);
   assert.match(cloud, /MODE_API = "api"/);
-  assert.match(cloud, /MODE_SAF = "saf"/);
-  assert.match(cloud, /onFolderFallbackRequested/);
+  assert.match(cloud, /Identity\.getAuthorizationClient\(activity\)/);
+  assert.doesNotMatch(cloud, /MODE_SAF|onFolderFallbackRequested/);
   assert.match(drive, /https:\/\/www\.googleapis\.com\/drive\/v3/);
   assert.match(drive, /https:\/\/www\.googleapis\.com\/upload\/drive\/v3/);
-  assert.match(drive, /retraPath/);
+  assert.match(drive, /Retra Backups/);
   assert.match(drive, /retraSha256/);
-  assert.match(drive, /drive_api_tombstones_v1\.json/);
-  assert.match(drive, /CloudConflicts/);
-  assert.match(drive, /sha256File/);
-  assert.match(transfer, /fun syncDetailed/);
+  assert.match(drive, /md5Checksum/);
+  assert.match(drive, /fun sha256/);
+  assert.match(transfer, /fun syncDetailed/); // retained for explicit local export/import paths only
   assert.match(transfer, /copyFileToDocumentVerified/);
-  assert.match(settings, /state\.cloudSyncMode === 'api' \? 'Drive API' : 'Drive folder'/);
+  assert.doesNotMatch(settings, /Drive folder/);
 });
 
 test('slow motion and turbo share one exact supported speed policy', () => {

@@ -12,8 +12,8 @@ const shaderRepo = fs.readFileSync(path.join(__dirname, '../app/src/main/java/co
 const shaderView = fs.readFileSync(path.join(__dirname, '../app/src/main/java/com/retra/emulator/ShaderGameView.kt'), 'utf8');
 
 test('release metadata and optimization are enabled', () => {
-  assert.match(gradle, /versionCode = 449/);
-  assert.match(gradle, /versionName = "1\.0\.2"/);
+  assert.match(gradle, /versionCode = 450/);
+  assert.match(gradle, /versionName = "1\.0\.3"/);
   assert.match(gradle, /optimization \{\s*enable = true\s*\}/s);
 });
 

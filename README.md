@@ -76,11 +76,11 @@ The latest stable APK and release notes are available from:
 
 ### **[GitHub Releases →](https://github.com/lascent/Retra/releases)**
 
-Current stable release: **Retra v1.0.2**
+Current stable release: **Retra v1.0.3**
 
 | Item | Current status |
 |---|---|
-| Version | `v1.0.2` |
+| Version | `v1.0.3` |
 | Release channel | Stable |
 | Minimum Android | API 26 / Android 8.0+ |
 | License | Mozilla Public License 2.0 |
@@ -94,6 +94,7 @@ Current stable release: **Retra v1.0.2**
 | **v1.0.0** | Official release |
 | **v1.0.1** | Added Create Backup and Restore Backup |
 | **v1.0.2** | Added in-app update checking and Android reinstall-recovery hardening |
+| **v1.0.3** | Added persistent ROM title editing plus controller, rewind, save-import, and Google Drive restore polish |
 
 Public release numbering follows Semantic Versioning. Earlier project work is organized in [`docs/DEVELOPMENT_HISTORY.md`](docs/DEVELOPMENT_HISTORY.md).
 
@@ -109,7 +110,7 @@ Retra includes lightweight gameplay color presets that affect only the rendered 
 
 ## Multiplayer scope
 
-Retra v1.0.2 supports normal GBA Link Cable-style multiplayer through:
+Retra v1.0.3 supports normal GBA Link Cable-style multiplayer through:
 
 - **Local Link** on one Android device.
 - **Wi-Fi Remote Link** between supported devices.
@@ -117,7 +118,7 @@ Retra v1.0.2 supports normal GBA Link Cable-style multiplayer through:
 
 Remote Link includes connection health metrics, heartbeat/timeouts, state-hash validation, jitter-aware input delay, host-authoritative recovery, bounded recovery retries, and deterministic input reseeding.
 
-### Not supported in v1.0.2
+### Not supported in v1.0.3
 
 - GBA Single-Pak / Multiboot
 - GBA Wireless Adapter / RFU emulation
@@ -175,12 +176,12 @@ CMake also accepts the legacy sibling `../mgba/` location or an explicit `RETRA_
 ### Android release metadata
 
 ```text
-versionName = 1.0.2
-versionCode = 449
+versionName = 1.0.3
+versionCode = 450
 minSdk      = 26
 ```
 
-`versionCode 449` upgrades cleanly over v1.0.1 (`448`) and v1.0.0 (`447`).
+`versionCode 450` upgrades cleanly over v1.0.2 (`449`), v1.0.1 (`448`), and v1.0.0 (`447`).
 
 ### Open and build
 

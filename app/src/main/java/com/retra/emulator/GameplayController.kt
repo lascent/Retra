@@ -132,7 +132,7 @@ internal fun MainActivity.buildMenuShell(title: String, showBack: Boolean, trail
             textSize = 36f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
-            contentDescription = "Back"
+            contentDescription = uiText("Back")
             setPadding(0, 0, dpInt(12), 0)
             setOnClickListener {
                 gameplayMenuBackHandler?.invoke() ?: gameplayMenuDialog?.let(::renderGameplayMainMenu)
@@ -142,7 +142,7 @@ internal fun MainActivity.buildMenuShell(title: String, showBack: Boolean, trail
     }
 
     val heading = TextView(this).apply {
-        text = title
+        text = uiText(title)
         textSize = 23f
         setTypeface(typeface, Typeface.BOLD)
         setTextColor(Color.WHITE)
@@ -196,7 +196,7 @@ internal fun MainActivity.addMenuAction(
     }
 
     val label = TextView(this).apply {
-        text = title
+        text = uiText(title)
         textSize = 18f
         setTextColor(Color.WHITE)
         setTypeface(typeface, Typeface.BOLD.takeIf { title == "Save" || title == "Load" } ?: Typeface.NORMAL)
@@ -205,7 +205,7 @@ internal fun MainActivity.addMenuAction(
 
     if (!subtitle.isNullOrBlank()) {
         val sub = TextView(this).apply {
-            text = subtitle
+            text = uiText(subtitle)
             textSize = 13f
             setTextColor(Color.argb(175, 255, 255, 255))
             setPadding(0, dpInt(2), 0, 0)
@@ -243,6 +243,7 @@ internal fun MainActivity.renderGameplayMainMenu(dialog: Dialog) {
         if (localLinkActive) showLocalLinkStateRestriction()
         else renderStateScreen(dialog, saveMode = true)
     }
+    addRewindGameplayAction(content, dialog)
     addMenuAction(
         content,
         if (EmulationSpeedPolicy.isNormal(activeEmulationSpeed)) "Speed mode" else "Normal speed",
@@ -260,6 +261,7 @@ internal fun MainActivity.renderGameplayMainMenu(dialog: Dialog) {
             renderCheatsScreen(dialog)
         }
     }
+    addLayoutAndImportGameplayActions(content, dialog)
     addMenuAction(content, "Settings") { openInGameSettings(dialog) }
 
     if (remoteTransport.isActive) {

@@ -12,7 +12,7 @@ test('v4.45 cloud/save graph uses explicit types to avoid recursive Kotlin infer
   assert.match(main, /(?:private|internal) val saveTransfer: SaveTransferRepository by lazy/);
   assert.match(main, /(?:private|internal) val driveApi: GoogleDriveApiRepository by lazy/);
   assert.match(main, /(?:private|internal) val cloudSync: CloudSyncCoordinator by lazy/);
-  assert.match(main, /(?:private|internal) val driveAuthRecoveryLauncher: ActivityResultLauncher<Intent>/);
+  assert.match(main, /(?:private|internal) val cloudAuthorizationLauncher: ActivityResultLauncher<IntentSenderRequest>/);
   assert.doesNotMatch(main, /(?:private|internal) val cloudSync by lazy/);
 });
 

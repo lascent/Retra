@@ -107,6 +107,11 @@ class RomIdentityStore(context: Context) {
         io { dao.updateLibraryMetadata(romId, favorite, safeCategories, System.currentTimeMillis()) }
     }
 
+    fun updateDisplayName(romId: String, displayName: String) {
+        if (romId.isBlank() || displayName.isBlank()) return
+        io { dao.updateDisplayName(romId, displayName, System.currentTimeMillis()) }
+    }
+
     fun updatePlaytime(romId: String, playtimeMs: Long) {
         if (romId.isBlank()) return
         io { dao.updatePlaytime(romId, playtimeMs.coerceAtLeast(0L), System.currentTimeMillis()) }
@@ -285,6 +290,9 @@ interface RomDao {
             "updated_at = :updatedAt WHERE rom_id = :romId"
     )
     fun updateLibraryMetadata(romId: String, favorite: Boolean, categoriesJson: String, updatedAt: Long)
+
+    @Query("UPDATE rom_records SET display_name = :displayName, updated_at = :updatedAt WHERE rom_id = :romId")
+    fun updateDisplayName(romId: String, displayName: String, updatedAt: Long)
 
     @Query("UPDATE rom_records SET playtime_ms = :playtimeMs, updated_at = :updatedAt WHERE rom_id = :romId")
     fun updatePlaytime(romId: String, playtimeMs: Long, updatedAt: Long)

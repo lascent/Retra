@@ -11,6 +11,7 @@ v0.8.0 → v0.8.9
 v0.9.0 → v0.9.12
 v1.0.0  First stable public release
 v1.0.1  Create Backup and Restore Backup
+v1.0.3  ROM title editing and storage polish
 v1.0.2  Update checker and reinstall recovery
 ```
 
@@ -85,3 +86,9 @@ Detailed public-facing changes are in the repository-root [`CHANGELOG.md`](../CH
 The repository also contains older engineering notes whose filenames retain their original internal build identifiers. They are preserved as historical implementation references and should not be interpreted as the public release version sequence.
 
 See [`history/`](history/) and the other engineering documents indexed in [`docs/README.md`](README.md).
+
+## v1.0.3 — ROM title editing and storage polish
+
+- Added persistent per-ROM display-name editing from the ROM detail overflow menu.
+- Kept ROM filenames and immutable ROM IDs unchanged.
+- Carried forward the controller, rewind, save import and Google Drive restore hardening.

@@ -119,6 +119,27 @@ function getActiveLayoutProfile(){
   return getLayoutProfile(layoutProfileStore.activeId) || getLayoutProfile('default');
 }
 
+
+function syncActiveLayoutProfileControllerFromEditor(orientation, controllerPayload){
+  if (orientation !== 'portrait' && orientation !== 'landscape') return;
+  if (!controllerPayload || typeof controllerPayload !== 'object') return;
+
+  const profile = getActiveLayoutProfile();
+  if (!profile) return;
+
+  profile.layouts = profile.layouts || {};
+  const existing = profile.layouts[orientation] || { controller:null, screen:null };
+  const controller = deepCloneLayoutValue(controllerPayload);
+  if (!controller) return;
+  controller.orientation = orientation;
+
+  profile.layouts[orientation] = {
+    controller,
+    screen: deepCloneLayoutValue(existing.screen)
+  };
+  saveLayoutProfileStore();
+}
+
 function captureActiveLayoutProfileFromRuntime(){
   const profile = getActiveLayoutProfile();
   if (!profile) return;
@@ -336,6 +357,21 @@ commitScreenEditorState = function(){
   captureActiveLayoutProfileFromRuntime();
   renderLayoutProfiles();
 };
+
+// When Screen Editor is launched directly from the gameplay menu, Back saves
+// the active profile and returns to the native game instead of walking through
+// the full Settings navigation stack. Capture phase wins over the generic
+// data-back-to handler in app-shell.js.
+screenEditorBackBtn?.addEventListener('click', event => {
+  if (!document.body.classList.contains('in-game-layout-editor')) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (typeof commitScreenEditorState === 'function') commitScreenEditorState();
+  document.body.classList.remove('in-game-layout-editor');
+  if (window.AndroidBridge && typeof window.AndroidBridge.closeInGameSettings === 'function') {
+    window.AndroidBridge.closeInGameSettings();
+  }
+}, true);
 
 // On startup, make the selected profile authoritative again. This is needed
 // after a full app restart because native gameplay keys are intentionally the

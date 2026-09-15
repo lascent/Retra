@@ -126,6 +126,7 @@ const entriesCount = document.getElementById('entriesCount');
 const bgFileInput = document.getElementById('bgFileInput');
 const coverFileInput = document.getElementById('coverFileInput');
 const romFilterBtn = document.getElementById('romFilterBtn');
+const menuEditNameBtn = document.getElementById('menuEditNameBtn');
 const menuChangeBgBtn = document.getElementById('menuChangeBgBtn');
 const menuChangeCoverBtn = document.getElementById('menuChangeCoverBtn');
 const romOverflowMenu = document.getElementById('romOverflowMenu');
@@ -324,8 +325,12 @@ function inferToastKind(message){
 
 function showToast(message, kind = 'auto', duration = 2300){
   if (!toast) return;
-  const resolvedKind = kind === 'auto' ? inferToastKind(message) : kind;
-  toast.textContent = message;
+  const originalMessage = String(message ?? '');
+  const resolvedKind = kind === 'auto' ? inferToastKind(originalMessage) : kind;
+  const localizedMessage = window.retraI18n?.translateMessage
+    ? window.retraI18n.translateMessage(originalMessage)
+    : originalMessage;
+  toast.textContent = localizedMessage;
   toast.classList.remove('info','success','warning','error');
   toast.classList.add(resolvedKind, 'show');
   clearTimeout(showToast.timer);
@@ -478,11 +483,19 @@ window.retraNativeGameClosed = function(romId){
 
 window.retraOpenInGameSettings = function(){
   document.body.classList.add('in-game-settings');
+  document.body.classList.remove('in-game-layout-editor');
   openSubPage('settingsHomePage');
 };
 
+window.retraOpenInGameLayoutEditor = function(){
+  document.body.classList.add('in-game-settings', 'in-game-layout-editor');
+  const back = document.querySelector('#screenSizePage .back-btn');
+  if (back) back.dataset.backTo = 'settingsHomePage';
+  openSubPage('screenSizePage');
+};
+
 window.retraCloseInGameSettings = function(){
-  document.body.classList.remove('in-game-settings');
+  document.body.classList.remove('in-game-settings', 'in-game-layout-editor');
 };
 
 window.retraHandleAndroidBack = function(){
@@ -596,6 +609,69 @@ try {
 } catch (error) {
   playHistory = [];
 }
+
+// v1.0.3 Library Sort/Display preferences. These are presentation-only: they
+// never rename, move or rewrite ROM files and they survive app restarts.
+const libraryViewStorageKey = 'retraLibraryViewV1';
+const libraryViewDefaults = Object.freeze({
+  sort: 'alphabetical',
+  direction: 'desc',
+  display: 'compact',
+  itemsPerRow: 3,
+  randomSeed: 1
+});
+
+function normalizeLibraryViewPrefs(value){
+  const next = value && typeof value === 'object' ? value : {};
+  const allowedSort = new Set(['alphabetical', 'playtime', 'lastPlayed', 'dateAdded', 'random']);
+  const allowedDisplay = new Set(['compact', 'comfortable', 'coverOnly', 'list']);
+  const sort = allowedSort.has(next.sort) ? next.sort : libraryViewDefaults.sort;
+  const direction = next.direction === 'asc' ? 'asc' : 'desc';
+  const display = allowedDisplay.has(next.display) ? next.display : libraryViewDefaults.display;
+  const itemsPerRow = Math.min(6, Math.max(2, Math.round(Number(next.itemsPerRow) || libraryViewDefaults.itemsPerRow)));
+  const randomSeed = Math.max(1, Math.floor(Number(next.randomSeed) || libraryViewDefaults.randomSeed));
+  return { sort, direction, display, itemsPerRow, randomSeed };
+}
+
+let libraryViewPrefs = (() => {
+  try {
+    return normalizeLibraryViewPrefs(JSON.parse(localStorage.getItem(libraryViewStorageKey) || '{}'));
+  } catch (_) {
+    return { ...libraryViewDefaults };
+  }
+})();
+
+function saveLibraryViewPrefs(){
+  libraryViewPrefs = normalizeLibraryViewPrefs(libraryViewPrefs);
+  try { localStorage.setItem(libraryViewStorageKey, JSON.stringify(libraryViewPrefs)); } catch (_) {}
+}
+
+function refreshLibraryRandomSeed(){
+  libraryViewPrefs.randomSeed = Math.max(1, Date.now() % 2147483647);
+  saveLibraryViewPrefs();
+}
+
+function readLibraryPlaytimeSortMap(){
+  try {
+    if (!(window.AndroidBridge && typeof window.AndroidBridge.getNativeStatistics === 'function')) return {};
+    const raw = window.AndroidBridge.getNativeStatistics();
+    const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
+    return parsed?.playtimeMsByRom && typeof parsed.playtimeMsByRom === 'object' ? parsed.playtimeMsByRom : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function stableLibraryRandomRank(id, seed){
+  const text = `${seed}|${String(id || '')}`;
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 let suppressedLibraryCardClickId = null;
 let suppressLibraryCardClickUntil = 0;
 
@@ -948,6 +1024,26 @@ function applyCoverToRenderedRom(rom, coverUrl, card = null){
     }
   }
 
+  // Keep Statistics -> Playtime by ROM in sync too. A manual/automatic cover
+  // change should be visible immediately without leaving and reopening the page.
+  const statisticsRow = [...document.querySelectorAll('#playtimeList .playtime-item')]
+    .find(item => String(item.dataset?.playtimeRom || '') === id);
+  if (statisticsRow) {
+    const coverWrap = statisticsRow.querySelector('.playtime-cover');
+    if (coverWrap) {
+      let statisticsImage = coverWrap.querySelector('img');
+      if (!statisticsImage) {
+        statisticsImage = document.createElement('img');
+        statisticsImage.loading = 'lazy';
+        statisticsImage.decoding = 'async';
+        statisticsImage.fetchPriority = 'low';
+        coverWrap.replaceChildren(statisticsImage);
+      }
+      statisticsImage.src = url;
+      statisticsImage.alt = `${rom.title || 'ROM'} cover`;
+    }
+  }
+
   return true;
 }
 
@@ -1015,11 +1111,49 @@ function getRomById(id){
 }
 
 function orderedLibraryRoms(){
-  // Keep the user's normal library order stable, but pin favourites first.
-  return libraryRoms
-    .map((rom, index) => ({ rom, index }))
-    .sort((a, b) => Number(Boolean(b.rom.favorite)) - Number(Boolean(a.rom.favorite)) || a.index - b.index)
-    .map(item => item.rom);
+  const prefs = normalizeLibraryViewPrefs(libraryViewPrefs);
+  const direction = prefs.direction === 'asc' ? 1 : -1;
+  const playtimeByRom = prefs.sort === 'playtime' ? readLibraryPlaytimeSortMap() : {};
+  const lastPlayedByRom = new Map();
+  if (prefs.sort === 'lastPlayed') {
+    playHistory.forEach(entry => {
+      const id = String(entry?.romId || '');
+      const playedAt = Math.max(0, Number(entry?.playedAt) || 0);
+      if (id && playedAt > (lastPlayedByRom.get(id) || 0)) lastPlayedByRom.set(id, playedAt);
+    });
+  }
+
+  const rows = libraryRoms.map((rom, index) => ({ rom, index }));
+  rows.sort((a, b) => {
+    const aRom = a.rom || {};
+    const bRom = b.rom || {};
+    let compared = 0;
+
+    if (prefs.sort === 'alphabetical') {
+      compared = String(aRom.title || aRom.fileName || '').localeCompare(
+        String(bRom.title || bRom.fileName || ''),
+        undefined,
+        { sensitivity: 'base', numeric: true }
+      );
+    } else if (prefs.sort === 'playtime') {
+      compared = (Math.max(0, Number(playtimeByRom[String(aRom.id)]) || 0) - Math.max(0, Number(playtimeByRom[String(bRom.id)]) || 0));
+    } else if (prefs.sort === 'lastPlayed') {
+      compared = (lastPlayedByRom.get(String(aRom.id)) || 0) - (lastPlayedByRom.get(String(bRom.id)) || 0);
+    } else if (prefs.sort === 'dateAdded') {
+      compared = (Math.max(0, Number(aRom.addedAt) || 0) - Math.max(0, Number(bRom.addedAt) || 0));
+    } else if (prefs.sort === 'random') {
+      compared = stableLibraryRandomRank(aRom.id, prefs.randomSeed) - stableLibraryRandomRank(bRom.id, prefs.randomSeed);
+    }
+
+    if (prefs.sort !== 'random' && compared !== 0) return compared * direction;
+    if (prefs.sort === 'random' && compared !== 0) return compared;
+
+    // Deterministic tie-breaks keep the grid stable while covers/artwork hydrate.
+    const titleTie = String(aRom.title || '').localeCompare(String(bRom.title || ''), undefined, { sensitivity: 'base', numeric: true });
+    if (titleTie !== 0) return titleTie;
+    return a.index - b.index;
+  });
+  return rows.map(item => item.rom);
 }
 
 function getSelectedLibraryRoms(){

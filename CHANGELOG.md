@@ -1,3 +1,40 @@
+## v1.0.3 — Library title and options cleanup
+- Capped Compact Grid ROM titles at two lines, including 5–6 items-per-row layouts, so long names stay compact and consistent.
+- Merged the separate Library Sort and Display header controls into one icon-only Library Options button; Sort and Display remain available as tabs in the same sheet.
+
+## v1.0.3 — Google Drive Kotlin compile hotfix
+- Moved **Restore from Google Drive** into the Google Drive section directly below **Backup Now**, keeping local backup/restore actions separate.
+
+- Fixed `CloudSyncCoordinator.kt` to construct `ClearTokenRequest` through the public `ClearTokenRequest.builder()` factory instead of directly invoking the inaccessible nested Builder constructor.
+- Preserves the real Google Drive API backup/restore path and all v1.0.3 features.
+
+## v1.0.3 — Inter default, language selector, dense-title wrapping
+
+- Switched Retra's default interface font from Poppins to Inter while keeping Poppins, Manrope, and DM Sans selectable.
+- Added a one-time migration so installs carrying the old implicit Poppins default move to Inter without repeatedly overriding later user choices.
+- Added Settings → Language directly below Fonts with English, Tiếng Việt, and Bahasa Indonesia.
+- Added persistent Vietnamese and Indonesian localization for the main Web UI and core native gameplay-menu actions; language is stored in portable `ui_language` settings so backup/restore preserves it.
+- Compact Library grid titles now wrap downward for long ROM names instead of being forced into a single ellipsis line, with denser typography at 5–6 items per row.
+- Preserved ROM/user-provided titles and category data from automatic translation.
+
+## v1.0.3 — Real Google Drive API backup/restore
+
+- Replaced Google Drive folder-picker backup/restore with Google Identity Services authorization and Drive REST API v3.
+- Cloud snapshots now live in `My Drive/Retra Backups`, with exact-folder reuse and automatic creation when needed.
+- Added immediate Backup Now, direct Drive restore listing/download, transfer progress, connected-account status, last-success timestamps, and clearer errors.
+- Added pre-upload/pre-restore backup validation and immutable cloud snapshots so a failed upload cannot replace the previous good backup.
+- Added fresh-install protection: Retra checks cloud snapshots before allowing an empty local installation to create a cloud backup.
+- Kept Android's document/folder pickers only for local backup/export/import flows.
+- Added `docs/GOOGLE_DRIVE_SETUP.md` with required Google Cloud, OAuth, package-name, and signing-certificate setup.
+
+## v1.0.3 — ROM title editing and storage polish
+
+- Added **Edit name** to the ROM detail three-dot menu beside Change background and Change Cover.
+- ROM title changes persist in the native Room library index and legacy title metadata without renaming the ROM file.
+- Renamed titles stay consistent across Library, ROM details, History, backup/restore, and Google Drive sync.
+- Includes the v1.0.2 controller 10/10, 105% landscape layout, rewind, save-import, and Google Drive restore fixes.
+- Bumped Android release metadata to `versionName 1.0.3` / `versionCode 450`.
+
 ## v1.0.2 — All-ROM Smooth Consistent-Speed Hotfix
 - Fast-forward timing now uses a shared exact emulated-time contract: 2×/4×/8×/16× target the same multiplier for every ROM relative to its own 1× timing.
 - Turbo renderer work is budgeted immediately to the useful 60–120 Hz presentation range (for example 8× uses renderer frameskip 3 at a 120 Hz budget), while CPU/timers/input/game logic still execute every emulated frame.
@@ -39,6 +76,8 @@
 - Added 8-frame native 16x batches, an 8192-frame audio ring, and turbo-only mGBA renderer frameskip.
 - Kept visible extreme-turbo presentation independent at a stable 60 Hz using the newest completed frame.
 # Changelog
+
+- Statistics → Playtime by ROM now uses each ROM’s persisted cover artwork and refreshes immediately after a cover change.
 ### Extreme 8×/16× turbo rendering hardening
 - Batched each short turbo slice behind one native JNI call instead of crossing Kotlin/JNI once per hidden emulated frame.
 - Kept input sampling on every emulated frame inside the native batch while converting only the final frame when a display update is actually due.

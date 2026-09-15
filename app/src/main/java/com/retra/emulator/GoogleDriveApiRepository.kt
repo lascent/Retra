@@ -2,7 +2,6 @@ package com.retra.emulator
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -15,380 +14,224 @@ import java.time.Instant
 import java.util.Locale
 
 /**
- * Google Drive REST v3 synchronization using an OAuth access token supplied by
- * Android's Google account authenticator. Files are scoped to an app-created
- * Retra Sync folder and carry path/hash appProperties for conflict-safe merging.
+ * Real Google Drive REST v3 backup transport.
  *
- * No client secret is stored in the APK. Devices/accounts that cannot issue a
- * Drive token fall back to SaveTransferRepository's SAF Drive-folder sync.
+ * Retra stores complete, validated .retra snapshots in:
+ *   My Drive / Retra Backups /
+ *
+ * This repository never uses Android's Storage Access Framework. OAuth access
+ * tokens are supplied by Google Identity Services (AuthorizationClient).
+ * Every upload creates a NEW snapshot; an older good backup is never patched or
+ * deleted as part of Backup Now / automatic backup.
  */
 class GoogleDriveApiRepository(
-    private val filesDir: File,
-    private val fileOps: RetraFileOps,
-    private val preparePortableMetadata: () -> Unit
+    private val cacheDir: File
 ) {
-    data class SyncResult(
-        val uploaded: Int = 0,
-        val downloaded: Int = 0,
-        val conflicts: Int = 0,
-        val unchanged: Int = 0,
-        val errors: Int = 0
+    data class CloudBackup(
+        val id: String,
+        val name: String,
+        val createdAt: Long,
+        val modifiedAt: Long,
+        val size: Long,
+        val md5: String,
+        val sha256: String
+    )
+
+    data class UploadResult(
+        val backup: CloudBackup,
+        val deduplicated: Boolean = false
     )
 
     class AuthExpiredException : Exception("Google Drive authorization expired")
 
-    private data class RemoteFile(
-        val id: String,
-        val path: String,
-        val hash: String,
-        val modifiedAt: Long,
-        val size: Long
-    )
-
-    fun queueDelete(paths: List<String>) {
-        if (paths.isEmpty()) return
-        val pending = readTombstones().toMutableSet()
-        pending.addAll(paths)
-        writeTombstones(pending)
+    /** Return backups without creating a folder. Restore and fresh-install checks use this. */
+    fun listBackups(accessToken: String): List<CloudBackup> {
+        val folderId = findBackupFolder(accessToken) ?: return emptyList()
+        return listBackups(accessToken, folderId)
     }
 
-    fun deletePaths(accessToken: String, paths: List<String>) {
-        if (paths.isEmpty()) return
-        val rootId = findOrCreateRoot(accessToken)
-        val wanted = paths.toSet()
-        listRemoteFiles(accessToken, rootId).filter { it.path in wanted }.forEach { remote ->
-            val connection = open("DELETE", "$DRIVE_API/files/${remote.id}", accessToken)
-            ensureSuccess(connection)
-        }
-        val state = readState().toMutableMap()
-        paths.forEach(state::remove)
-        writeState(state)
-        val pending = readTombstones().toMutableSet()
-        pending.removeAll(paths.toSet())
-        writeTombstones(pending)
-    }
-
-    fun sync(accessToken: String, preferRemoteOnFirstSync: Boolean = false): SyncResult {
-        preparePortableMetadata()
-        val rootId = findOrCreateRoot(accessToken)
-        val local = localFiles()
-        val remote = listRemoteFiles(accessToken, rootId).associateBy { it.path }.toMutableMap()
-        val lastState = readState().toMutableMap()
-        val preferRemoteForUnpairedEmptyInstall = preferRemoteOnFirstSync || shouldPreferRemoteForFreshInstall(local, lastState)
-        val tombstones = readTombstones().toMutableSet()
-        val completedDeletes = mutableSetOf<String>()
-        tombstones.forEach { path ->
-            val remoteFile = remote[path]
-            if (remoteFile == null) {
-                completedDeletes += path
-                lastState.remove(path)
-            } else {
-                try {
-                    val connection = open("DELETE", "$DRIVE_API/files/${remoteFile.id}", accessToken)
-                    ensureSuccess(connection)
-                    remote.remove(path)
-                    completedDeletes += path
-                    lastState.remove(path)
-                } catch (e: AuthExpiredException) {
-                    throw e
-                } catch (_: Exception) {
-                    // Keep tombstone for the next sync attempt.
-                }
-            }
-        }
-        if (completedDeletes.isNotEmpty()) {
-            tombstones.removeAll(completedDeletes)
-            writeTombstones(tombstones)
-        }
-        var uploaded = 0
-        var downloaded = 0
-        var conflicts = 0
-        var unchanged = 0
-        var errors = 0
-
-        (local.keys + remote.keys).toSortedSet().forEach { path ->
-            val localFile = local[path]
-            val remoteFile = remote[path]
-            try {
-                when {
-                    localFile == null && remoteFile != null -> {
-                        val target = File(fileOps.persistentDataRoot(), path)
-                        if (download(accessToken, remoteFile, target)) {
-                            downloaded++
-                            lastState[path] = remoteFile.hash.ifBlank { sha256File(target) }
-                        } else errors++
-                    }
-                    localFile != null && remoteFile == null -> {
-                        val hash = sha256File(localFile)
-                        val created = upload(accessToken, rootId, path, hash, localFile, null)
-                        if (created != null) {
-                            uploaded++
-                            lastState[path] = hash
-                            remote[path] = created
-                        } else errors++
-                    }
-                    localFile != null && remoteFile != null -> {
-                        val localHash = sha256File(localFile)
-                        val remoteHash = remoteFile.hash.ifBlank { downloadHash(accessToken, remoteFile) }
-                        if (localHash == remoteHash && localHash.isNotBlank()) {
-                            unchanged++
-                            lastState[path] = localHash
-                            return@forEach
-                        }
-                        val previous = lastState[path]
-                        val localChanged = previous == null || localHash != previous
-                        val remoteChanged = previous == null || remoteHash != previous
-                        when {
-                            previous != null && localChanged && !remoteChanged -> {
-                                if (upload(accessToken, rootId, path, localHash, localFile, remoteFile.id) != null) {
-                                    uploaded++
-                                    lastState[path] = localHash
-                                } else errors++
-                            }
-                            previous != null && !localChanged && remoteChanged -> {
-                                if (download(accessToken, remoteFile, localFile)) {
-                                    downloaded++
-                                    lastState[path] = remoteHash
-                                } else errors++
-                            }
-                            else -> {
-                                conflicts++
-                                // Explicit reinstall recovery is remote-first when
-                                // this device has no sync journal yet. A clean install
-                                // creates new empty Metadata/library.json and
-                                // Metadata/settings.json immediately; timestamp-only
-                                // conflict resolution would otherwise let those empty
-                                // files overwrite the user's real cloud backup.
-                                if (previous == null && preferRemoteForUnpairedEmptyInstall) {
-                                    preserveLocalConflict(path, localFile)
-                                    if (download(accessToken, remoteFile, localFile)) {
-                                        downloaded++
-                                        lastState[path] = remoteHash
-                                    } else errors++
-                                } else if (remoteFile.modifiedAt > localFile.lastModified() + CLOCK_TOLERANCE_MS) {
-                                    preserveLocalConflict(path, localFile)
-                                    if (download(accessToken, remoteFile, localFile)) {
-                                        downloaded++
-                                        lastState[path] = remoteHash
-                                    } else errors++
-                                } else {
-                                    preserveRemoteConflict(accessToken, path, remoteFile)
-                                    if (upload(accessToken, rootId, path, localHash, localFile, remoteFile.id) != null) {
-                                        uploaded++
-                                        lastState[path] = localHash
-                                    } else errors++
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (e: AuthExpiredException) {
-                throw e
-            } catch (_: Exception) {
-                errors++
-            }
-        }
-        writeState(lastState)
-        return SyncResult(uploaded, downloaded, conflicts, unchanged, errors)
-    }
-
-
-    private fun shouldPreferRemoteForFreshInstall(local: Map<String, File>, lastState: Map<String, String>): Boolean {
-        if (lastState.isNotEmpty()) return false
-        // Directly meaningful portable files mean this device already has user
-        // data and should use normal conflict handling. Metadata-only state is
-        // what a brand-new Retra install generates before its first sync.
-        if (local.keys.any { path -> !path.startsWith("Metadata/") }) return false
-        val library = local["Metadata/library.json"] ?: return true
-        return runCatching {
-            val root = JSONObject(library.readText(Charsets.UTF_8))
-            (root.optJSONArray("roms")?.length() ?: 0) == 0
-        }.getOrDefault(false)
-    }
-
-    private fun localFiles(): Map<String, File> {
-        val root = fileOps.persistentDataRoot()
-        val out = linkedMapOf<String, File>()
-        if (!root.exists()) return out
-        root.walkTopDown().filter { it.isFile && it.length() > 0L }.forEach { file ->
-            val path = file.relativeTo(root).invariantSeparatorsPath
-            if (!path.startsWith("Backups/CloudConflicts/")) out[path] = file
-        }
-        return out
-    }
-
-    private fun findOrCreateRoot(token: String): String {
-        val q = "trashed=false and mimeType='application/vnd.google-apps.folder' and appProperties has { key='retraRoot' and value='1' }"
-        val url = "$DRIVE_API/files?q=${encode(q)}&spaces=drive&fields=files(id,name)&pageSize=10"
-        val result = requestJson("GET", url, token)
-        val files = result.optJSONArray("files") ?: JSONArray()
-        if (files.length() > 0) return files.getJSONObject(0).getString("id")
-
-        val metadata = JSONObject().apply {
-            put("name", "Retra Sync")
-            put("mimeType", "application/vnd.google-apps.folder")
-            put("appProperties", JSONObject().put("retraRoot", "1"))
-        }
-        return requestJson("POST", "$DRIVE_API/files?fields=id", token, metadata.toString().toByteArray()).getString("id")
-    }
-
-    private fun listRemoteFiles(token: String, rootId: String): List<RemoteFile> {
-        val out = mutableListOf<RemoteFile>()
-        var pageToken: String? = null
-        do {
-            val q = "'$rootId' in parents and trashed=false"
-            val suffix = buildString {
-                append("?q=").append(encode(q))
-                append("&spaces=drive&pageSize=1000")
-                append("&fields=nextPageToken,files(id,name,size,modifiedTime,appProperties)")
-                if (!pageToken.isNullOrBlank()) append("&pageToken=").append(encode(pageToken!!))
-            }
-            val json = requestJson("GET", "$DRIVE_API/files$suffix", token)
-            val files = json.optJSONArray("files") ?: JSONArray()
-            for (index in 0 until files.length()) {
-                val item = files.getJSONObject(index)
-                val props = item.optJSONObject("appProperties") ?: JSONObject()
-                val path = props.optString("retraPath", "")
-                if (path.isBlank()) continue
-                out += RemoteFile(
-                    id = item.getString("id"),
-                    path = path,
-                    hash = props.optString("retraSha256", ""),
-                    modifiedAt = parseDriveTime(item.optString("modifiedTime", "")),
-                    size = item.optString("size", "0").toLongOrNull() ?: 0L
-                )
-            }
-            pageToken = json.optString("nextPageToken", "").ifBlank { null }
-        } while (pageToken != null)
-        return out
-    }
-
-    private fun upload(
-        token: String,
-        rootId: String,
-        path: String,
-        hash: String,
+    /**
+     * Upload a new immutable snapshot. Existing backups are never PATCHed.
+     * A failed or unverifiable upload is removed only if it is the newly-created file.
+     */
+    fun uploadBackup(
+        accessToken: String,
         source: File,
-        existingId: String?
-    ): RemoteFile? {
-        val metadata = JSONObject().apply {
-            put("name", path.substringAfterLast('/'))
-            if (existingId == null) put("parents", JSONArray().put(rootId))
-            put("appProperties", JSONObject().apply {
-                put("retraPath", path)
-                put("retraSha256", hash)
-                put("retraSync", "1")
-            })
+        sha256: String,
+        onProgress: (Int) -> Unit = {}
+    ): UploadResult {
+        require(source.isFile && source.length() > 0L) { "Backup archive is empty" }
+        val existing = listBackups(accessToken)
+        val newest = existing.maxByOrNull { it.createdAt }
+        if (newest != null && newest.sha256.equals(sha256, ignoreCase = true)) {
+            onProgress(100)
+            return UploadResult(newest, deduplicated = true)
         }
-        val boundary = "RetraBoundary${System.nanoTime()}"
-        val header = ("--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
-            metadata.toString() + "\r\n--$boundary\r\nContent-Type: application/octet-stream\r\n\r\n").toByteArray()
-        val footer = "\r\n--$boundary--\r\n".toByteArray()
-        val endpoint = if (existingId == null) "$DRIVE_UPLOAD/files?uploadType=multipart&fields=id,size,modifiedTime,appProperties"
-            else "$DRIVE_UPLOAD/files/$existingId?uploadType=multipart&fields=id,size,modifiedTime,appProperties"
-        val method = if (existingId == null) "POST" else "PATCH"
-        val json = requestMultipart(method, endpoint, token, boundary, header, source, footer)
-        val props = json.optJSONObject("appProperties") ?: metadata.getJSONObject("appProperties")
-        return RemoteFile(
-            id = json.getString("id"),
-            path = props.optString("retraPath", path),
-            hash = props.optString("retraSha256", hash),
-            modifiedAt = parseDriveTime(json.optString("modifiedTime", "")),
-            size = json.optString("size", source.length().toString()).toLongOrNull() ?: source.length()
-        )
+
+        val folderId = findOrCreateBackupFolder(accessToken)
+        val localMd5 = digestFile(source, "MD5")
+        val metadata = JSONObject()
+            .put("name", source.name)
+            .put("parents", JSONArray().put(folderId))
+            .put("mimeType", BACKUP_MIME)
+            .put("appProperties", JSONObject()
+                .put("retraBackup", "1")
+                .put("retraSchema", "1")
+                .put("retraSha256", sha256.lowercase(Locale.US))
+                .put("retraCreatedAt", System.currentTimeMillis().toString()))
+
+        var createdId: String? = null
+        try {
+            val boundary = "RetraBackupBoundary${System.nanoTime()}"
+            val header = ("--$boundary\r\n" +
+                "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+                metadata.toString() + "\r\n" +
+                "--$boundary\r\n" +
+                "Content-Type: $BACKUP_MIME\r\n\r\n").toByteArray(Charsets.UTF_8)
+            val footer = "\r\n--$boundary--\r\n".toByteArray(Charsets.UTF_8)
+            val endpoint = "$DRIVE_UPLOAD/files?uploadType=multipart&fields=id,name,size,createdTime,modifiedTime,md5Checksum,appProperties"
+            val json = requestMultipart(endpoint, accessToken, boundary, header, source, footer, onProgress)
+            createdId = json.optString("id").takeIf { it.isNotBlank() }
+                ?: throw IllegalStateException("Drive did not return the uploaded file ID")
+            val uploaded = jsonToBackup(json)
+
+            if (uploaded.size != source.length()) {
+                throw IllegalStateException("Drive upload size verification failed")
+            }
+            if (uploaded.md5.isBlank() || !uploaded.md5.equals(localMd5, ignoreCase = true)) {
+                throw IllegalStateException("Drive upload checksum verification failed")
+            }
+            if (!uploaded.sha256.equals(sha256, ignoreCase = true)) {
+                throw IllegalStateException("Drive backup metadata verification failed")
+            }
+            onProgress(100)
+            return UploadResult(uploaded)
+        } catch (error: Exception) {
+            // Protect every prior good backup. At most, clean up the NEW failed object.
+            createdId?.let { id -> runCatching { deleteFile(accessToken, id) } }
+            throw error
+        }
     }
 
-    private fun download(token: String, remote: RemoteFile, target: File): Boolean {
+    /** Download one chosen snapshot and verify Drive size/checksum before returning it. */
+    fun downloadBackup(
+        accessToken: String,
+        backup: CloudBackup,
+        target: File,
+        onProgress: (Int) -> Unit = {}
+    ): File {
         target.parentFile?.mkdirs()
-        val tmp = File(target.parentFile, ".${target.name}.${System.nanoTime()}.drive.tmp")
-        return try {
-            val connection = open("GET", "$DRIVE_API/files/${remote.id}?alt=media", token)
+        val partial = File(target.parentFile ?: cacheDir, ".${target.name}.${System.nanoTime()}.part")
+        try {
+            val connection = open("GET", "$DRIVE_API/files/${backup.id}?alt=media", accessToken)
             ensureSuccess(connection)
+            val total = backup.size.takeIf { it > 0L } ?: connection.contentLengthLong.coerceAtLeast(0L)
+            var copied = 0L
             connection.inputStream.use { input ->
-                FileOutputStream(tmp).use { output ->
-                    input.copyTo(output, 64 * 1024)
+                FileOutputStream(partial).use { output ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        copied += read
+                        if (total > 0L) onProgress(((copied * 100L) / total).toInt().coerceIn(0, 99))
+                    }
                     output.flush()
                     runCatching { output.fd.sync() }
                 }
             }
-            if (remote.size > 0L && tmp.length() != remote.size) return false
-            if (remote.hash.isNotBlank() && !sha256File(tmp).equals(remote.hash, true)) return false
-            fileOps.moveTempIntoPlace(tmp, target, "Could not replace Drive data")
-            if (remote.modifiedAt > 0L) target.setLastModified(remote.modifiedAt)
-            true
-        } finally {
-            if (tmp.exists()) tmp.delete()
-        }
-    }
-
-    private fun downloadHash(token: String, remote: RemoteFile): String {
-        val temp = File(filesDir, ".drive_hash_${System.nanoTime()}.tmp")
-        return try {
-            if (!download(token, remote, temp)) "" else sha256File(temp)
-        } finally {
-            temp.delete()
-        }
-    }
-
-    private fun preserveLocalConflict(path: String, file: File) {
-        val target = conflictFile(path, "local")
-        target.parentFile?.mkdirs()
-        runCatching { fileOps.atomicCopyVerified(file, target) }
-    }
-
-    private fun preserveRemoteConflict(token: String, path: String, remote: RemoteFile) {
-        val target = conflictFile(path, "drive")
-        runCatching { download(token, remote, target) }
-    }
-
-    private fun conflictFile(path: String, side: String): File {
-        val safePath = path.split('/').joinToString("/") { fileOps.sanitizeFileName(it) }
-        return File(File(fileOps.persistentCategoryDir("Backups"), "CloudConflicts"), "${System.currentTimeMillis()}/$side/$safePath")
-    }
-
-    private fun readTombstones(): Set<String> {
-        val file = File(filesDir, TOMBSTONE_FILE)
-        if (!file.exists()) return emptySet()
-        return runCatching {
-            val array = JSONArray(file.readText())
-            buildSet {
-                for (index in 0 until array.length()) {
-                    val path = array.optString(index, "")
-                    if (path.isNotBlank()) add(path)
+            if (backup.size > 0L && partial.length() != backup.size) {
+                throw IllegalStateException("Downloaded backup size does not match Google Drive")
+            }
+            if (backup.md5.isNotBlank()) {
+                val actual = digestFile(partial, "MD5")
+                if (!actual.equals(backup.md5, ignoreCase = true)) {
+                    throw IllegalStateException("Downloaded backup checksum is invalid")
                 }
             }
-        }.getOrDefault(emptySet())
-    }
-
-    private fun writeTombstones(paths: Set<String>) {
-        val array = JSONArray()
-        paths.toSortedSet().forEach(array::put)
-        runCatching { fileOps.atomicWriteText(File(filesDir, TOMBSTONE_FILE), array.toString()) }
-    }
-
-    private fun readState(): Map<String, String> {
-        val file = File(filesDir, STATE_FILE)
-        if (!file.exists()) return emptyMap()
-        return runCatching {
-            val obj = JSONObject(file.readText()).optJSONObject("files") ?: JSONObject()
-            buildMap {
-                val names = obj.keys()
-                while (names.hasNext()) {
-                    val name = names.next()
-                    val hash = obj.optString(name, "")
-                    if (hash.isNotBlank()) put(name, hash)
-                }
-            }
-        }.getOrDefault(emptyMap())
-    }
-
-    private fun writeState(state: Map<String, String>) {
-        val json = JSONObject().apply {
-            put("version", 1)
-            put("updatedAt", System.currentTimeMillis())
-            put("files", JSONObject().apply { state.toSortedMap().forEach { (path, hash) -> put(path, hash) } })
+            if (target.exists() && !target.delete()) throw IllegalStateException("Could not replace temporary restore file")
+            if (!partial.renameTo(target)) partial.copyTo(target, overwrite = true)
+            onProgress(100)
+            return target
+        } finally {
+            if (partial.exists()) partial.delete()
         }
-        runCatching { fileOps.atomicWriteText(File(filesDir, STATE_FILE), json.toString()) }
+    }
+
+    /** No-op for snapshot storage: the next archive reflects deletions without mutating old backups. */
+    fun queueDelete(paths: List<String>) = Unit
+    fun deletePaths(accessToken: String, paths: List<String>) = Unit
+
+    private fun findBackupFolder(token: String): String? {
+        // Exact My Drive root + exact name prevents accidentally binding to a
+        // same-name nested folder. If duplicates already exist, oldest is reused.
+        val q = "'root' in parents and trashed = false and mimeType = '$FOLDER_MIME' and name = '$BACKUP_FOLDER_NAME'"
+        val fields = "files(id,name,createdTime,appProperties)"
+        val result = requestJson("GET", "$DRIVE_API/files?q=${encode(q)}&spaces=drive&orderBy=createdTime&fields=${encode(fields)}&pageSize=100", token)
+        val files = result.optJSONArray("files") ?: JSONArray()
+        if (files.length() == 0) return null
+
+        var selectedId: String? = null
+        var selectedCreated = Long.MAX_VALUE
+        for (i in 0 until files.length()) {
+            val item = files.optJSONObject(i) ?: continue
+            val id = item.optString("id")
+            if (id.isBlank()) continue
+            val created = parseDriveTime(item.optString("createdTime"))
+            if (selectedId == null || (created > 0L && created < selectedCreated)) {
+                selectedId = id
+                selectedCreated = if (created > 0L) created else selectedCreated
+            }
+        }
+        return selectedId
+    }
+
+    private fun findOrCreateBackupFolder(token: String): String {
+        findBackupFolder(token)?.let { return it }
+        val body = JSONObject()
+            .put("name", BACKUP_FOLDER_NAME)
+            .put("mimeType", FOLDER_MIME)
+            .put("parents", JSONArray().put("root"))
+            .put("appProperties", JSONObject().put("retraBackupRoot", "1"))
+        val created = requestJson("POST", "$DRIVE_API/files?fields=id,name,parents,appProperties", token, body.toString().toByteArray(Charsets.UTF_8))
+        return created.optString("id").takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("Could not create My Drive/$BACKUP_FOLDER_NAME")
+    }
+
+    private fun listBackups(token: String, folderId: String): List<CloudBackup> {
+        val q = "'$folderId' in parents and trashed = false"
+        val fields = "nextPageToken,files(id,name,size,createdTime,modifiedTime,md5Checksum,mimeType,appProperties)"
+        val backups = mutableListOf<CloudBackup>()
+        var pageToken: String? = null
+        do {
+            val tokenPart = pageToken?.let { "&pageToken=${encode(it)}" }.orEmpty()
+            val url = "$DRIVE_API/files?q=${encode(q)}&spaces=drive&orderBy=createdTime%20desc&fields=${encode(fields)}&pageSize=100$tokenPart"
+            val result = requestJson("GET", url, token)
+            val files = result.optJSONArray("files") ?: JSONArray()
+            for (i in 0 until files.length()) {
+                val json = files.optJSONObject(i) ?: continue
+                val name = json.optString("name")
+                val props = json.optJSONObject("appProperties")
+                val isRetra = props?.optString("retraBackup") == "1" || name.endsWith(".retra", ignoreCase = true)
+                if (isRetra) backups += jsonToBackup(json)
+            }
+            pageToken = result.optString("nextPageToken").takeIf { it.isNotBlank() }
+        } while (pageToken != null)
+        return backups.sortedByDescending { if (it.createdAt > 0L) it.createdAt else it.modifiedAt }
+    }
+
+    private fun jsonToBackup(json: JSONObject): CloudBackup {
+        val props = json.optJSONObject("appProperties") ?: JSONObject()
+        return CloudBackup(
+            id = json.optString("id"),
+            name = json.optString("name", "Retra backup.retra"),
+            createdAt = parseDriveTime(json.optString("createdTime")),
+            modifiedAt = parseDriveTime(json.optString("modifiedTime")),
+            size = json.optString("size", "0").toLongOrNull() ?: 0L,
+            md5 = json.optString("md5Checksum"),
+            sha256 = props.optString("retraSha256")
+        )
     }
 
     private fun requestJson(method: String, url: String, token: String, body: ByteArray? = null): JSONObject {
@@ -404,33 +247,49 @@ class GoogleDriveApiRepository(
     }
 
     private fun requestMultipart(
-        method: String,
         url: String,
         token: String,
         boundary: String,
         header: ByteArray,
         source: File,
-        footer: ByteArray
+        footer: ByteArray,
+        onProgress: (Int) -> Unit
     ): JSONObject {
-        val connection = open(if (method == "PATCH") "POST" else method, url, token)
-        if (method == "PATCH") connection.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+        val connection = open("POST", url, token)
         connection.doOutput = true
-        connection.setChunkedStreamingMode(64 * 1024)
+        connection.setChunkedStreamingMode(BUFFER_SIZE)
         connection.setRequestProperty("Content-Type", "multipart/related; boundary=$boundary")
         connection.outputStream.use { output ->
             output.write(header)
-            FileInputStream(source).use { it.copyTo(output, 64 * 1024) }
+            var copied = 0L
+            val total = source.length().coerceAtLeast(1L)
+            FileInputStream(source).use { input ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                    copied += read
+                    onProgress(((copied * 100L) / total).toInt().coerceIn(0, 99))
+                }
+            }
             output.write(footer)
+            output.flush()
         }
         ensureSuccess(connection)
         return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
     }
 
+    private fun deleteFile(token: String, id: String) {
+        val connection = open("DELETE", "$DRIVE_API/files/$id", token)
+        ensureSuccess(connection)
+    }
+
     private fun open(method: String, url: String, token: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
-            connectTimeout = 15_000
-            readTimeout = 30_000
+            connectTimeout = 20_000
+            readTimeout = 120_000
             useCaches = false
             setRequestProperty("Authorization", "Bearer $token")
             setRequestProperty("Accept", "application/json")
@@ -438,34 +297,37 @@ class GoogleDriveApiRepository(
 
     private fun ensureSuccess(connection: HttpURLConnection) {
         val code = connection.responseCode
-        if (code == 401 || code == 403) throw AuthExpiredException()
+        if (code == 401) throw AuthExpiredException()
         if (code !in 200..299) {
             val message = runCatching { connection.errorStream?.bufferedReader()?.use { it.readText() } }.getOrNull()
-            error("Drive API $code${if (message.isNullOrBlank()) "" else ": $message"}")
+            throw IllegalStateException("Google Drive API $code${if (message.isNullOrBlank()) "" else ": $message"}")
         }
     }
 
-    private fun sha256File(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
+    fun sha256(file: File): String = digestFile(file, "SHA-256")
+
+    private fun digestFile(file: File, algorithm: String): String {
+        val digest = MessageDigest.getInstance(algorithm)
         FileInputStream(file).use { input ->
-            val buffer = ByteArray(64 * 1024)
+            val buffer = ByteArray(BUFFER_SIZE)
             while (true) {
                 val count = input.read(buffer)
                 if (count <= 0) break
                 digest.update(buffer, 0, count)
             }
         }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        return digest.digest().joinToString("") { "%02x".format(Locale.US, it) }
     }
 
     private fun parseDriveTime(value: String): Long = runCatching { Instant.parse(value).toEpochMilli() }.getOrDefault(0L)
     private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
 
     companion object {
+        const val BACKUP_FOLDER_NAME = "Retra Backups"
+        private const val BACKUP_MIME = "application/x-retra-backup"
+        private const val FOLDER_MIME = "application/vnd.google-apps.folder"
         private const val DRIVE_API = "https://www.googleapis.com/drive/v3"
         private const val DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3"
-        private const val STATE_FILE = "drive_api_sync_state_v1.json"
-        private const val TOMBSTONE_FILE = "drive_api_tombstones_v1.json"
-        private const val CLOCK_TOLERANCE_MS = 1500L
+        private const val BUFFER_SIZE = 64 * 1024
     }
 }

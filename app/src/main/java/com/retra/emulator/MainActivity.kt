@@ -11,6 +11,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.webkit.JavascriptInterface
 import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -240,9 +241,10 @@ class MainActivity : AppCompatActivity() {
     internal var pendingCloudEnable = false
     internal var pendingCloudRestore = false
     internal var pendingCloudAccount: String? = null
-    internal var pendingDriveAuthAccount: String? = null
-    internal var pendingDriveAuthRestore = false
     internal var pendingBackupSelection: BackupRepository.Selection? = null
+    internal var pendingSaveImportRomId: String? = null
+    internal var pendingSaveImportGameplay = false
+    internal var pendingSaveImportSession: PendingSaveImportSession? = null
     // Coalesce repeated portable-folder writes (volume sliders, rapid save-state
     // updates, lifecycle commits) into one serialized SAF export. A dirty bit
     // guarantees a change that arrives during an export gets one final pass.
@@ -379,24 +381,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     internal val driveApi: GoogleDriveApiRepository by lazy {
-        GoogleDriveApiRepository(
-            filesDir = filesDir,
-            fileOps = fileOps,
-            preparePortableMetadata = { writePortableMetadataFiles() }
-        )
+        GoogleDriveApiRepository(cacheDir = cacheDir)
     }
 
     internal val cloudSync: CloudSyncCoordinator by lazy {
         CloudSyncCoordinator(
             activity = this,
             prefs = prefs,
-            saveTransfer = saveTransfer,
+            backupRepository = backupRepository,
             driveApi = driveApi,
             ioExecutor = ioExecutor,
-            cloudRootUri = { cloudRootUri() },
             onSettingsChanged = { runOnUiThread { notifyWebSettingsState() } },
-            onPortableDataDownloaded = { explicitRecovery ->
-                val applied = backupRepository.applyPortableMetadataFromPersistentData()
+            onBackupRestored = {
                 runOnUiThread {
                     applyRuntimeSettingsToNative()
                     notifyWebSettingsState()
@@ -406,20 +402,11 @@ class MainActivity : AppCompatActivity() {
                             null
                         )
                     }
-                    if (explicitRecovery && applied > 0) {
-                        RetraNotice.makeText(
-                            this,
-                            "Retra recovery restored saves, library data, statistics and settings",
-                            RetraNotice.LENGTH_LONG
-                        ).show()
-                    }
                 }
             },
-            onFolderFallbackRequested = { runOnUiThread { requestCloudSyncFolder() } },
-            onAuthRecoveryRequired = { account, intent, restoreRemoteFirst ->
-                pendingDriveAuthAccount = account
-                pendingDriveAuthRestore = restoreRemoteFirst
-                driveAuthRecoveryLauncher.launch(intent)
+            onAuthorizationResolutionRequired = { pendingIntent ->
+                val request = IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                cloudAuthorizationLauncher.launch(request)
             }
         )
     }
@@ -607,9 +594,7 @@ class MainActivity : AppCompatActivity() {
     internal val cloudAccountPicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != RESULT_OK) {
-                if (pendingCloudEnable && cloudRootUri() == null) {
-                    prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
-                }
+                if (pendingCloudEnable) prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
                 pendingCloudEnable = false
                 pendingCloudRestore = false
                 pendingCloudAccount = null
@@ -620,75 +605,36 @@ class MainActivity : AppCompatActivity() {
             val accountName = result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME).orEmpty()
             val accountType = result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_TYPE).orEmpty()
             if (accountName.isBlank() || accountType != "com.google") {
-                if (pendingCloudEnable && cloudRootUri() == null) {
-                    prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
-                }
+                if (pendingCloudEnable) prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
                 pendingCloudEnable = false
                 pendingCloudRestore = false
                 pendingCloudAccount = null
                 notifyWebSettingsState()
-                RetraNotice.makeText(this, "Choose a Google account to use Drive sync", RetraNotice.LENGTH_SHORT).show()
+                RetraNotice.makeText(this, "Choose a Google account for Google Drive", RetraNotice.LENGTH_SHORT).show()
                 return@registerForActivityResult
             }
 
             pendingCloudAccount = accountName
-            val restoreRemoteFirst = pendingCloudRestore
+            val restore = pendingCloudRestore
             RetraNotice.makeText(
                 this,
-                if (restoreRemoteFirst) "Selected $accountName • looking for your Retra recovery data" else "Selected $accountName • connecting Google Drive API",
+                if (restore) "Selected $accountName • loading Retra backups" else "Selected $accountName • authorizing Google Drive",
                 RetraNotice.LENGTH_SHORT
             ).show()
-            cloudSync.connectAccount(
-                accountName,
-                interactive = true,
-                fallbackToFolder = !restoreRemoteFirst,
-                restoreRemoteFirst = restoreRemoteFirst
-            )
+            cloudSync.connectAccount(accountName, restore = restore, showResult = true)
+            pendingCloudEnable = false
             pendingCloudRestore = false
             notifyWebSettingsState()
         }
 
-    internal val cloudFolderPicker =
-        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-            if (uri == null) {
-                if (pendingCloudEnable && cloudRootUri() == null) {
-                    prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
-                }
-                pendingCloudEnable = false
-                pendingCloudRestore = false
-                pendingCloudAccount = null
-                notifyWebSettingsState()
-                return@registerForActivityResult
-            }
-            persistTreePermission(uri)
-            val account = pendingCloudAccount ?: prefs.getString(CLOUD_SYNC_ACCOUNT_PREF, null)
-            cloudSync.markSafConnected(uri, account)
-            pendingCloudEnable = false
-            pendingCloudRestore = false
-            pendingCloudAccount = null
-            syncCloudAsync(showResult = true)
+    internal val cloudAuthorizationLauncher: ActivityResultLauncher<IntentSenderRequest> =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            cloudSync.onAuthorizationResolutionResult(result.resultCode, result.data)
         }
 
-    internal val driveAuthRecoveryLauncher: ActivityResultLauncher<Intent> =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            val account = pendingDriveAuthAccount
-            val restoreRemoteFirst = pendingDriveAuthRestore
-            pendingDriveAuthAccount = null
-            pendingDriveAuthRestore = false
-            if (result.resultCode == RESULT_OK && !account.isNullOrBlank()) {
-                cloudSync.connectAccount(
-                    account,
-                    interactive = false,
-                    fallbackToFolder = !restoreRemoteFirst,
-                    restoreRemoteFirst = restoreRemoteFirst
-                )
-            } else if (!account.isNullOrBlank() && !restoreRemoteFirst) {
-                pendingCloudAccount = account
-                RetraNotice.makeText(this, "Drive API authorization was not granted • choose a Drive folder instead", RetraNotice.LENGTH_LONG).show()
-                requestCloudSyncFolder()
-            } else if (restoreRemoteFirst) {
-                RetraNotice.makeText(this, "Google Drive recovery was cancelled", RetraNotice.LENGTH_SHORT).show()
-            }
+    internal val saveImportPicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            handleSaveImportPickerResult(uri)
         }
 
     internal val importSavesFolderPicker =
@@ -1135,6 +1081,17 @@ class MainActivity : AppCompatActivity() {
             return true
         }
 
+        @JavascriptInterface
+        fun renameRomTitle(romId: String, requestedTitle: String): Boolean {
+            if (romId.isBlank() || romIdentityStore.getById(romId) == null) return false
+            val normalized = requestedTitle.trim().replace(Regex("\\s+"), " ").take(64)
+            if (normalized.isBlank()) return false
+            romIdentityStore.updateDisplayName(romId, normalized)
+            prefs.edit().putString(titleKey(romId), normalized).apply()
+            syncCloudAsync(showResult = false)
+            return true
+        }
+
 
         @JavascriptInterface
         fun syncRomCompletionState(stateJson: String): Int {
@@ -1275,12 +1232,23 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun openCloudSyncSettings() {
-            runOnUiThread { cloudSync.showSettings({ requestCloudSyncAccount() }, { requestCloudSyncFolder() }) }
+            runOnUiThread { cloudSync.showSettings { requestCloudSyncAccount() } }
+        }
+
+        @JavascriptInterface
+        fun backupToGoogleDrive() {
+            runOnUiThread {
+                if (!cloudSync.isReady()) requestCloudSyncAccount()
+                else cloudSync.backupNow(showResult = true)
+            }
         }
 
         @JavascriptInterface
         fun restoreFromGoogleDrive() {
-            runOnUiThread { requestCloudRecoveryAccount() }
+            runOnUiThread {
+                if (!cloudSync.isReady()) requestCloudRecoveryAccount()
+                else cloudSync.restoreFromDrive(showResult = true)
+            }
         }
 
         @JavascriptInterface
@@ -1518,6 +1486,8 @@ class MainActivity : AppCompatActivity() {
     external fun getPlatform(): Int
     external fun quickSaveState(path: String): Boolean
     external fun quickLoadState(path: String): Boolean
+    external fun rewindSeconds(seconds: Int): Boolean
+    external fun getRewindAvailableSeconds(): Int
     external fun setCoreConfigOption(key: String, value: String)
     external fun readAudioSamples(buffer: ShortArray): Int
     external fun readAudioSamplesAtSpeed(buffer: ShortArray, speed: Double): Int

@@ -265,13 +265,18 @@ function getNativeStatistics(){
   }
 }
 
-async function hydratePlaytimeCover(row, rom){
-  if (!row || !rom?.id || !rom.coverCached) return;
+async function hydratePlaytimeCover(row, rom, nativeAlreadyChecked = false){
+  if (!row || !rom?.id) return;
   try {
-    const blob = await getStoredRomCoverBlob(rom.id);
-    if (!blob || !row.isConnected) return;
-    const cover = setRomCoverObjectUrl(rom.id, blob);
-    if (!cover) return;
+    // Statistics resolves artwork from the exact same sources as Library/History.
+    // Native media is checked first because Change Cover persists there even when
+    // this WebView has not hydrated its legacy IndexedDB cover metadata yet.
+    let cover = (nativeAlreadyChecked ? '' : getNativeRomMediaUrl(rom.id, 'cover')) || romCoverObjectUrls.get(rom.id) || rom.cover || '';
+    if (!cover && rom.coverCached) {
+      const blob = await getStoredRomCoverBlob(rom.id);
+      if (blob) cover = setRomCoverObjectUrl(rom.id, blob);
+    }
+    if (!cover || !row.isConnected) return;
     const media = row.querySelector('.playtime-cover');
     if (!media) return;
     const image = document.createElement('img');
@@ -317,7 +322,7 @@ function renderPlaytimeByRom(playtimeByRom){
 
     const coverWrap = document.createElement('div');
     coverWrap.className = 'playtime-cover';
-    const cover = romCoverObjectUrls.get(rom.id) || rom.cover || '';
+    const cover = getNativeRomMediaUrl(rom.id, 'cover') || romCoverObjectUrls.get(rom.id) || rom.cover || '';
     if (cover) {
       const image = document.createElement('img');
       image.loading = 'lazy';
@@ -351,7 +356,7 @@ function renderPlaytimeByRom(playtimeByRom){
     row.append(left, time);
     list.appendChild(row);
 
-    if (!cover && rom.coverCached) hydratePlaytimeCover(row, rom);
+    if (!cover) hydratePlaytimeCover(row, rom, true);
   });
 }
 
@@ -403,7 +408,9 @@ let lastLibraryRenderSignature = '';
 
 function getLibraryRenderSignature(){
   const assignments = readCategoryMap('retraRomCategoryAssignments');
-  return JSON.stringify(orderedLibraryRoms().map(rom => [
+  return JSON.stringify([
+    [libraryViewPrefs.sort, libraryViewPrefs.direction, libraryViewPrefs.display, libraryViewPrefs.itemsPerRow, libraryViewPrefs.randomSeed],
+    orderedLibraryRoms().map(rom => [
     String(rom.id || ''),
     String(rom.title || ''),
     String(rom.fileName || ''),
@@ -414,11 +421,13 @@ function getLibraryRenderSignature(){
     String(romCoverObjectUrls.get(rom.id) || rom.cover || ''),
     Boolean(rom.coverCached),
     Array.isArray(assignments[String(rom.id)]) ? assignments[String(rom.id)] : []
-  ]));
+    ])
+  ]);
 }
 
 function renderLibraryFromStorage({ force = false } = {}){
   if (!libraryGrid) return false;
+  applyLibraryDisplayPreferences();
 
   // Chromium can skip painting off-screen card internals for large libraries
   // while preserving each card's grid geometry and hit target. Small libraries
@@ -929,6 +938,7 @@ function refreshRomRecentSaves(card = currentRomCard){
 }
 
 function openRomDetail(card){
+  closeLibraryViewSheet();
   libraryOverflowMenu?.classList.remove('open');
   setRomOverflowOpen(false);
   currentRomCard = card;
@@ -973,6 +983,146 @@ function openRomDetail(card){
 
   openSubPage('romDetailPage');
 }
+
+// v1.0.3 Library Sort / Display sheet -------------------------------------------------
+const libraryViewBtn = document.getElementById('libraryViewBtn');
+const libraryViewSheet = document.getElementById('libraryViewSheet');
+const libraryViewTabs = [...document.querySelectorAll('[data-library-view-tab]')];
+const libraryViewPanels = [...document.querySelectorAll('[data-library-view-panel]')];
+const librarySortOptions = [...document.querySelectorAll('[data-library-sort]')];
+const libraryDisplayModes = [...document.querySelectorAll('[data-library-display]')];
+const libraryItemsPerRow = document.getElementById('libraryItemsPerRow');
+const libraryItemsPerRowValue = document.getElementById('libraryItemsPerRowValue');
+
+function applyLibraryDisplayPreferences(){
+  if (!libraryGrid) return;
+  libraryViewPrefs = normalizeLibraryViewPrefs(libraryViewPrefs);
+  libraryGrid.classList.remove(
+    'library-display-compact',
+    'library-display-comfortable',
+    'library-display-cover-only',
+    'library-display-list'
+  );
+  const displayClass = {
+    compact: 'library-display-compact',
+    comfortable: 'library-display-comfortable',
+    coverOnly: 'library-display-cover-only',
+    list: 'library-display-list'
+  }[libraryViewPrefs.display] || 'library-display-compact';
+  libraryGrid.classList.add(displayClass);
+  libraryGrid.style.setProperty('--library-columns', String(libraryViewPrefs.itemsPerRow));
+  libraryGrid.dataset.displayMode = libraryViewPrefs.display;
+  libraryGrid.dataset.itemsPerRow = String(libraryViewPrefs.itemsPerRow);
+}
+
+function setLibraryViewTab(tab){
+  const next = tab === 'display' ? 'display' : 'sort';
+  libraryViewTabs.forEach(button => {
+    const active = button.dataset.libraryViewTab === next;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  libraryViewPanels.forEach(panel => panel.classList.toggle('active', panel.dataset.libraryViewPanel === next));
+}
+
+function updateLibraryViewSheetUi(){
+  libraryViewPrefs = normalizeLibraryViewPrefs(libraryViewPrefs);
+  librarySortOptions.forEach(button => {
+    const selected = button.dataset.librarySort === libraryViewPrefs.sort;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    const indicator = button.querySelector('.library-sort-direction');
+    if (indicator && button.dataset.librarySort !== 'random') {
+      indicator.textContent = libraryViewPrefs.direction === 'asc' ? '↑' : '↓';
+    }
+  });
+  libraryDisplayModes.forEach(button => {
+    const selected = button.dataset.libraryDisplay === libraryViewPrefs.display;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  });
+  if (libraryItemsPerRow) {
+    libraryItemsPerRow.value = String(libraryViewPrefs.itemsPerRow);
+    libraryItemsPerRow.disabled = libraryViewPrefs.display === 'list';
+  }
+  if (libraryItemsPerRowValue) libraryItemsPerRowValue.textContent = String(libraryViewPrefs.itemsPerRow);
+  libraryViewSheet?.classList.toggle('list-mode', libraryViewPrefs.display === 'list');
+}
+
+function openLibraryViewSheet(tab){
+  libraryOverflowMenu?.classList.remove('open');
+  setLibraryViewTab(tab);
+  updateLibraryViewSheetUi();
+  libraryViewSheet?.classList.add('open');
+  libraryViewSheet?.setAttribute('aria-hidden', 'false');
+  libraryViewBtn?.classList.add('active');
+}
+
+function closeLibraryViewSheet(){
+  libraryViewSheet?.classList.remove('open');
+  libraryViewSheet?.setAttribute('aria-hidden', 'true');
+  libraryViewBtn?.classList.remove('active');
+}
+
+libraryViewBtn?.addEventListener('click', event => {
+  event.preventDefault();
+  event.stopPropagation();
+  openLibraryViewSheet('sort');
+});
+
+libraryViewTabs.forEach(button => {
+  button.addEventListener('click', () => setLibraryViewTab(button.dataset.libraryViewTab));
+});
+
+librarySortOptions.forEach(button => {
+  button.addEventListener('click', () => {
+    const nextSort = button.dataset.librarySort;
+    if (!nextSort) return;
+    if (nextSort === 'random') {
+      libraryViewPrefs.sort = 'random';
+      refreshLibraryRandomSeed();
+    } else if (libraryViewPrefs.sort === nextSort) {
+      libraryViewPrefs.direction = libraryViewPrefs.direction === 'asc' ? 'desc' : 'asc';
+      saveLibraryViewPrefs();
+    } else {
+      libraryViewPrefs.sort = nextSort;
+      // Recent/playtime/date sorts are most useful newest/highest first.
+      libraryViewPrefs.direction = nextSort === 'alphabetical' ? 'asc' : 'desc';
+      saveLibraryViewPrefs();
+    }
+    updateLibraryViewSheetUi();
+    renderLibraryFromStorage({ force: true });
+  });
+});
+
+libraryDisplayModes.forEach(button => {
+  button.addEventListener('click', () => {
+    const nextDisplay = button.dataset.libraryDisplay;
+    if (!nextDisplay) return;
+    libraryViewPrefs.display = nextDisplay;
+    saveLibraryViewPrefs();
+    applyLibraryDisplayPreferences();
+    updateLibraryViewSheetUi();
+  });
+});
+
+libraryItemsPerRow?.addEventListener('input', () => {
+  libraryViewPrefs.itemsPerRow = Math.min(6, Math.max(2, Number(libraryItemsPerRow.value) || 3));
+  saveLibraryViewPrefs();
+  applyLibraryDisplayPreferences();
+  updateLibraryViewSheetUi();
+});
+
+libraryViewSheet?.addEventListener('click', event => {
+  if (event.target === libraryViewSheet) closeLibraryViewSheet();
+});
+
+navItems.forEach(item => item.addEventListener('click', closeLibraryViewSheet));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && libraryViewSheet?.classList.contains('open')) closeLibraryViewSheet();
+});
+
+applyLibraryDisplayPreferences();
 
 updateFloatingAddRomButton('libraryPage');
 updateRomDetailState('libraryPage');
@@ -1102,7 +1252,8 @@ function filterCards(){
     const matchCategory = librarySelectionApi.matchesCategory(assigned, category);
     const show = matchQuery && matchCategory;
 
-    card.style.display = show ? 'block' : 'none';
+    // Leave the visible card's display value to the active grid/list mode.
+    card.style.display = show ? '' : 'none';
     if (show) visible++;
   });
 

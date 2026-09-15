@@ -46,6 +46,14 @@ class SaveTransferRepository(
         val errors: Int = 0
     )
 
+
+    data class ImportSaveResult(
+        val success: Boolean,
+        val romId: String? = null,
+        val title: String? = null,
+        val message: String
+    )
+
     /** Backward-compatible summary used by older callers/tests. */
     fun sync(rootUri: Uri): Pair<Int, Int> {
         val result = syncDetailed(rootUri)
@@ -96,12 +104,16 @@ class SaveTransferRepository(
                         } else errors++
                     }
                     localFile != null && remoteFile == null -> {
-                        val created = ensureRemoteFile(root, path)
-                        if (created != null && copyFileToDocumentVerified(localFile, created)) {
-                            uploaded++
-                            lastState[path] = sha256File(localFile)
-                            remote[path] = created
-                        } else errors++
+                        if (preferRemoteOnFirstSync) {
+                            unchanged++
+                        } else {
+                            val created = ensureRemoteFile(root, path)
+                            if (created != null && copyFileToDocumentVerified(localFile, created)) {
+                                uploaded++
+                                lastState[path] = sha256File(localFile)
+                                remote[path] = created
+                            } else errors++
+                        }
                     }
                     localFile != null && remoteFile != null -> {
                         val localHash = sha256File(localFile)
@@ -121,6 +133,14 @@ class SaveTransferRepository(
                         val remoteChanged = previous == null || remoteHash != previous
 
                         when {
+                            preferRemoteOnFirstSync -> {
+                                conflicts++
+                                preserveLocalConflict(path, localFile)
+                                if (copyDocumentToFile(remoteFile, localFile)) {
+                                    downloaded++
+                                    lastState[path] = remoteHash
+                                } else errors++
+                            }
                             previous != null && localChanged && !remoteChanged -> {
                                 if (copyFileToDocumentVerified(localFile, remoteFile)) {
                                     uploaded++
@@ -185,6 +205,82 @@ class SaveTransferRepository(
             }
         }
         return exported
+    }
+
+    /**
+     * Imports one raw battery .sav. When targetRomId is supplied (gameplay
+     * menu), the filename must match that exact ROM. From Data & Storage, the
+     * filename must resolve to exactly one ROM already present in the library.
+     *
+     * Raw .sav files do not contain a universal ROM identifier, so Retra uses
+     * strict normalized filename matching plus save-size compatibility and an
+     * automatic pre-replacement backup to prevent accidental cross-ROM imports.
+     */
+    fun importBatterySave(uri: Uri, targetRomId: String? = null): ImportSaveResult {
+        val displayName = fileOps.queryDisplayName(uri)?.trim().orEmpty()
+        if (displayName.isBlank() || !displayName.endsWith(".sav", ignoreCase = true)) {
+            return ImportSaveResult(false, message = "Choose a .sav battery save file")
+        }
+
+        val targets = romSaveTargets()
+        val selectedBase = normalizedSaveBase(displayName)
+        val target = if (!targetRomId.isNullOrBlank()) {
+            targets.firstOrNull { it.id == targetRomId }
+        } else {
+            val matches = targets.filter { candidate ->
+                val aliases = setOf(normalizedSaveBase(candidate.fileName), normalizedSaveBase(candidate.title))
+                selectedBase in aliases
+            }
+            if (matches.size == 1) matches.first() else null
+        } ?: return ImportSaveResult(
+            false,
+            message = if (targetRomId.isNullOrBlank())
+                "No single ROM in your library matches ${displayName.substringBeforeLast('.')}"
+            else "This game is not available in the Retra library"
+        )
+
+        val targetAliases = setOf(normalizedSaveBase(target.fileName), normalizedSaveBase(target.title))
+        if (selectedBase !in targetAliases) {
+            return ImportSaveResult(false, target.id, target.title, "This .sav does not match ${target.title}")
+        }
+
+        val tempDir = File(appContext.cacheDir, "save_import").apply { mkdirs() }
+        val temp = File(tempDir, "${fileOps.sanitizeFileName(target.id)}_${System.nanoTime()}.sav")
+        return try {
+            val input = resolver.openInputStream(uri)
+                ?: return ImportSaveResult(false, target.id, target.title, "Could not read the selected .sav")
+            input.use { source ->
+                FileOutputStream(temp).use { output ->
+                    source.copyTo(output, 64 * 1024)
+                    output.flush()
+                    runCatching { output.fd.sync() }
+                }
+            }
+
+            val importedSize = temp.length()
+            if (!isPlausibleBatterySaveSize(importedSize)) {
+                return ImportSaveResult(false, target.id, target.title, "The selected .sav has an unsupported save size")
+            }
+            val existing = saveData.batterySaveFile(target.id)
+            if (existing.exists() && existing.length() > 0L && existing.length() != importedSize) {
+                return ImportSaveResult(false, target.id, target.title, "This .sav size does not match ${target.title}")
+            }
+
+            if (!saveData.replaceBatterySaveFromFile(target.id, temp)) {
+                ImportSaveResult(false, target.id, target.title, "Could not replace the save safely")
+            } else {
+                ImportSaveResult(true, target.id, target.title, "${target.title} save imported")
+            }
+        } catch (error: Exception) {
+            ImportSaveResult(false, target.id, target.title, error.message ?: "Could not import this .sav")
+        } finally {
+            if (temp.exists()) temp.delete()
+        }
+    }
+
+    private fun isPlausibleBatterySaveSize(size: Long): Boolean {
+        if (size < 512L || size > 512L * 1024L) return false
+        return size and (size - 1L) == 0L
     }
 
     fun importSaves(rootUri: Uri): Int {
@@ -520,9 +616,22 @@ class SaveTransferRepository(
         return targets.values.toList()
     }
 
-    private fun normalizedSaveBase(value: String): String = value.substringBeforeLast('.', value)
-        .lowercase(Locale.US)
-        .replace(Regex("[^a-z0-9]+"), "")
+    private fun normalizedSaveBase(value: String): String {
+        var base = value.trim().lowercase(Locale.US)
+        val suffixes = listOf(".sav", ".srm", ".rtc", ".gba", ".gbc", ".gb", ".mgba", ".zip")
+        var changed: Boolean
+        do {
+            changed = false
+            for (suffix in suffixes) {
+                if (base.endsWith(suffix)) {
+                    base = base.removeSuffix(suffix)
+                    changed = true
+                    break
+                }
+            }
+        } while (changed)
+        return base.replace(Regex("[^a-z0-9]+"), "")
+    }
 
     companion object {
         private val portableRootDirectories = listOf(

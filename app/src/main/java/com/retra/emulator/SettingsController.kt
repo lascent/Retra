@@ -82,13 +82,17 @@ internal fun MainActivity.settingsStateJson(): String = JSONObject().apply {
     val cloudMode = cloudSync.mode()
     val cloudAccount = prefs.getString(CLOUD_SYNC_ACCOUNT_PREF, "") ?: ""
     put("cloudSyncMode", cloudMode)
-    put("cloudFolderConnected", if (cloudMode == "api") cloudAccount.isNotBlank() else !prefs.getString(CLOUD_SYNC_URI_PREF, null).isNullOrBlank())
+    put("cloudFolderConnected", cloudAccount.isNotBlank())
     put("cloudAccount", cloudAccount)
     put("cloudLastBackupAt", cloudSync.lastSuccessfulSyncAt())
+    put("cloudLastRestoreAt", cloudSync.lastRestoreAt())
     put("cloudLastSyncError", cloudSync.lastSyncError())
     put("cloudLastUploaded", cloudSync.lastUploadedCount())
     put("cloudLastDownloaded", cloudSync.lastDownloadedCount())
     put("cloudLastConflicts", cloudSync.lastConflictCount())
+    put("cloudTransferActive", cloudSync.transferActive())
+    put("cloudTransferLabel", cloudSync.transferLabel())
+    put("cloudTransferProgress", cloudSync.transferProgress())
     put("enableCheats", prefs.getBoolean(ENABLE_CHEATS_PREF, true))
     put("romPatching", prefs.getBoolean(ROM_PATCHING_PREF, true))
     put("autoSaveLoad", prefs.getBoolean(AUTO_SAVE_LOAD_PREF, true))
@@ -337,16 +341,12 @@ internal fun MainActivity.openImportPicker() {
     importPicker.launch(arrayOf("*/*"))
 }
 
-internal fun MainActivity.cloudRootUri(): Uri? = prefs.getString(CLOUD_SYNC_URI_PREF, null)?.let {
-    try { Uri.parse(it) } catch (_: Exception) { null }
-}
-
 internal fun MainActivity.requestCloudSyncAccount() {
     pendingCloudEnable = true
     pendingCloudRestore = false
     pendingCloudAccount = null
     cloudSync.launchAccountChooser({ cloudAccountPicker.launch(it) }) {
-        if (cloudRootUri() == null) prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
+        prefs.edit().putBoolean(CLOUD_SYNC_ENABLED_PREF, false).apply()
         pendingCloudEnable = false
         pendingCloudRestore = false
         notifyWebSettingsState()
@@ -355,27 +355,19 @@ internal fun MainActivity.requestCloudSyncAccount() {
 }
 
 internal fun MainActivity.requestCloudRecoveryAccount() {
-    pendingCloudEnable = true
+    pendingCloudEnable = false
     pendingCloudRestore = true
     pendingCloudAccount = null
     RetraNotice.makeText(
         this,
-        "Choose the Google account that contains your previous Retra backup",
+        "Choose the Google account that contains your Retra backup",
         RetraNotice.LENGTH_LONG
     ).show()
     cloudSync.launchAccountChooser({ cloudAccountPicker.launch(it) }) {
-        pendingCloudEnable = false
         pendingCloudRestore = false
         notifyWebSettingsState()
         RetraNotice.makeText(this, "Google account picker is unavailable on this device", RetraNotice.LENGTH_LONG).show()
     }
-}
-
-internal fun MainActivity.requestCloudSyncFolder() {
-    pendingCloudEnable = true
-    val account = pendingCloudAccount ?: prefs.getString(CLOUD_SYNC_ACCOUNT_PREF, null)
-    RetraNotice.makeText(this, cloudSync.folderPrompt(account), RetraNotice.LENGTH_LONG).show()
-    cloudFolderPicker.launch(cloudRootUri())
 }
 
 internal fun MainActivity.openAppFolderInternal() {
@@ -425,9 +417,9 @@ internal fun MainActivity.openAppFolderInternal() {
 internal fun MainActivity.deleteCloudPathsAsync(paths: List<String>) { cloudSync.deletePaths(paths) }
 
 internal fun MainActivity.syncCloudAsync(showResult: Boolean) {
-    // Keep Retra's provider-backed metadata current independently of optional cloud sync.
+    // Keep Retra's provider-backed local metadata current independently of cloud backup.
     syncAppFolderAsync(showResult = false)
-    if (showResult) cloudSync.sync(showResult = true)
+    if (showResult) cloudSync.backupNow(showResult = true)
     else cloudSync.requestAutoSync(urgent = false)
 }
 

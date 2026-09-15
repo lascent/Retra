@@ -32,6 +32,9 @@
 <button aria-label="Search" class="icon-btn" id="searchBtn">
 <svg viewbox="0 0 24 24"><path d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"></path></svg>
 </button>
+<button aria-label="Library sort and display" class="icon-btn library-view-trigger" id="libraryViewBtn" type="button">
+<svg viewbox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"></path><circle cx="17" cy="7" r="2"></circle><path d="M20 7h1"></path><path d="M4 12h3"></path><circle cx="10" cy="12" r="2"></circle><path d="M13 12h8"></path><path d="M4 17h8"></path><circle cx="15" cy="17" r="2"></circle><path d="M18 17h3"></path></svg>
+</button>
 <button aria-label="More options" class="icon-btn" id="libraryMoreBtn">
 <svg viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg>
 </button>
@@ -95,6 +98,10 @@
 </button>
 </div>
 <div class="rom-overflow-menu" id="romOverflowMenu">
+<button class="rom-overflow-item" id="menuEditNameBtn" type="button">
+<svg viewbox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
+<span>Edit name</span>
+</button>
 <button class="rom-overflow-item" id="menuChangeBgBtn" type="button">
 <svg viewbox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4"></path></svg>
 <span>Change background</span>
@@ -339,12 +346,18 @@
 <svg viewbox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"></path><path d="m7 14 5-5 5 5"></path><path d="M5 4h14"></path></svg>
 <div><strong>Restore backup</strong><span>Restore data from an existing Retra .retra backup</span></div>
 </button>
-<button class="backup-action-btn backup-cloud-recovery" id="restoreCloudBackupBtn" type="button">
-<svg viewbox="0 0 24 24" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.2 8.3 4.5 4.5 0 0 0 7 18Z"></path><path d="M12 16V9"></path><path d="m9 12 3-3 3 3"></path></svg>
-<div><strong>Restore from Google Drive</strong><span>Recover saves, library, statistics and settings after reinstalling Retra</span></div>
-</button>
 </div>
 <p class="storage-info-note">Retra backups do not include ROM or BIOS files. Save files, save states, cheats, layouts, artwork, library metadata, statistics, and portable app settings can be recovered separately.</p>
+
+
+<div class="storage-section-label">Google Drive</div>
+<div class="detail-list data-storage-card">
+<div class="detail-row"><div><strong>Automatic Google Drive backup</strong><span id="cloudSyncSummary">Protect saves, statistics and settings across reinstalls and devices</span></div><label class="switch"><input id="cloudSyncToggle" type="checkbox"/><span class="slider"></span></label></div>
+<button class="detail-row tappable" id="cloudBackupNowBtn" type="button"><div><strong>Backup Now</strong><span id="cloudBackupNowSummary">Upload a validated backup directly to My Drive/Retra Backups</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
+<button class="detail-row tappable" id="restoreCloudBackupBtn" type="button"><div><strong>Restore from Google Drive</strong><span>Recover saves, library, statistics and settings after reinstalling Retra</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
+<button class="detail-row tappable disabled-row" disabled="" id="syncSettingsBtn"><div><strong>Google Drive settings</strong><span id="syncSettingsSummary">Connect a Google account to manage Drive backup</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
+</div>
+
 </div>
 </section>
 
@@ -421,13 +434,18 @@
 <div class="settings-item-copy"><strong>Fonts</strong><span>Choose the Retra interface font</span></div>
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
+<button class="settings-item" data-setting="Language">
+<div class="settings-item-icon"><svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"></path></svg></div>
+<div class="settings-item-copy"><strong>Language</strong><span>Choose the Retra interface language</span></div>
+<svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
+</button>
 <button class="settings-item" data-setting="About">
 <div class="settings-item-icon"><svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7h.01"></path></svg></div>
 <div class="settings-item-copy"><strong>About</strong><span>Retra version, licenses, information</span></div>
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
 </div>
-<div class="version" id="settingsVersionLabel">Retra v1.0.2</div>
+<div class="version" id="settingsVersionLabel">Retra v1.0.3</div>
 </section>
 <!-- APPEARANCE -->
 <section class="page settings-detail-page" id="appearanceSettingsPage">
@@ -728,6 +746,10 @@
 <button aria-label="Add control" class="preview-add-fab" id="addControlFab" type="button">
 <svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
 </button>
+<button aria-label="Toggle editor grid" aria-pressed="false" class="screen-grid-toggle" id="screenGridToggleBtn" type="button">
+<svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M4 10h16M4 16h16M10 4v16M16 4v16"></path></svg>
+<span>Grid</span>
+</button>
 <div aria-label="Move menu button" class="preview-toolbar top landscape-only layout-control" data-control-label="Menu" data-layout-control="menu" role="button" tabindex="0">
 <span class="toolbar-icon menu solo myboy-menu-button">
 <svg aria-hidden="true" class="myboy-menu-icon" viewbox="0 0 24 24">
@@ -921,8 +943,6 @@
 <h2>Misc</h2>
 </div>
 <div class="detail-list">
-<div class="detail-row"><div><strong>Automatic Google Drive backup</strong><span id="cloudSyncSummary">Protect saves, statistics and settings across reinstalls and devices</span></div><label class="switch"><input id="cloudSyncToggle" type="checkbox"/><span class="slider"></span></label></div>
-<button class="detail-row tappable disabled-row" disabled="" id="syncSettingsBtn"><div><strong>Sync settings</strong><span id="syncSettingsSummary">Available when cloud sync is enabled</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
 <div class="detail-row"><div><strong>Enable cheats</strong><span>Allow cheat codes while playing</span></div><label class="switch"><input checked="" id="enableCheatsToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-row"><div><strong>ROM patching</strong><span>Auto IPS/UPS/BPS patching when a matching patch is available</span></div><label class="check-control"><input checked="" id="romPatchingToggle" type="checkbox"/><span></span></label></div>
 <div class="detail-row"><div><strong>Automatic game artwork</strong><span>Find and cache matching covers in the background</span></div><label class="switch"><input checked="" id="automaticArtworkToggle" type="checkbox"/><span class="slider"></span></label></div>
@@ -940,7 +960,6 @@
 <div class="detail-row"><div><strong>Confirm on close/reset</strong><span>Ask before closing or resetting a game</span></div><label class="switch"><input checked="" id="confirmCloseResetToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-row"><div><strong>Full screen mode</strong><span>Make games fullscreen by hiding system bars</span></div><label class="switch"><input checked="" id="fullScreenModeToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-row"><div><strong>Immersive mode</strong><span>Hide gesture/navigation bars while a game is running</span></div><label class="switch"><input checked="" id="immersiveModeToggle" type="checkbox"/><span class="slider"></span></label></div>
-<button class="detail-row tappable" id="importSavesBtn"><div><strong>Import saves</strong><span>Import battery saves and save states from another Retra folder</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
 <button class="detail-row tappable" id="openAppFolderBtn"><div><strong>Open app folder</strong><span>Open Retra storage in Android Files</span></div><svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button>
 </div>
 </section>
@@ -974,12 +993,12 @@
 <h2>Fonts</h2>
 </div>
 <div class="detail-list font-settings-list" id="fontSettingsList">
-<button class="detail-row tappable font-option active" data-font-name="Poppins" type="button">
-<div><strong>Poppins</strong><span>Default</span></div>
+<button class="detail-row tappable font-option" data-font-name="Poppins" type="button">
+<div><strong>Poppins</strong><span>Alternative</span></div>
 <svg aria-hidden="true" class="font-check" viewbox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
 </button>
-<button class="detail-row tappable font-option" data-font-name="Inter" type="button">
-<div><strong>Inter</strong><span>Clean and highly readable</span></div>
+<button class="detail-row tappable font-option active" data-font-name="Inter" type="button">
+<div><strong>Inter</strong><span>Default • clean and highly readable</span></div>
 <svg aria-hidden="true" class="font-check" viewbox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
 </button>
 <button class="detail-row tappable font-option" data-font-name="Manrope" type="button">
@@ -989,6 +1008,29 @@
 <button class="detail-row tappable font-option" data-font-name="DM Sans" type="button">
 <div><strong>DM Sans</strong><span>Balanced and compact</span></div>
 <svg aria-hidden="true" class="font-check" viewbox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
+</button>
+</div>
+</section>
+<!-- LANGUAGE -->
+<section class="page settings-detail-page" id="languageSettingsPage">
+<div class="sub-header">
+<button aria-label="Back" class="back-btn" data-back-to="settingsHomePage">
+<svg viewbox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
+</button>
+<h2>Language</h2>
+</div>
+<div class="detail-list language-settings-list" id="languageSettingsList">
+<button class="detail-row tappable language-option active" data-language-code="en" type="button">
+<div><strong>English</strong><span>Default</span></div>
+<svg aria-hidden="true" class="font-check language-check" viewbox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
+</button>
+<button class="detail-row tappable language-option" data-language-code="vi" type="button">
+<div><strong>Tiếng Việt</strong><span>Vietnamese interface</span></div>
+<svg aria-hidden="true" class="font-check language-check" viewbox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
+</button>
+<button class="detail-row tappable language-option" data-language-code="id" type="button">
+<div><strong>Bahasa Indonesia</strong><span>Indonesian interface</span></div>
+<svg aria-hidden="true" class="font-check language-check" viewbox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
 </button>
 </div>
 </section>
@@ -1003,10 +1045,10 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version" data-retra-version-label>Retra v1.0.2</p>
+<p class="about-version" data-retra-version-label>Retra v1.0.3</p>
 <div class="about-update-list">
   <div class="about-update-row about-version-row">
-    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.2</span></div>
+    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.3</span></div>
   </div>
   <button class="about-update-row about-update-button" data-check-updates type="button">
     <div><strong>Check for updates</strong><span data-update-status>Automatically checked in the background</span></div>
@@ -1027,7 +1069,7 @@
 </div>
 <div class="about-panel privacy-policy-panel">
 <h3>Retra Privacy Policy</h3>
-<p class="about-version">Effective for Retra v1.0.2</p>
+<p class="about-version">Effective for Retra v1.0.3</p>
 <p class="disclaimer"><strong>Local game data.</strong> Retra stores your library metadata, settings, save files, save states, cheats, controller layouts, artwork preferences, and play statistics on your device. Retra does not include ROMs or copyrighted game software.</p>
 <p class="disclaimer"><strong>Network features.</strong> Internet access is used for features such as automatic artwork lookup, optional Google Drive synchronization, Wi-Fi Remote Link, and the lightweight GitHub Releases update check. Update checks contact Retra's official GitHub repository and do not include your ROMs, saves, or library contents. Bluetooth access is used only for Bluetooth Remote Link.</p>
 <p class="disclaimer"><strong>Google Drive.</strong> If you enable automatic Drive backup or explicitly choose Restore from Google Drive, Retra uses the authorization granted by you to synchronize supported saves, save states, library metadata, statistics, and portable settings with your own Drive storage. ROM and BIOS files are not uploaded. Drive backup can be disabled at any time.</p>
@@ -1185,10 +1227,10 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version" data-retra-version-label>Retra v1.0.2</p>
+<p class="about-version" data-retra-version-label>Retra v1.0.3</p>
 <div class="about-update-list">
   <div class="about-update-row about-version-row">
-    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.2</span></div>
+    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.3</span></div>
   </div>
   <button class="about-update-row about-update-button" data-check-updates type="button">
     <div><strong>Check for updates</strong><span data-update-status>Automatically checked in the background</span></div>
@@ -1272,6 +1314,18 @@
 </button>
 </div>
 <button class="rom-card-actions-cancel" id="closeRecentSaveActions" type="button">Cancel</button>
+</div>
+</div>
+<!-- ROM DISPLAY NAME EDIT MODAL -->
+<div class="modal-backdrop" id="romRenameModal" aria-hidden="true">
+<div class="category-modal-card" role="dialog" aria-modal="true" aria-labelledby="romRenameTitle">
+<h3 class="modal-title" id="romRenameTitle">Edit ROM name</h3>
+<p class="modal-copy">Change the title shown in Retra. The ROM file name is not changed.</p>
+<input aria-label="ROM display name" autocomplete="off" id="romRenameInput" maxlength="64" placeholder="ROM name" type="text"/>
+<div class="modal-actions">
+<button class="modal-btn secondary" id="cancelRomRename" type="button">Cancel</button>
+<button class="modal-btn primary" id="saveRomRename" type="button">Save</button>
+</div>
 </div>
 </div>
 <!-- RECENT SAVE RENAME MODAL -->
@@ -1509,6 +1563,48 @@
     </div>
   </div>
 </div>
+
+<!-- LIBRARY SORT / DISPLAY SHEET -->
+<div class="library-view-backdrop" id="libraryViewSheet" aria-hidden="true">
+  <section class="library-view-sheet" role="dialog" aria-modal="true" aria-labelledby="libraryViewSheetTitle">
+    <div class="library-view-tabs" role="tablist" aria-label="Library options">
+      <button class="library-view-tab active" id="librarySortTab" data-library-view-tab="sort" type="button" role="tab" aria-selected="true">Sort</button>
+      <button class="library-view-tab" id="libraryDisplayTab" data-library-view-tab="display" type="button" role="tab" aria-selected="false">Display</button>
+    </div>
+    <h2 class="sr-only" id="libraryViewSheetTitle">Library sort and display</h2>
+
+    <div class="library-view-panel active" data-library-view-panel="sort" role="tabpanel" aria-labelledby="librarySortTab">
+      <div class="library-sort-options" id="librarySortOptions">
+        <button class="library-sort-option" data-library-sort="alphabetical" type="button"><span class="library-sort-direction" aria-hidden="true">↓</span><span>Alphabetically</span></button>
+        <button class="library-sort-option" data-library-sort="playtime" type="button"><span class="library-sort-direction" aria-hidden="true">↓</span><span>Playtime</span></button>
+        <button class="library-sort-option" data-library-sort="lastPlayed" type="button"><span class="library-sort-direction" aria-hidden="true">↓</span><span>Last played</span></button>
+        <button class="library-sort-option" data-library-sort="dateAdded" type="button"><span class="library-sort-direction" aria-hidden="true">↓</span><span>Date added</span></button>
+        <button class="library-sort-option" data-library-sort="random" type="button"><span class="library-sort-direction random-icon" aria-hidden="true">↝</span><span>Random</span></button>
+      </div>
+      <p class="library-view-hint">Tap the selected sort again to reverse its order. Tap Random again to reshuffle.</p>
+    </div>
+
+    <div class="library-view-panel" data-library-view-panel="display" role="tabpanel" aria-labelledby="libraryDisplayTab">
+      <h3 class="library-view-section-title">Display mode</h3>
+      <div class="library-display-modes" id="libraryDisplayModes">
+        <button data-library-display="compact" type="button">Compact grid</button>
+        <button data-library-display="comfortable" type="button">Comfortable grid</button>
+        <button data-library-display="coverOnly" type="button">Cover-only grid</button>
+        <button data-library-display="list" type="button">List</button>
+      </div>
+      <div class="library-items-row">
+        <div>
+          <strong>Items per row</strong>
+          <small>Grid modes only</small>
+        </div>
+        <span id="libraryItemsPerRowValue">3</span>
+      </div>
+      <input aria-label="Items per row" class="library-items-slider" id="libraryItemsPerRow" max="6" min="2" step="1" type="range" value="3"/>
+      <div class="library-items-ticks" aria-hidden="true"><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+    </div>
+  </section>
+</div>
+
 <nav class="bottom-nav">
 <button class="nav-item active" data-page="libraryPage">
 <svg viewbox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"></path><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"></path></svg>
@@ -1531,6 +1627,7 @@
 <script src="scroll-performance.js"></script>
 <script src="interaction-motion.js"></script>
 <script src="library-selection.js"></script>
+<script src="i18n.js"></script>
 <script src="app-shell.js"></script>
 <script src="library-ui.js"></script>
 <script src="settings-ui.js"></script>

@@ -309,13 +309,22 @@ internal fun MainActivity.migrateLandscapeControllerScaleTo100() {
 }
 
 internal fun MainActivity.applyDefaultControllerLayout(parentWidth: Int, parentHeight: Int, portrait: Boolean) {
-    val defaultScale = 1.0f
-    fun width(view: View) = viewUnscaledWidth(view) * defaultScale
-    fun height(view: View) = viewUnscaledHeight(view) * defaultScale
+    val standardScale = 1.0f
+    val landscapePrimaryScale = 1.05f
 
-    // v3.94: portrait and landscape controls both start at 100%.
-    // Portrait and landscape remain completely separate datasets;
-    // saved values for one side are never transformed into the other.
+    fun scaleFor(view: View): Float =
+        if (!portrait && view in listOf(binding.buttonL, binding.buttonR, binding.dpadContainer, binding.abContainer)) {
+            landscapePrimaryScale
+        } else {
+            standardScale
+        }
+
+    fun width(view: View) = viewUnscaledWidth(view) * scaleFor(view)
+    fun height(view: View) = viewUnscaledHeight(view) * scaleFor(view)
+
+    // Landscape uses a slightly larger 105% gameplay cluster for the controls
+    // the player's thumbs hit most often (D-pad, A/B, L/R). Menu and Start/Select
+    // stay at their native 100% size. Portrait remains 100% across the board.
     listOf(
         binding.utilityBar,
         binding.buttonL,
@@ -323,43 +332,57 @@ internal fun MainActivity.applyDefaultControllerLayout(parentWidth: Int, parentH
         binding.dpadContainer,
         binding.startSelectContainer,
         binding.abContainer
-    ).forEach {
-        it.translationX = 0f
-        it.translationY = 0f
-        it.pivotX = 0f
-        it.pivotY = 0f
-        it.scaleX = defaultScale
-        it.scaleY = defaultScale
+    ).forEach { view ->
+        val scale = scaleFor(view)
+        view.translationX = 0f
+        view.translationY = 0f
+        view.pivotX = 0f
+        view.pivotY = 0f
+        view.scaleX = scale
+        view.scaleY = scale
     }
 
     if (!portrait) {
-        // LANDSCAPE DEFAULT (100%)
-        // Menu top-center; L/R top corners; D-pad lower-left; A/B lower-right;
-        // Start/Select bottom-center.
-        val side = maxOf(dp(18f), parentWidth * 0.028f)
-        val topInset = maxOf(dp(10f), parentHeight * 0.026f)
+        // LANDSCAPE DEFAULT
+        // Menu is centered tightly against the top edge, L/R stay at the top
+        // corners, and the larger 105% D-pad/A-B cluster sits at the lower sides.
+        // Start/Select remains 100% at bottom-center.
+        val shoulderSide = maxOf(dp(18f), parentWidth * 0.028f)
+        val shoulderTop = maxOf(dp(10f), parentHeight * 0.026f)
+        val menuTop = maxOf(dp(6f), parentHeight * 0.014f)
+        val lowerSide = maxOf(dp(18f), parentWidth * 0.035f)
         val lowerInset = maxOf(dp(12f), parentHeight * 0.030f)
 
-        placeNativeControl(binding.utilityBar, (parentWidth - width(binding.utilityBar)) / 2f, topInset, defaultScale)
-        placeNativeControl(binding.buttonL, side, topInset, defaultScale)
-        placeNativeControl(binding.buttonR, parentWidth - width(binding.buttonR) - side, topInset, defaultScale)
+        placeNativeControl(
+            binding.utilityBar,
+            (parentWidth - width(binding.utilityBar)) / 2f,
+            menuTop,
+            scaleFor(binding.utilityBar)
+        )
+        placeNativeControl(binding.buttonL, shoulderSide, shoulderTop, scaleFor(binding.buttonL))
+        placeNativeControl(
+            binding.buttonR,
+            parentWidth - width(binding.buttonR) - shoulderSide,
+            shoulderTop,
+            scaleFor(binding.buttonR)
+        )
         placeNativeControl(
             binding.dpadContainer,
-            maxOf(dp(18f), parentWidth * 0.035f),
+            lowerSide,
             parentHeight - height(binding.dpadContainer) - lowerInset,
-            defaultScale
+            scaleFor(binding.dpadContainer)
         )
         placeNativeControl(
             binding.abContainer,
-            parentWidth - width(binding.abContainer) - maxOf(dp(18f), parentWidth * 0.035f),
+            parentWidth - width(binding.abContainer) - lowerSide,
             parentHeight - height(binding.abContainer) - lowerInset,
-            defaultScale
+            scaleFor(binding.abContainer)
         )
         placeNativeControl(
             binding.startSelectContainer,
             (parentWidth - width(binding.startSelectContainer)) / 2f,
             parentHeight - height(binding.startSelectContainer) - maxOf(dp(10f), parentHeight * 0.018f),
-            defaultScale
+            scaleFor(binding.startSelectContainer)
         )
     } else {
         // PORTRAIT DEFAULT (100%) — My Boy!-style zones.
@@ -372,26 +395,26 @@ internal fun MainActivity.applyDefaultControllerLayout(parentWidth: Int, parentH
         val abY = parentHeight - height(binding.abContainer) - dpadBottom
         val shoulderRowY = parentHeight * 0.64f
 
-        placeNativeControl(binding.buttonL, side, shoulderRowY, defaultScale)
+        placeNativeControl(binding.buttonL, side, shoulderRowY, scaleFor(binding.buttonL))
         placeNativeControl(
             binding.buttonR,
             parentWidth - width(binding.buttonR) - side,
             shoulderRowY,
-            defaultScale
+            scaleFor(binding.buttonR)
         )
         placeNativeControl(
             binding.utilityBar,
             (parentWidth - width(binding.utilityBar)) / 2f,
             shoulderRowY,
-            defaultScale
+            scaleFor(binding.utilityBar)
         )
 
-        placeNativeControl(binding.dpadContainer, side, dpadY, defaultScale)
+        placeNativeControl(binding.dpadContainer, side, dpadY, scaleFor(binding.dpadContainer))
         placeNativeControl(
             binding.abContainer,
             parentWidth - width(binding.abContainer) - side,
             abY,
-            defaultScale
+            scaleFor(binding.abContainer)
         )
 
         val startSelectY = minOf(
@@ -403,7 +426,7 @@ internal fun MainActivity.applyDefaultControllerLayout(parentWidth: Int, parentH
             binding.startSelectContainer,
             (parentWidth - width(binding.startSelectContainer)) / 2f,
             startSelectY,
-            defaultScale
+            scaleFor(binding.startSelectContainer)
         )
     }
 

@@ -15,6 +15,7 @@
 #include <thread>
 #include <array>
 #include <cmath>
+#include <iterator>
 
 extern "C" {
 #include <mgba/core/core.h>
@@ -620,6 +621,111 @@ static void clearLocalLinkInputScheduleLocked() {
 
 static void destroyLocalLinkLocked();
 
+// Retra rewind is a bounded, RAM-only raw-state ring. States are sampled by
+// wall clock rather than emulated frame count so 2x/4x/8x/16x fast-forward
+// still represents roughly the last 15 seconds the player actually experienced.
+struct RetraRewindSnapshot {
+    int64_t activeTimelineMs = 0;
+    std::vector<uint8_t> state;
+};
+static std::deque<RetraRewindSnapshot> rewindSnapshots;
+static size_t rewindBytes = 0;
+static int64_t rewindActiveTimelineMs = 0;
+static int64_t lastRewindCaptureTimelineMs = -1;
+static std::chrono::steady_clock::time_point lastRewindFrameWallClock{};
+static constexpr int64_t RETRA_REWIND_CAPTURE_INTERVAL_MS = 500;
+static constexpr int64_t RETRA_REWIND_MAX_AGE_MS = 16'500;
+static constexpr int64_t RETRA_REWIND_MAX_FRAME_GAP_MS = 100;
+static constexpr size_t RETRA_REWIND_MAX_BYTES = 32u * 1024u * 1024u;
+
+static void clearRewindLocked() {
+    rewindSnapshots.clear();
+    rewindBytes = 0;
+    rewindActiveTimelineMs = 0;
+    lastRewindCaptureTimelineMs = -1;
+    lastRewindFrameWallClock = {};
+}
+
+static void captureRewindSnapshotLocked() {
+    if (!core || localLinkActive.load(std::memory_order_acquire)) return;
+
+    // Advance a gameplay-only wall-clock timeline. A long gap means gameplay
+    // was paused/backgrounded/menu-open, so cap it instead of treating the
+    // pause itself as rewindable gameplay time.
+    const auto now = std::chrono::steady_clock::now();
+    if (lastRewindFrameWallClock.time_since_epoch().count() != 0) {
+        const auto deltaMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - lastRewindFrameWallClock
+        ).count();
+        if (deltaMs > 0) rewindActiveTimelineMs += std::min<int64_t>(deltaMs, RETRA_REWIND_MAX_FRAME_GAP_MS);
+    }
+    lastRewindFrameWallClock = now;
+
+    if (lastRewindCaptureTimelineMs >= 0 &&
+        rewindActiveTimelineMs - lastRewindCaptureTimelineMs < RETRA_REWIND_CAPTURE_INTERVAL_MS) {
+        return;
+    }
+
+    const size_t stateSize = core->stateSize(core);
+    if (stateSize == 0 || stateSize > RETRA_REWIND_MAX_BYTES) return;
+
+    std::vector<uint8_t> bytes(stateSize);
+    core->saveState(core, bytes.data());
+
+    rewindBytes += bytes.size();
+    rewindSnapshots.push_back({rewindActiveTimelineMs, std::move(bytes)});
+    lastRewindCaptureTimelineMs = rewindActiveTimelineMs;
+
+    while (!rewindSnapshots.empty()) {
+        const bool tooOld = rewindActiveTimelineMs - rewindSnapshots.front().activeTimelineMs > RETRA_REWIND_MAX_AGE_MS;
+        const bool tooLarge = rewindBytes > RETRA_REWIND_MAX_BYTES;
+        if (!tooOld && !tooLarge) break;
+        rewindBytes -= rewindSnapshots.front().state.size();
+        rewindSnapshots.pop_front();
+    }
+}
+
+static int rewindAvailableSecondsLocked() {
+    if (!core || localLinkActive.load(std::memory_order_acquire) || rewindSnapshots.empty()) return 0;
+    const int64_t ageMs = rewindActiveTimelineMs - rewindSnapshots.front().activeTimelineMs;
+    return static_cast<int>(std::max<int64_t>(0, std::min<int64_t>(15, ageMs / 1000)));
+}
+
+static bool rewindBySecondsLocked(int seconds) {
+    if (!core || localLinkActive.load(std::memory_order_acquire)) return false;
+    if (seconds != 5 && seconds != 10 && seconds != 15) return false;
+
+    const int64_t targetTimelineMs = rewindActiveTimelineMs - static_cast<int64_t>(seconds) * 1000;
+    auto selected = rewindSnapshots.end();
+    for (auto it = rewindSnapshots.rbegin(); it != rewindSnapshots.rend(); ++it) {
+        if (it->activeTimelineMs <= targetTimelineMs) {
+            selected = std::prev(it.base());
+            break;
+        }
+    }
+    if (selected == rewindSnapshots.end() || selected->state.empty()) return false;
+    if (selected->state.size() != core->stateSize(core)) return false;
+
+    if (!core->loadState(core, selected->state.data())) return false;
+    keyMask.store(0, std::memory_order_relaxed);
+    keyPressLatch.store(0, std::memory_order_relaxed);
+
+    // Never play PCM queued by the pre-rewind timeline. The next frame starts
+    // a fresh audio history from the restored state.
+    if (core->getAudioBuffer) {
+        if (mAudioBuffer* audio = core->getAudioBuffer(core)) {
+            const size_t available = mAudioBufferAvailable(audio);
+            if (available) mAudioBufferRead(audio, nullptr, available);
+        }
+    }
+    resetRetraAudioResamplerLocked();
+
+    // Old snapshots belong to the abandoned future timeline. Clearing them
+    // prevents repeatedly jumping between incompatible histories.
+    clearRewindLocked();
+    return true;
+}
+
 static int mapCheatTypeForCore(int requestedType) {
     if (!core) {
         return 0;
@@ -751,6 +857,7 @@ static bool addCheatSetWithTypeLocked(
 }
 
 static void destroyCoreLocked() {
+    clearRewindLocked();
     if (!core) {
         return;
     }
@@ -1776,6 +1883,7 @@ Java_com_retra_emulator_MainActivity_runFrameNoVideo(
     core->setKeys(core, heldKeys | tappedKeys);
     syncGbaMosaicRenderer(core);
     core->runFrame(core);
+    captureRewindSnapshotLocked();
     return JNI_TRUE;
 }
 
@@ -1817,6 +1925,7 @@ Java_com_retra_emulator_MainActivity_runTurboSlice(
         // every hidden 8x/16x frame is redundant hot-path work.
         core->runFrame(core);
     }
+    captureRewindSnapshotLocked();
 
     if (discardAudio == JNI_TRUE && core->getAudioBuffer) {
         // Extreme turbo intentionally has no audible PCM. Drain mGBA's audio ring
@@ -1916,6 +2025,7 @@ Java_com_retra_emulator_MainActivity_runFrame(
         core->setKeys(core, heldKeys | tappedKeys);
         syncGbaMosaicRenderer(core);
         core->runFrame(core);
+        captureRewindSnapshotLocked();
         width = videoWidth;
         height = videoHeight;
         sourceBuffer = videoBuffer;
@@ -2134,6 +2244,25 @@ static bool loadStateLocked(const char* statePath) {
 
 extern "C"
 JNIEXPORT jboolean JNICALL
+Java_com_retra_emulator_MainActivity_rewindSeconds(
+        JNIEnv*,
+        jobject,
+        jint seconds) {
+    std::lock_guard<std::mutex> lock(coreMutex);
+    return rewindBySecondsLocked(static_cast<int>(seconds)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_retra_emulator_MainActivity_getRewindAvailableSeconds(
+        JNIEnv*,
+        jobject) {
+    std::lock_guard<std::mutex> lock(coreMutex);
+    return static_cast<jint>(rewindAvailableSecondsLocked());
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
 Java_com_retra_emulator_MainActivity_quickSaveState(
         JNIEnv* env,
         jobject,
@@ -2166,6 +2295,7 @@ Java_com_retra_emulator_MainActivity_quickLoadState(
     std::lock_guard<std::mutex> lock(coreMutex);
     const bool loaded = !localLinkActive.load(std::memory_order_acquire) &&
             loadStateLocked(statePath);
+    if (loaded) clearRewindLocked();
     env->ReleaseStringUTFChars(path, statePath);
     return loaded ? JNI_TRUE : JNI_FALSE;
 }
@@ -2347,6 +2477,7 @@ Java_com_retra_emulator_MainActivity_resetCore(
 
     keyMask.store(0, std::memory_order_relaxed);
     keyPressLatch.store(0, std::memory_order_relaxed);
+    clearRewindLocked();
     core->reset(core);
     // Reapply manual choices after Reset. In Automatic mode this handler is
     // non-destructive and keeps mGBA's Pokémon ROM-hack save selection intact.

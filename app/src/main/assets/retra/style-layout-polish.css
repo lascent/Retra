@@ -118,7 +118,7 @@ body[data-resolved-mode="light"] .entry-item{
 
 /* v3.53 selectable interface fonts */
 :root{
-  --app-font:Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --app-font:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 
 .font-settings-list .font-option{
@@ -144,12 +144,14 @@ body[data-resolved-mode="light"] .entry-item{
   transition:opacity .16s ease, transform .16s ease;
 }
 
-.font-option.active .font-check{
+.font-option.active .font-check,
+.language-option.active .language-check{
   opacity:1;
   transform:scale(1);
 }
 
-.font-option.active{
+.font-option.active,
+.language-option.active{
   background:var(--accent-soft);
 }
 
@@ -1904,3 +1906,8 @@ body[data-translucent="true"] .selection-modal .myboy-dialog-card:not(.import-sa
     margin-top:2px;
   }
 }
+
+
+/* v1.0.3 language selector mirrors the font selector. */
+.language-settings-list .language-option{width:100%;text-align:left;}
+.language-settings-list .language-option > div{min-width:0;}

@@ -81,6 +81,33 @@ class SaveDataRepository(
         }
     }
 
+    /**
+     * Atomically replaces a ROM's canonical battery save with an externally
+     * imported .sav. The previous save is preserved in Backups first, and the
+     * transient mGBA working copy is removed so a stale session can never win
+     * over the newly imported data on the next launch.
+     */
+    fun replaceBatterySaveFromFile(romId: String, source: File): Boolean {
+        if (romId.isBlank() || !source.exists() || source.length() <= 0L) return false
+        return synchronized(saveLockFor(romId)) {
+            runCatching {
+                val canonical = batterySaveFile(romId)
+                if (canonical.exists() && canonical.length() > 0L) {
+                    backupBatterySaveIfChanged(romId)
+                }
+                fileOps.atomicCopyVerified(source, canonical)
+                canonical.setLastModified(System.currentTimeMillis())
+
+                val working = workingSaveFile(romId)
+                if (working.exists() && !working.delete()) {
+                    throw IllegalStateException("Could not clear the previous working save")
+                }
+                prefs.edit().putBoolean(dataDeletedKey(romId), false).apply()
+                true
+            }.getOrDefault(false)
+        }
+    }
+
     fun migrateLegacyBatteryData(romId: String, launchFile: File?) {
         if (romId.isBlank() || launchFile == null) return
         if (prefs.getBoolean(dataDeletedKey(romId), false)) return

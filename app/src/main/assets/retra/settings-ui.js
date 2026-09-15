@@ -6,6 +6,7 @@ const settingsPageMap = {
   Misc: 'miscSettingsPage',
   Advanced: 'advancedSettingsPage',
   Fonts: 'fontsSettingsPage',
+  Language: 'languageSettingsPage',
   About: 'aboutSettingsPage'
 };
 
@@ -45,7 +46,7 @@ const fontStacks = {
 };
 
 function normalizeFontSlug(value){
-  return (value || 'Poppins')
+  return (value || 'Inter')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -54,12 +55,28 @@ function normalizeFontSlug(value){
 }
 
 function getSavedUiFont(){
-  const saved = getNativeUiPreference('font') || localStorage.getItem(fontStorageKey) || 'Poppins';
-  return fontStacks[saved] ? saved : 'Poppins';
+  const saved = getNativeUiPreference('font') || localStorage.getItem(fontStorageKey) || 'Inter';
+  const validSaved = fontStacks[saved] ? saved : 'Inter';
+  const migrationKey = 'retraInterDefaultMigrationV103';
+  const migrated = getNativeUiPreference(migrationKey) || localStorage.getItem(migrationKey);
+  // v1.0.3 switches the old implicit Poppins default to Inter once. Users can
+  // still select Poppins afterward; the migration marker prevents re-forcing it.
+  if (!migrated && validSaved === 'Poppins') {
+    localStorage.setItem(migrationKey, '1');
+    setNativeUiPreference(migrationKey, '1');
+    localStorage.setItem(fontStorageKey, 'Inter');
+    setNativeUiPreference('font', 'Inter');
+    return 'Inter';
+  }
+  if (!migrated) {
+    localStorage.setItem(migrationKey, '1');
+    setNativeUiPreference(migrationKey, '1');
+  }
+  return validSaved;
 }
 
 function applyUiFont(fontName, { persist = false, notify = false } = {}){
-  const selected = fontStacks[fontName] ? fontName : 'Poppins';
+  const selected = fontStacks[fontName] ? fontName : 'Inter';
   document.documentElement.style.setProperty('--app-font', fontStacks[selected]);
   document.body.dataset.uiFont = normalizeFontSlug(selected);
 
@@ -70,11 +87,11 @@ function applyUiFont(fontName, { persist = false, notify = false } = {}){
   });
 
   if (settingsVersionLabel) {
-    settingsVersionLabel.textContent = 'Retra v1.0.2';
+    settingsVersionLabel.textContent = 'Retra v1.0.3';
   }
 
   if (persist) { localStorage.setItem(fontStorageKey, selected); setNativeUiPreference('font', selected); }
-  if (notify) showToast(`${selected} font selected`);
+  if (notify) showToast(window.retraI18n?.format('fontSelected', { font: selected }) || `${selected} font selected`);
 }
 
 fontOptions.forEach(option => {
@@ -105,7 +122,7 @@ function setUpdateStatus(text){
 }
 
 function hydrateRetraVersion(){
-  let versionName = '1.0.2';
+  let versionName = '1.0.3';
   try {
     if (window.AndroidBridge && typeof window.AndroidBridge.getAppVersionInfo === 'function') {
       const info = JSON.parse(String(window.AndroidBridge.getAppVersionInfo() || '{}'));
@@ -963,6 +980,8 @@ const skipImportSavesBtn = document.getElementById('skipImportSavesBtn');
 const openAppFolderBtn = document.getElementById('openAppFolderBtn');
 const cloudSyncToggle = document.getElementById('cloudSyncToggle');
 const cloudSyncSummary = document.getElementById('cloudSyncSummary');
+const cloudBackupNowBtn = document.getElementById('cloudBackupNowBtn');
+const cloudBackupNowSummary = document.getElementById('cloudBackupNowSummary');
 const syncSettingsBtn = document.getElementById('syncSettingsBtn');
 const syncSettingsSummary = document.getElementById('syncSettingsSummary');
 const enableCheatsToggle = document.getElementById('enableCheatsToggle');
@@ -1098,30 +1117,40 @@ function applyNativeSettingsState(state){
     if (smcCheckValue) smcCheckValue.value = String(state.smcCheck);
   }
 
-  const cloudReady = !!state.cloudSync && !!state.cloudFolderConnected;
+  const cloudConnected = !!state.cloudFolderConnected;
+  const cloudAutoEnabled = !!state.cloudSync;
   const cloudAccount = String(state.cloudAccount || '').trim();
-  const cloudMode = state.cloudSyncMode === 'api' ? 'Drive API' : 'Drive folder';
   const cloudLastBackupAt = Math.max(0, Number(state.cloudLastBackupAt) || 0);
   const cloudLastError = String(state.cloudLastSyncError || '').trim();
+  const cloudTransferActive = !!state.cloudTransferActive;
+  const cloudTransferLabel = String(state.cloudTransferLabel || '').trim();
+  const cloudTransferProgress = Math.max(0, Math.min(100, Number(state.cloudTransferProgress) || 0));
   const cloudBackupTime = cloudLastBackupAt > 0
     ? new Date(cloudLastBackupAt).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
     : '';
   if (cloudSyncSummary) {
-    if (!cloudReady) cloudSyncSummary.textContent = 'Choose a Google account to protect saves across reinstalls and devices';
-    else if (cloudLastError && cloudLastBackupAt > 0) cloudSyncSummary.textContent = `Protected ${cloudBackupTime} • sync needs attention`;
-    else if (cloudLastError) cloudSyncSummary.textContent = `Connected • backup needs attention`;
-    else if (cloudLastBackupAt > 0) cloudSyncSummary.textContent = `Protected • last backup ${cloudBackupTime}`;
-    else cloudSyncSummary.textContent = `${cloudAccount ? `${cloudAccount} • ` : ''}${cloudMode} connected • waiting for first backup`;
+    if (cloudTransferActive) cloudSyncSummary.textContent = `${cloudTransferLabel || 'Google Drive'} • ${cloudTransferProgress}%`;
+    else if (!cloudConnected) cloudSyncSummary.textContent = 'Choose a Google account to back up directly to My Drive/Retra Backups';
+    else if (!cloudAutoEnabled) cloudSyncSummary.textContent = `${cloudAccount} • automatic backup off`;
+    else if (cloudLastError && cloudLastBackupAt > 0) cloudSyncSummary.textContent = `${cloudAccount} • last backup ${cloudBackupTime} • needs attention`;
+    else if (cloudLastError) cloudSyncSummary.textContent = `${cloudAccount} • backup needs attention`;
+    else if (cloudLastBackupAt > 0) cloudSyncSummary.textContent = `${cloudAccount} • last successful backup ${cloudBackupTime}`;
+    else cloudSyncSummary.textContent = `${cloudAccount} • Drive API connected • waiting for first backup`;
+  }
+  if (cloudBackupNowSummary) {
+    if (cloudTransferActive) cloudBackupNowSummary.textContent = `${cloudTransferLabel || 'Working'} • ${cloudTransferProgress}%`;
+    else if (cloudLastError) cloudBackupNowSummary.textContent = cloudLastError;
+    else if (cloudLastBackupAt > 0) cloudBackupNowSummary.textContent = `Last successful backup ${cloudBackupTime}`;
+    else cloudBackupNowSummary.textContent = 'Upload immediately to My Drive/Retra Backups';
   }
   if (syncSettingsBtn) {
-    syncSettingsBtn.disabled = !cloudReady;
-    syncSettingsBtn.classList.toggle('disabled-row', !cloudReady);
+    syncSettingsBtn.disabled = !cloudConnected;
+    syncSettingsBtn.classList.toggle('disabled-row', !cloudConnected);
   }
   if (syncSettingsSummary) {
-    if (!cloudReady) syncSettingsSummary.textContent = 'Available when automatic Drive backup is enabled';
-    else if (cloudLastError) syncSettingsSummary.textContent = `${cloudLastError} • tap for Sync now`;
-    else if (cloudLastBackupAt > 0) syncSettingsSummary.textContent = `Last protected ${cloudBackupTime} • Sync now or manage Drive`;
-    else syncSettingsSummary.textContent = 'Sync now, change account/folder, or disconnect';
+    if (!cloudConnected) syncSettingsSummary.textContent = 'Connect a Google account to manage Drive backup';
+    else if (cloudLastError) syncSettingsSummary.textContent = `${cloudAccount} • ${cloudLastError}`;
+    else syncSettingsSummary.textContent = `${cloudAccount} • Backup Now, Restore, change account, or disconnect`;
   }
 }
 
@@ -1249,6 +1278,13 @@ cloudSyncToggle?.addEventListener('change', () => {
     window.AndroidBridge.setCloudSyncEnabled(cloudSyncToggle.checked);
   } else {
     setNativeSetting('cloudSync', cloudSyncToggle.checked);
+  }
+});
+cloudBackupNowBtn?.addEventListener('click', () => {
+  if (window.AndroidBridge && typeof window.AndroidBridge.backupToGoogleDrive === 'function') {
+    window.AndroidBridge.backupToGoogleDrive();
+  } else {
+    showToast('Google Drive backup is available in the Android app');
   }
 });
 syncSettingsBtn?.addEventListener('click', () => {

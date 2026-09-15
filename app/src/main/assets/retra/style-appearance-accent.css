@@ -31,7 +31,7 @@
   border-radius:999px;
   background:var(--accent);
   color:var(--on-accent);
-  font:800 15px/1 Poppins,system-ui,sans-serif;
+  font:800 15px/1 var(--app-font, Inter,system-ui,sans-serif);
   box-shadow:0 3px 9px rgba(0,0,0,.22);
   z-index:4;
 }

@@ -7,6 +7,7 @@ const screenPreviewSurface = document.getElementById('previewScreenSurface');
 const screenContextMenu = document.getElementById('screenContextMenu');
 const screenSizeModeButtons = [...document.querySelectorAll('.screen-context-option[data-size-mode]')];
 const addControlFab = document.getElementById('addControlFab');
+const screenGridToggleBtn = document.getElementById('screenGridToggleBtn');
 const previewScaleHandle = document.getElementById('previewScaleHandle');
 const previewScaleValue = document.getElementById('previewScaleValue');
 const controlRemoveMenu = document.getElementById('controlRemoveMenu');
@@ -16,8 +17,8 @@ const addControlList = document.getElementById('addControlList');
 const addControlItems = [...document.querySelectorAll('.add-control-item')];
 const closeAddControlModalBtn = document.getElementById('closeAddControlModalBtn');
 const resetPreviewLayoutBtn = document.getElementById('resetPreviewLayoutBtn');
-
 const screenSizeStorageKey = 'retraScreenSizeStateV388';
+const screenEditorGridStorageKey = 'retraScreenEditorGridV1';
 const previewLayoutStorageKeyBase = 'retraPreviewButtonsLayoutV390';
 const screenSizeLabels = {
   fullscreen: 'Make fullscreen',
@@ -27,14 +28,26 @@ const screenSizeLabels = {
   stretch: 'Break aspect ratio',
   custom: 'Custom resize'
 };
-
+let screenEditorGridEnabled = localStorage.getItem(screenEditorGridStorageKey) === '1';
+function applyScreenEditorGrid(){
+  emulatorPreview?.classList.toggle('screen-grid-enabled', screenEditorGridEnabled);
+  if (screenGridToggleBtn) {
+    screenGridToggleBtn.classList.toggle('active', screenEditorGridEnabled);
+    screenGridToggleBtn.setAttribute('aria-pressed', screenEditorGridEnabled ? 'true' : 'false');
+  }
+}
+screenGridToggleBtn?.addEventListener('click', event => {
+  event.preventDefault();
+  event.stopPropagation();
+  screenEditorGridEnabled = !screenEditorGridEnabled;
+  localStorage.setItem(screenEditorGridStorageKey, screenEditorGridEnabled ? '1' : '0');
+  applyScreenEditorGrid();
+});
 const DEFAULT_CONTROLLER_SCALE_PORTRAIT = 1.0;
 const DEFAULT_CONTROLLER_SCALE_LANDSCAPE = 1.0;
-
 function defaultControllerScale(orientation = currentEditorOrientation()){
   return orientation === 'portrait' ? DEFAULT_CONTROLLER_SCALE_PORTRAIT : DEFAULT_CONTROLLER_SCALE_LANDSCAPE;
 }
-
 function currentEditorOrientation(){
   // Prefer the visual viewport in Android WebView because innerWidth/innerHeight
   // can briefly report the previous orientation while the system bars are
@@ -43,18 +56,15 @@ function currentEditorOrientation(){
   const height = Math.max(1, Number(window.visualViewport?.height) || window.innerHeight || 1);
   return height >= width ? 'portrait' : 'landscape';
 }
-
 function currentPreviewLayoutStorageKey(orientation = currentEditorOrientation()){
   return `${previewLayoutStorageKeyBase}_${orientation}`;
 }
-
 const screenSizeState = {
   orientation: currentEditorOrientation(),
   landscape: 'best',
   portrait: 'best',
   customFrames: { landscape: null, portrait: null }
 };
-
 try {
   const savedState = JSON.parse(localStorage.getItem(screenSizeStorageKey) || '{}');
   if (savedState && typeof savedState === 'object') {
@@ -77,23 +87,18 @@ try {
     });
   }
 } catch (error) {}
-
 function currentScreenMode(orientation = currentEditorOrientation()){
   return screenSizeState[orientation] || 'best';
 }
-
 function setCurrentScreenMode(mode){
   screenSizeState[currentEditorOrientation()] = mode;
 }
-
 function currentCustomFrame(orientation = currentEditorOrientation()){
   return screenSizeState.customFrames[orientation] || null;
 }
-
 function setCurrentCustomFrame(frame){
   screenSizeState.customFrames[currentEditorOrientation()] = frame;
 }
-
 function buildScreenLayoutPayload(orientation = currentEditorOrientation()){
   return {
     orientation,
@@ -101,21 +106,17 @@ function buildScreenLayoutPayload(orientation = currentEditorOrientation()){
     customFrame: currentCustomFrame(orientation)
   };
 }
-
 function hydrateEditorOrientationFromNative(orientation = currentEditorOrientation()){
   if (orientation !== 'portrait' && orientation !== 'landscape') return false;
   if (!window.AndroidBridge || typeof window.AndroidBridge.getGameplayLayout !== 'function') return false;
-
   try {
     const raw = nativeGetGameplayLayout(orientation);
     const bundle = JSON.parse(raw || '{}');
     if (bundle.orientation && bundle.orientation !== orientation) return false;
-
     if (bundle.controller && typeof bundle.controller === 'object') {
       bundle.controller.orientation = orientation;
       localStorage.setItem(currentPreviewLayoutStorageKey(orientation), JSON.stringify(bundle.controller));
     }
-
     if (bundle.screen && typeof bundle.screen === 'object') {
       const mode = bundle.screen.mode;
       screenSizeState[orientation] = ['fullscreen','centered','betterfit','best','stretch','custom'].includes(mode) ? mode : 'best';
@@ -143,43 +144,34 @@ function hydrateEditorOrientationFromNative(orientation = currentEditorOrientati
     return false;
   }
 }
-
 function persistScreenSizeState(orientation = currentEditorOrientation()){
   if (orientation !== 'portrait' && orientation !== 'landscape') return;
-
   screenSizeState.orientation = orientation;
   localStorage.setItem(screenSizeStorageKey, JSON.stringify(screenSizeState));
   if (window.AndroidBridge && typeof window.AndroidBridge.setEmulatorScreenLayout === 'function') {
     nativeSetScreenLayout(JSON.stringify(buildScreenLayoutPayload(orientation)));
   }
 }
-
 function updateScreenSizeSummary(){
   if (!screenSizeSummary) return;
   const orientation = currentEditorOrientation();
   const name = orientation === 'portrait' ? 'Portrait' : 'Landscape';
   screenSizeSummary.textContent = `${name}: ${screenSizeLabels[currentScreenMode()] || screenSizeLabels.best}`;
 }
-
 function fitGbaScreen(maxWidth, maxHeight, aspect = 3 / 2){
   let width = Math.max(1, maxWidth);
   let height = width / aspect;
-
   if (height > maxHeight) {
     height = Math.max(1, maxHeight);
     width = height * aspect;
   }
-
   return { width, height };
 }
-
 function updateResponsiveScreenFrame(){
   if (!emulatorPreview || !previewScreenFrame) return;
-
   const previewWidth = emulatorPreview.clientWidth;
   const previewHeight = emulatorPreview.clientHeight;
   if (!previewWidth || !previewHeight) return;
-
   const orientation = currentEditorOrientation();
   const mode = currentScreenMode();
   let width = previewWidth;
@@ -187,7 +179,6 @@ function updateResponsiveScreenFrame(){
   let left = previewWidth / 2;
   let top = previewHeight / 2;
   let transform = 'translate(-50%, -50%)';
-
   if (mode === 'custom' && currentCustomFrame()) {
     const custom = currentCustomFrame();
     const minWidth = Math.max(96, previewWidth * 0.20);
@@ -241,10 +232,8 @@ function updateResponsiveScreenFrame(){
       3 / 2
     ));
   }
-
   width = Math.max(1, Math.round(width));
   height = Math.max(1, Math.round(height));
-
   previewScreenFrame.style.width = `${width}px`;
   previewScreenFrame.style.height = `${height}px`;
   previewScreenFrame.style.left = `${Math.round(left)}px`;
@@ -253,7 +242,6 @@ function updateResponsiveScreenFrame(){
   previewScreenFrame.style.bottom = 'auto';
   previewScreenFrame.style.transform = transform;
 }
-
 const previewControlCatalog = {
   menu: { label: 'Menu', isBase: true },
   shoulderLeft: { label: 'Left shoulder', isBase: true },
@@ -275,12 +263,10 @@ const previewControlCatalog = {
   fastForward: { label: 'Fast forward' },
   screenshot: { label: 'Screenshot' }
 };
-
 const previewLayoutDefaults = {};
 const previewControlElements = new Map();
 let screenEditorOrientationSwitchInProgress = false;
 let screenEditorOrientationGeneration = 0;
-
 function clearBasePreviewControlInlineGeometry(){
   document.querySelectorAll('#screenSizePage [data-layout-control]:not(.extra-control)').forEach(element => {
     ['left','top','right','bottom','transform'].forEach(property => element.style.removeProperty(property));
@@ -291,44 +277,34 @@ function clearBasePreviewControlInlineGeometry(){
   previewScaleHandle?.classList.remove('visible', 'screen-scale-mode');
   previewScaleValue?.classList.remove('visible');
 }
-
 const previewLayoutState = {
   selectedId: 'dpad',
   controls: {}
 };
-
 let previewLayoutInitialized = false;
 let previewLayoutInitializedOrientation = null;
 let previewExtraControlCounter = 0;
-
 function clampPreviewValue(value, min, max){
   if (Number.isNaN(value)) return min;
   if (max < min) return min;
   return Math.min(Math.max(value, min), max);
 }
-
 function renderRestoreDefaultControlsSection(){
   if (!addControlList) return;
-
   addControlList.querySelector('.restore-default-controls')?.remove();
-
   const hiddenBaseIds = Object.entries(previewLayoutState.controls)
     .filter(([controlId, state]) => state?.base && state.hidden === true && previewControlCatalog[controlId]?.isBase)
     .map(([controlId]) => controlId);
-
   if (!hiddenBaseIds.length) {
     refreshAddControlAvailability();
     return;
   }
-
   const section = document.createElement('div');
   section.className = 'restore-default-controls';
-
   const title = document.createElement('div');
   title.className = 'restore-default-controls-title';
   title.textContent = 'Restore default controls';
   section.appendChild(title);
-
   hiddenBaseIds.forEach(controlId => {
     const button = document.createElement('button');
     button.className = 'add-control-item restore-default-control-item';
@@ -338,24 +314,20 @@ function renderRestoreDefaultControlsSection(){
     button.addEventListener('click', () => restorePreviewBaseControl(controlId));
     section.appendChild(button);
   });
-
   addControlList.prepend(section);
   refreshAddControlAvailability();
 }
-
 function restorePreviewBaseControl(controlId){
   if (!ensurePreviewLayoutInitialized()) return;
   const state = previewLayoutState.controls[controlId];
   const element = previewControlElements.get(controlId);
   const defaults = previewLayoutDefaults[controlId];
   if (!state || !state.base || !element || !defaults) return;
-
   removeConflictingExtraPreviewControls(state.type || controlId, controlId);
   state.hidden = false;
   if (typeof state.x !== 'number') state.x = defaults.x;
   if (typeof state.y !== 'number') state.y = defaults.y;
   if (typeof state.scale !== 'number') state.scale = defaults.scale || defaultControllerScale(previewLayoutInitializedOrientation || currentEditorOrientation());
-
   element.classList.remove('is-hidden');
   applyPreviewLayoutControls();
   selectPreviewControl(controlId);
@@ -364,11 +336,9 @@ function restorePreviewBaseControl(controlId){
   closeAddControlModal();
   showToast(`${state.label || previewControlCatalog[controlId]?.label || 'Control'} restored`);
 }
-
 let previewControlLongPressTimer = null;
 let previewControlLongPressState = null;
 let ignorePreviewControlClickUntil = 0;
-
 function clearPreviewControlLongPress(){
   if (previewControlLongPressTimer) {
     clearTimeout(previewControlLongPressTimer);
@@ -376,41 +346,32 @@ function clearPreviewControlLongPress(){
   }
   previewControlLongPressState = null;
 }
-
 function hideControlRemoveMenu(){
   controlRemoveMenu?.classList.remove('open');
   controlRemoveMenu?.setAttribute('aria-hidden', 'true');
   if (controlRemoveMenu) delete controlRemoveMenu.dataset.controlId;
 }
-
 function positionControlRemoveMenu(controlId){
   if (!controlRemoveMenu || !emulatorPreview) return;
   const element = previewControlElements.get(controlId);
   if (!element || element.classList.contains('is-hidden')) return;
-
   const previewRect = emulatorPreview.getBoundingClientRect();
   const controlRect = element.getBoundingClientRect();
   const menuWidth = controlRemoveMenu.offsetWidth || 132;
   const menuHeight = controlRemoveMenu.offsetHeight || 38;
-
   let left = controlRect.left - previewRect.left + (controlRect.width - menuWidth) / 2;
   let top = controlRect.top - previewRect.top - menuHeight - 9;
-
   // If there is no room above, place it directly below the held control.
   if (top < 6) top = controlRect.bottom - previewRect.top + 9;
-
   left = clampPreviewValue(left, 6, Math.max(6, previewRect.width - menuWidth - 6));
   top = clampPreviewValue(top, 6, Math.max(6, previewRect.height - menuHeight - 6));
-
   controlRemoveMenu.style.left = `${left}px`;
   controlRemoveMenu.style.top = `${top}px`;
 }
-
 function openControlRemoveMenu(controlId){
   if (!ensurePreviewLayoutInitialized()) return;
   const state = previewLayoutState.controls[controlId];
   if (!state || state.hidden) return;
-
   stopPreviewDrag();
   selectPreviewControl(controlId);
   controlRemoveMenu.dataset.controlId = controlId;
@@ -419,7 +380,6 @@ function openControlRemoveMenu(controlId){
   positionControlRemoveMenu(controlId);
   ignorePreviewControlClickUntil = Date.now() + 650;
 }
-
 function beginPreviewControlLongPress(controlId, event){
   clearPreviewControlLongPress();
   previewControlLongPressState = {
@@ -435,15 +395,12 @@ function beginPreviewControlLongPress(controlId, event){
     openControlRemoveMenu(controlId);
   }, 480);
 }
-
 function removePreviewControl(controlId){
   if (!ensurePreviewLayoutInitialized()) return;
   const state = previewLayoutState.controls[controlId];
   const element = previewControlElements.get(controlId);
   if (!state || !element) return;
-
   const label = state.label || previewControlCatalog[state.type]?.label || 'Control';
-
   if (state.base) {
     // Built-in controls stay in the layout data so Reset layout can restore them.
     state.hidden = true;
@@ -453,7 +410,6 @@ function removePreviewControl(controlId){
     previewControlElements.delete(controlId);
     delete previewLayoutState.controls[controlId];
   }
-
   if (previewLayoutState.selectedId === controlId) previewLayoutState.selectedId = null;
   previewScaleHandle?.classList.remove('visible');
   previewScaleValue?.classList.remove('visible');
@@ -463,11 +419,9 @@ function removePreviewControl(controlId){
   refreshAddControlAvailability();
   showToast(`${label} removed`);
 }
-
 function attachPreviewControlEvents(control){
   if (!control || control.dataset.eventsBound === '1') return;
   control.dataset.eventsBound = '1';
-
   control.addEventListener('pointerdown', event => {
     if (event.button !== undefined && event.button !== 0) return;
     if (event.target.closest('#previewScaleHandle')) return;
@@ -477,21 +431,18 @@ function attachPreviewControlEvents(control){
     beginPreviewControlLongPress(control.dataset.layoutControl, event);
     beginPreviewControlDrag(control.dataset.layoutControl, event);
   });
-
   ['pointerup', 'pointercancel'].forEach(eventName => {
     control.addEventListener(eventName, () => {
       // Pointer capture owns the gesture; movement tolerance separates drag from hold.
       if (previewControlLongPressTimer) clearPreviewControlLongPress();
     });
   });
-
   control.addEventListener('contextmenu', event => {
     event.preventDefault();
     event.stopPropagation();
     clearPreviewControlLongPress();
     openControlRemoveMenu(control.dataset.layoutControl);
   });
-
   control.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
@@ -499,11 +450,9 @@ function attachPreviewControlEvents(control){
     hideControlRemoveMenu();
     selectPreviewControl(control.dataset.layoutControl);
   });
-
   control.addEventListener('keydown', event => {
     const controlId = control.dataset.layoutControl;
     if (!controlId) return;
-
     const step = event.shiftKey ? 8 : 1;
     const movement = {
       ArrowLeft: [-step, 0],
@@ -511,21 +460,18 @@ function attachPreviewControlEvents(control){
       ArrowUp: [0, -step],
       ArrowDown: [0, step]
     }[event.key];
-
     if (movement) {
       event.preventDefault();
       event.stopPropagation();
       nudgePreviewControl(controlId, movement[0], movement[1]);
       return;
     }
-
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       event.stopPropagation();
       removePreviewControl(controlId);
       return;
     }
-
     if (event.key === '+' || event.key === '=') {
       event.preventDefault();
       resizePreviewControlFromKeyboard(controlId, 0.05);
@@ -540,10 +486,8 @@ function registerPreviewControlElement(controlId, element){
   previewControlElements.set(controlId, element);
   attachPreviewControlEvents(element);
 }
-
 function createExtraControlElement(controlId, type){
   if (!emulatorPreview) return null;
-
   const control = document.createElement('div');
   control.className = 'layout-control extra-control';
   if (type === 'quickLoad' || type === 'quickSave' || type === 'fastForward') {
@@ -562,26 +506,22 @@ function createExtraControlElement(controlId, type){
   registerPreviewControlElement(controlId, control);
   return control;
 }
-
 function defaultBaseControlState(controlId, orientation, element, previewRect){
   const baseWidth = Math.max(1, Number(element.dataset.baseWidth) || element.offsetWidth || 44);
   const baseHeight = Math.max(1, Number(element.dataset.baseHeight) || element.offsetHeight || 44);
-  const scale = defaultControllerScale(orientation);
+  const scale = defaultBaseControllerScale(controlId, orientation);
   const scaledWidth = baseWidth * scale;
   const scaledHeight = baseHeight * scale;
   const width = Math.max(1, previewRect.width);
   const height = Math.max(1, previewRect.height);
-
   let left = (width - scaledWidth) / 2;
   let top = 10;
-
   if (orientation === 'portrait') {
     // My Boy!-style portrait zones: game screen at the top, shoulder/menu row
     // below it, Start/Select in the lower-middle, D-pad and A/B at the bottom.
     const side = Math.max(10, width * 0.03);
     const shoulderY = height * 0.64;
     const bottom = Math.max(14, height * 0.018);
-
     switch (controlId) {
       case 'shoulderLeft':
         left = side;
@@ -612,8 +552,8 @@ function defaultBaseControlState(controlId, orientation, element, previewRect){
     // Landscape defaults intentionally do not reuse any portrait geometry.
     const side = Math.max(18, width * 0.028);
     const topInset = Math.max(10, height * 0.026);
+    const menuTop = Math.max(6, height * 0.014);
     const bottom = Math.max(12, height * 0.03);
-
     switch (controlId) {
       case 'shoulderLeft':
         left = side;
@@ -625,7 +565,7 @@ function defaultBaseControlState(controlId, orientation, element, previewRect){
         break;
       case 'menu':
         left = (width - scaledWidth) / 2;
-        top = topInset;
+        top = menuTop;
         break;
       case 'dpad':
         left = Math.max(18, width * 0.035);
@@ -641,10 +581,8 @@ function defaultBaseControlState(controlId, orientation, element, previewRect){
         break;
     }
   }
-
   left = clampPreviewValue(left, 0, Math.max(0, width - scaledWidth));
   top = clampPreviewValue(top, 0, Math.max(0, height - scaledHeight));
-
   return {
     type: controlId,
     base: true,
@@ -654,13 +592,11 @@ function defaultBaseControlState(controlId, orientation, element, previewRect){
     label: element.dataset.controlLabel || previewControlCatalog[controlId]?.label || controlId
   };
 }
-
 function ensurePreviewLayoutInitialized(){
   const orientation = currentEditorOrientation();
   if (screenEditorOrientationSwitchInProgress) return false;
   if (previewLayoutInitialized && previewLayoutInitializedOrientation === orientation) return true;
   if (!emulatorPreview || !emulatorPreview.clientWidth || !emulatorPreview.clientHeight) return false;
-
   // IMPORTANT: never recycle the old orientation's live DOM/state here. A resize
   // event can fire before the dedicated orientation switch handler. If that old
   // state were measured against the new viewport, its positions would be clamped
@@ -669,7 +605,6 @@ function ensurePreviewLayoutInitialized(){
   if (previewLayoutInitialized && previewLayoutInitializedOrientation !== orientation) {
     return false;
   }
-
   let savedLayout = {};
   try {
     const candidate = JSON.parse(localStorage.getItem(currentPreviewLayoutStorageKey(orientation)) || '{}') || {};
@@ -682,22 +617,17 @@ function ensurePreviewLayoutInitialized(){
   } catch (error) {
     savedLayout = {};
   }
-
   const previewRect = emulatorPreview.getBoundingClientRect();
   const baseControls = [...document.querySelectorAll('#screenSizePage [data-layout-control]')].filter(control => !control.classList.contains('extra-control'));
-
   baseControls.forEach(control => {
     const id = control.dataset.layoutControl;
     if (!id) return;
-
     const rect = control.getBoundingClientRect();
     control.dataset.baseWidth = String(control.offsetWidth || rect.width || 44);
     control.dataset.baseHeight = String(control.offsetHeight || rect.height || 44);
-
     // Never infer untouched defaults from the outgoing orientation's rendered
     // pixels. Each orientation gets its own deterministic normalized layout.
     const defaults = defaultBaseControlState(id, orientation, control, previewRect);
-
     previewLayoutDefaults[id] = defaults;
     const saved = savedLayout.controls?.[id] || {};
     previewLayoutState.controls[id] = {
@@ -707,23 +637,17 @@ function ensurePreviewLayoutInitialized(){
       scale: typeof saved.scale === 'number' ? saved.scale : defaults.scale,
       hidden: saved.hidden === true
     };
-
     registerPreviewControlElement(id, control);
   });
-
   Object.entries(savedLayout.controls || {}).forEach(([controlId, saved]) => {
     if (saved?.base) return;
-
     const matched = String(controlId).match(/extra-(\d+)/);
     if (matched) previewExtraControlCounter = Math.max(previewExtraControlCounter, Number(matched[1]));
-
     const type = saved.type;
     if (!type || !previewControlCatalog[type] || saved.hidden === true) return;
-
     // v4.47 migration: old editor data could contain stacked copies of the
     // same control. Keep the first valid visible instance and drop the rest.
     if (isPreviewControlTypePlaced(type)) return;
-
     createExtraControlElement(controlId, type);
     previewLayoutState.controls[controlId] = {
       type,
@@ -735,24 +659,20 @@ function ensurePreviewLayoutInitialized(){
       hidden: false
     };
   });
-
   const savedSelectedId = savedLayout.selectedId;
   if (savedSelectedId && previewLayoutState.controls[savedSelectedId] && !previewLayoutState.controls[savedSelectedId].hidden) {
     previewLayoutState.selectedId = savedSelectedId;
   } else if (savedSelectedId) {
     previewLayoutState.selectedId = null;
   }
-
   previewLayoutInitialized = true;
   previewLayoutInitializedOrientation = orientation;
   refreshAddControlAvailability();
   return true;
 }
-
 function serializePreviewLayoutState(){
   return JSON.stringify(previewLayoutState);
 }
-
 function buildPreviewLayoutPayload(orientation = previewLayoutInitializedOrientation || currentEditorOrientation()){
   let payload;
   try {
@@ -763,48 +683,44 @@ function buildPreviewLayoutPayload(orientation = previewLayoutInitializedOrienta
   payload.orientation = orientation;
   return payload;
 }
-
 function persistPreviewLayoutState(orientation = previewLayoutInitializedOrientation || currentEditorOrientation()){
   if (!previewLayoutInitialized) return;
   if (orientation !== 'portrait' && orientation !== 'landscape') return;
   // The live editor state belongs to exactly one orientation. Refuse any write
   // to a different key even if a late resize/orientation event asks for it.
   if (previewLayoutInitializedOrientation && orientation !== previewLayoutInitializedOrientation) return;
-
   // Never derive this key from the *new* device orientation during a rotation.
   // The initialized orientation owns this in-memory controller state until it
   // is discarded. This is what keeps portrait and landscape fully isolated.
   const payload = buildPreviewLayoutPayload(orientation);
   const json = JSON.stringify(payload);
-
   localStorage.setItem(currentPreviewLayoutStorageKey(orientation), json);
   if (window.AndroidBridge && typeof window.AndroidBridge.setControllerLayout === 'function') {
     nativeSetControllerLayout(json);
   }
+  // Sync immediately so hidden base controls cannot be restored by a stale profile snapshot.
+  if (typeof syncActiveLayoutProfileControllerFromEditor === 'function') {
+    syncActiveLayoutProfileControllerFromEditor(orientation, payload);
+  }
 }
-
 function commitScreenEditorState(){
   const orientation = previewLayoutInitializedOrientation || currentEditorOrientation();
   if (orientation !== 'portrait' && orientation !== 'landscape') return;
-
   // Capture the exact live orientation before leaving. No Save button is needed.
   if (previewLayoutInitialized) {
     const controllerPayload = buildPreviewLayoutPayload(orientation);
     const controllerJson = JSON.stringify(controllerPayload);
     const screenPayload = buildScreenLayoutPayload(orientation);
     const screenJson = JSON.stringify(screenPayload);
-
     localStorage.setItem(currentPreviewLayoutStorageKey(orientation), controllerJson);
     screenSizeState.orientation = orientation;
     localStorage.setItem(screenSizeStorageKey, JSON.stringify(screenSizeState));
-
     if (window.AndroidBridge && typeof window.AndroidBridge.commitGameplayLayout === 'function') {
       // Synchronous native transaction: Back -> Settings -> Start game always
       // reads the exact screen + controller layout that was just visible.
       nativeCommitGameplayLayout(controllerJson, screenJson);
       return;
     }
-
     if (window.AndroidBridge && typeof window.AndroidBridge.setControllerLayout === 'function') {
       nativeSetControllerLayout(controllerJson);
     }
@@ -813,17 +729,14 @@ function commitScreenEditorState(){
     }
     return;
   }
-
   // Screen-only fallback if the editor has not finished measuring its controls.
   persistScreenSizeState(orientation);
 }
-
 function adaptiveControlScaleHandlePlacement(controlRect, previewRect, handleSize, forcedXDirection = 0, forcedYDirection = 0){
   const freeLeft = Math.max(0, controlRect.left - previewRect.left);
   const freeRight = Math.max(0, previewRect.right - controlRect.right);
   const freeTop = Math.max(0, controlRect.top - previewRect.top);
   const freeBottom = Math.max(0, previewRect.bottom - controlRect.bottom);
-
   // Put the resize handle on the sides with the most free canvas. This makes
   // edge controls resizeable instead of pinning the handle against/off-screen.
   const preferredXDirection = freeRight >= freeLeft ? 1 : -1;
@@ -843,7 +756,6 @@ function adaptiveControlScaleHandlePlacement(controlRect, previewRect, handleSiz
   const desiredTop = yDirection > 0
     ? controlRect.bottom - previewRect.top - handleSize * overlap
     : controlRect.top - previewRect.top - handleSize * (1 - overlap);
-
   return {
     left: clampPreviewValue(desiredLeft, 0, Math.max(0, previewRect.width - handleSize)),
     top: clampPreviewValue(desiredTop, 0, Math.max(0, previewRect.height - handleSize)),
@@ -852,12 +764,9 @@ function adaptiveControlScaleHandlePlacement(controlRect, previewRect, handleSiz
     corner: `${yDirection > 0 ? 'bottom' : 'top'}-${xDirection > 0 ? 'right' : 'left'}`
   };
 }
-
 function updateScaleHandle(){
   if (!previewScaleHandle || !emulatorPreview) return;
-
   const previewRect = emulatorPreview.getBoundingClientRect();
-
   // The emulator screen uses the exact same expand/minimize handle as the
   // controller buttons. Tapping the screen selects it, then dragging this
   // handle outward grows it and dragging inward shrinks it.
@@ -872,7 +781,6 @@ function updateScaleHandle(){
       scalingScreen ? activeScreenScale.xDirection : 0,
       scalingScreen ? activeScreenScale.yDirection : 0
     );
-
     previewScaleHandle.style.left = `${placement.left}px`;
     previewScaleHandle.style.top = `${placement.top}px`;
     previewScaleHandle.dataset.scaleDirectionX = String(placement.xDirection);
@@ -881,13 +789,11 @@ function updateScaleHandle(){
     previewScaleHandle.style.cursor = placement.xDirection === placement.yDirection ? 'nwse-resize' : 'nesw-resize';
     previewScaleHandle.classList.add('visible', 'screen-scale-mode');
     previewScaleHandle.setAttribute('aria-label', 'Resize emulator screen');
-
     if (previewScaleValue) {
       const best = fitGbaScreen(previewRect.width * 0.82, previewRect.height * 0.88, 3 / 2);
       const percent = Math.round(clampPreviewValue(frameRect.width / Math.max(1, best.width), 0.2, 3) * 100);
       previewScaleValue.textContent = `${percent}%`;
       previewScaleValue.setAttribute('aria-label', `Emulator screen size ${percent}%`);
-
       const badgeWidth = previewScaleValue.offsetWidth || 52;
       const badgeHeight = previewScaleValue.offsetHeight || 28;
       let badgeLeft = frameRect.left - previewRect.left + (frameRect.width - badgeWidth) / 2;
@@ -903,10 +809,8 @@ function updateScaleHandle(){
     }
     return;
   }
-
   previewScaleHandle.classList.remove('screen-scale-mode');
   previewScaleHandle.setAttribute('aria-label', 'Resize selected control');
-
   if (!previewLayoutState.selectedId) {
     previewScaleHandle.classList.remove('visible');
     previewScaleValue?.classList.remove('visible');
@@ -919,7 +823,6 @@ function updateScaleHandle(){
     previewScaleValue?.classList.remove('visible');
     return;
   }
-
   const controlRect = selected.getBoundingClientRect();
   const handleSize = previewScaleHandle.offsetWidth || 42;
   const scalingThisControl = activePreviewScale?.controlId === previewLayoutState.selectedId;
@@ -930,7 +833,6 @@ function updateScaleHandle(){
     scalingThisControl ? activePreviewScale.xDirection : 0,
     scalingThisControl ? activePreviewScale.yDirection : 0
   );
-
   previewScaleHandle.style.left = `${placement.left}px`;
   previewScaleHandle.style.top = `${placement.top}px`;
   previewScaleHandle.dataset.scaleDirectionX = String(placement.xDirection);
@@ -938,35 +840,28 @@ function updateScaleHandle(){
   previewScaleHandle.dataset.scaleCorner = placement.corner;
   previewScaleHandle.style.cursor = placement.xDirection === placement.yDirection ? 'nwse-resize' : 'nesw-resize';
   previewScaleHandle.classList.add('visible');
-
   if (previewScaleValue) {
     const percent = Math.round(clampPreviewValue(Number(state.scale) || 1, 0.65, 1.7) * 100);
     previewScaleValue.textContent = `${percent}%`;
     previewScaleValue.setAttribute('aria-label', `Selected control size ${percent}%`);
-
     const badgeWidth = previewScaleValue.offsetWidth || 52;
     const badgeHeight = previewScaleValue.offsetHeight || 28;
     let badgeLeft = controlRect.left - previewRect.left + (controlRect.width - badgeWidth) / 2;
     let badgeTop = controlRect.bottom - previewRect.top + 7;
-
     // If there is not enough space below the button, put the value above it.
     if (badgeTop + badgeHeight > previewRect.height - 6) {
       badgeTop = controlRect.top - previewRect.top - badgeHeight - 7;
     }
-
     badgeLeft = clampPreviewValue(badgeLeft, 6, Math.max(6, previewRect.width - badgeWidth - 6));
     badgeTop = clampPreviewValue(badgeTop, 6, Math.max(6, previewRect.height - badgeHeight - 6));
-
     previewScaleValue.style.left = `${badgeLeft}px`;
     previewScaleValue.style.top = `${badgeTop}px`;
     previewScaleValue.classList.add('visible');
   }
-
   if (controlRemoveMenu?.classList.contains('open') && controlRemoveMenu.dataset.controlId === previewLayoutState.selectedId) {
     positionControlRemoveMenu(previewLayoutState.selectedId);
   }
 }
-
 function clearPreviewSelection(){
   previewLayoutState.selectedId = null;
   previewControlElements.forEach(element => {
@@ -977,43 +872,34 @@ function clearPreviewSelection(){
   hideControlRemoveMenu();
   persistPreviewLayoutState();
 }
-
 function selectPreviewControl(controlId){
   if (!ensurePreviewLayoutInitialized()) return;
   clearScreenFrameSelection();
   if (!previewLayoutState.controls[controlId] || previewLayoutState.controls[controlId].hidden) return;
-
   previewLayoutState.selectedId = controlId;
   previewControlElements.forEach((element, id) => {
     element.classList.toggle('is-selected', id === controlId);
   });
-
   updateScaleHandle();
   persistPreviewLayoutState();
 }
-
 function applyPreviewLayoutControls(){
   if (screenEditorOrientationSwitchInProgress) return;
   if (previewLayoutInitialized && previewLayoutInitializedOrientation !== currentEditorOrientation()) return;
   if (!ensurePreviewLayoutInitialized() || !emulatorPreview) return;
-
   const previewWidth = emulatorPreview.clientWidth;
   const previewHeight = emulatorPreview.clientHeight;
   if (!previewWidth || !previewHeight) return;
-
   Object.entries(previewLayoutState.controls).forEach(([controlId, state]) => {
     const element = previewControlElements.get(controlId);
     if (!element) return;
-
     element.classList.toggle('is-hidden', state.hidden === true);
     if (state.hidden) return;
-
     const scale = clampPreviewValue(Number(state.scale) || 1, 0.65, 1.7);
     const baseWidth = Number(element.dataset.baseWidth) || element.offsetWidth || 44;
     const baseHeight = Number(element.dataset.baseHeight) || element.offsetHeight || 44;
     const scaledWidth = baseWidth * scale;
     const scaledHeight = baseHeight * scale;
-
     const left = clampPreviewValue(
       (typeof state.x === 'number' ? state.x : 0.5) * previewWidth,
       0,
@@ -1024,20 +910,17 @@ function applyPreviewLayoutControls(){
       0,
       Math.max(0, previewHeight - scaledHeight)
     );
-
     // Keep the saved state orientation-local. These values are only updated by
     // explicit user interaction in this orientation; rendering must not convert
     // one orientation into another. Inline !important makes the user's saved
     // coordinates authoritative over the CSS default portrait/landscape positions.
     state.scale = scale;
-
     element.style.setProperty('left', `${left}px`, 'important');
     element.style.setProperty('top', `${top}px`, 'important');
     element.style.setProperty('right', 'auto', 'important');
     element.style.setProperty('bottom', 'auto', 'important');
     element.style.setProperty('transform', `scale(${scale})`, 'important');
   });
-
   if (previewLayoutState.selectedId && previewLayoutState.controls[previewLayoutState.selectedId] && !previewLayoutState.controls[previewLayoutState.selectedId].hidden) {
     // Repaint only; persistence on every pointermove can stall WebView dragging.
     previewControlElements.forEach((element, id) => {
@@ -1051,7 +934,6 @@ function applyPreviewLayoutControls(){
     updateScaleHandle();
   }
 }
-
 let activePreviewDrag = null;
 let activePreviewScale = null;
 function stopPreviewDrag(event){
@@ -1168,7 +1050,6 @@ function beginPreviewControlDrag(controlId, event){
 function stopPreviewScale(event){
   if (!activePreviewScale) return;
   if (event?.pointerId !== undefined && activePreviewScale.pointerId !== undefined && event.pointerId !== activePreviewScale.pointerId) return;
-
   flushPendingPreviewScale();
   const scale = activePreviewScale;
   activePreviewScale = null;
@@ -1192,13 +1073,11 @@ function handlePreviewScaleMove(event){
     if (next) applyPreviewScaleMove(next);
   });
 }
-
 function applyPreviewScaleMove(event){
   if (!activePreviewScale || !emulatorPreview) return;
   if (activePreviewScale.pointerId !== undefined && event.pointerId !== undefined && event.pointerId !== activePreviewScale.pointerId) return;
   const state = previewLayoutState.controls[activePreviewScale.controlId];
   if (!state) return;
-
   const deltaX = event.clientX - activePreviewScale.startX;
   const deltaY = event.clientY - activePreviewScale.startY;
   // Whichever corner the handle moved to, dragging away from the selected
@@ -1210,7 +1089,6 @@ function applyPreviewScaleMove(event){
   const nextScale = clampPreviewValue(activePreviewScale.startScale + delta, 0.65, 1.7);
   const scaledWidth = activePreviewScale.baseWidth * nextScale;
   const scaledHeight = activePreviewScale.baseHeight * nextScale;
-
   let nextLeft = activePreviewScale.startLeft;
   let nextTop = activePreviewScale.startTop;
   // When the adaptive handle is on the left/top, keep the opposite edge
@@ -1221,14 +1099,11 @@ function applyPreviewScaleMove(event){
   if (activePreviewScale.yDirection < 0) {
     nextTop += activePreviewScale.startHeight - scaledHeight;
   }
-
   nextLeft = clampPreviewValue(nextLeft, 0, Math.max(0, activePreviewScale.previewWidth - scaledWidth));
   nextTop = clampPreviewValue(nextTop, 0, Math.max(0, activePreviewScale.previewHeight - scaledHeight));
-
   state.scale = nextScale;
   state.x = nextLeft / Math.max(1, activePreviewScale.previewWidth);
   state.y = nextTop / Math.max(1, activePreviewScale.previewHeight);
-
   const element = activePreviewScale.element || previewControlElements.get(activePreviewScale.controlId);
   if (element) {
     element.style.setProperty('left', `${nextLeft}px`, 'important');
@@ -1245,11 +1120,9 @@ function beginPreviewScale(event){
   const state = previewLayoutState.controls[controlId];
   const element = previewControlElements.get(controlId);
   if (!controlId || !state || !element) return;
-
   event.preventDefault();
   event.stopPropagation();
   hideControlRemoveMenu();
-
   const previewRect = emulatorPreview.getBoundingClientRect();
   const elementRect = element.getBoundingClientRect();
   const startScale = clampPreviewValue(Number(state.scale) || 1, 0.65, 1.7);
@@ -1259,7 +1132,6 @@ function beginPreviewScale(event){
   const startHeight = baseHeight * startScale;
   const xDirection = Number(previewScaleHandle?.dataset.scaleDirectionX) || 1;
   const yDirection = Number(previewScaleHandle?.dataset.scaleDirectionY) || 1;
-
   activePreviewScale = {
     controlId,
     element,
@@ -1278,15 +1150,12 @@ function beginPreviewScale(event){
     previewWidth: previewRect.width,
     previewHeight: previewRect.height
   };
-
   // Resize capture stays separate from controller-body drag capture.
   try { previewScaleHandle?.setPointerCapture?.(event.pointerId); } catch (_) {}
-
   window.addEventListener('pointermove', handlePreviewScaleMove);
   window.addEventListener('pointerup', stopPreviewScale);
   window.addEventListener('pointercancel', stopPreviewScale);
 }
-
 function removeExtraPreviewControls(){
   Object.entries(previewLayoutState.controls).forEach(([controlId, state]) => {
     if (state.base) return;
@@ -1295,15 +1164,12 @@ function removeExtraPreviewControls(){
     delete previewLayoutState.controls[controlId];
   });
 }
-
 function resetPreviewLayout(){
   if (!ensurePreviewLayoutInitialized()) return;
   removeExtraPreviewControls();
-
   Object.entries(previewLayoutDefaults).forEach(([controlId, defaults]) => {
     previewLayoutState.controls[controlId] = { ...defaults };
   });
-
   previewLayoutState.selectedId = 'dpad';
   previewExtraControlCounter = 0;
   applyPreviewLayoutControls();
@@ -1311,7 +1177,6 @@ function resetPreviewLayout(){
   renderRestoreDefaultControlsSection();
   refreshAddControlAvailability();
 }
-
 function getNewPreviewControlPosition(){
   const extraCount = Object.values(previewLayoutState.controls).filter(control => !control.base).length;
   const offsetX = (extraCount % 3) * 0.06;
@@ -1321,19 +1186,15 @@ function getNewPreviewControlPosition(){
     y: clampPreviewValue(0.56 + offsetY, 0.12, 0.80)
   };
 }
-
 function addPreviewControl(type){
   if (!ensurePreviewLayoutInitialized() || !previewControlCatalog[type]) return;
-
   if (isPreviewControlTypePlaced(type)) {
     refreshAddControlAvailability();
     showToast(`${previewControlCatalog[type].label} is already on this screen`);
     return;
   }
-
   const controlId = `extra-${++previewExtraControlCounter}`;
   createExtraControlElement(controlId, type);
-
   const position = getNewPreviewControlPosition();
   previewLayoutState.controls[controlId] = {
     type,
@@ -1344,7 +1205,6 @@ function addPreviewControl(type){
     label: previewControlCatalog[type].label,
     hidden: false
   };
-
   applyPreviewLayoutControls();
   selectPreviewControl(controlId);
   persistPreviewLayoutState();
@@ -1352,7 +1212,6 @@ function addPreviewControl(type){
   closeAddControlModal();
   showToast(`${previewControlCatalog[type].label} added`);
 }
-
 function openAddControlModal(){
   hideControlRemoveMenu();
   renderRestoreDefaultControlsSection();
@@ -1362,13 +1221,11 @@ function openAddControlModal(){
   previewScaleHandle?.classList.remove('visible');
   previewScaleValue?.classList.remove('visible');
 }
-
 function closeAddControlModal(){
   addControlModal?.classList.remove('open');
   addControlModal?.setAttribute('aria-hidden', 'true');
   updateScaleHandle();
 }
-
 let screenFrameSelected = false;
 function clearScreenFrameSelection(){
   screenFrameSelected = false;
@@ -1378,26 +1235,22 @@ function clearScreenFrameSelection(){
     previewScaleValue?.classList.remove('visible');
   }
 }
-
 function selectScreenFrame(){
   screenFrameSelected = true;
   previewScreenFrame?.classList.add('is-selected');
   clearPreviewSelection();
   updateScaleHandle();
 }
-
 function enterCustomScreenGestureMode(){
   setCurrentScreenMode('custom');
   if (screenPreviewShell) screenPreviewShell.dataset.sizeMode = 'custom';
   screenSizeModeButtons.forEach(button => button.classList.remove('active'));
   updateScreenSizeSummary();
 }
-
 function applyScreenSizePreview(){
   if (!screenPreviewShell) return;
   const orientation = currentEditorOrientation();
   const mode = currentScreenMode();
-
   screenSizeState.orientation = orientation;
   screenPreviewShell.dataset.orientation = orientation;
   screenPreviewShell.dataset.sizeMode = mode;
@@ -1406,18 +1259,15 @@ function applyScreenSizePreview(){
   screenPreviewShell.classList.toggle('landscape', orientation === 'landscape');
   document.body.classList.toggle('screen-editor-portrait', orientation === 'portrait');
   document.body.classList.toggle('screen-editor-landscape', orientation === 'landscape');
-
   screenSizeModeButtons.forEach(button => {
     button.classList.toggle('active', button.dataset.sizeMode === mode);
   });
-
   updateScreenSizeSummary();
   requestAnimationFrame(() => {
     updateResponsiveScreenFrame();
     applyPreviewLayoutControls();
   });
 }
-
 screenSizeModeButtons.forEach(button => {
   button.addEventListener('click', () => {
     setCurrentScreenMode(button.dataset.sizeMode);
@@ -1429,11 +1279,9 @@ screenSizeModeButtons.forEach(button => {
     showToast(`${screenSizeLabels[button.dataset.sizeMode] || 'Screen size mode'} selected`);
   });
 });
-
 let lastScreenEditorOrientation = null;
 function syncScreenEditorOrientation(){
   if (currentOrientationPage !== 'screenSizePage') return;
-
   const next = currentEditorOrientation();
   if (next === lastScreenEditorOrientation &&
       previewLayoutInitializedOrientation === next &&
@@ -1442,9 +1290,7 @@ function syncScreenEditorOrientation(){
     applyScreenSizePreview();
     return;
   }
-
   const previous = previewLayoutInitializedOrientation || lastScreenEditorOrientation;
-
   // Rotation is a dataset swap, not an edit. Never rewrite the outgoing
   // orientation merely because the viewport changed. User edits are already
   // saved by drag/resize/add/remove actions. If the phone rotates in the middle
@@ -1454,15 +1300,12 @@ function syncScreenEditorOrientation(){
     persistPreviewLayoutState(previous);
     persistScreenSizeState(previous);
   }
-
   screenEditorOrientationSwitchInProgress = true;
   const generation = ++screenEditorOrientationGeneration;
   lastScreenEditorOrientation = next;
-
   // Native SharedPreferences are the gameplay source of truth. Load the exact
   // incoming orientation before rebuilding its editor DOM.
   hydrateEditorOrientationFromNative(next);
-
   // Drop the old orientation's DOM-only geometry. The saved data is already in
   // its own orientation key. Base controls must have their old inline !important
   // positions removed so the NEW orientation's CSS defaults can be measured.
@@ -1497,13 +1340,11 @@ function syncScreenEditorOrientation(){
   screenFrameSelected = false;
   clearBasePreviewControlInlineGeometry();
   hideControlRemoveMenu();
-
   updateShellOrientation(currentOrientationPage);
   screenPreviewShell?.classList.toggle('portrait', next === 'portrait');
   screenPreviewShell?.classList.toggle('landscape', next === 'landscape');
   document.body.classList.toggle('screen-editor-portrait', next === 'portrait');
   document.body.classList.toggle('screen-editor-landscape', next === 'landscape');
-
   // Wait for two paint/layout passes. This prevents measuring the new controls
   // while Android/WebView is still reporting dimensions from the old rotation.
   requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1515,11 +1356,11 @@ function syncScreenEditorOrientation(){
     }
     screenEditorOrientationSwitchInProgress = false;
     applyScreenSizePreview();
+    applyScreenEditorGrid();
     ensurePreviewLayoutInitialized();
     applyPreviewLayoutControls();
   }));
 }
-
 let screenEditorOrientationSyncTimer = null;
 function scheduleScreenEditorOrientationSync(delay = 180){
   clearTimeout(screenEditorOrientationSyncTimer);
@@ -1528,7 +1369,6 @@ function scheduleScreenEditorOrientationSync(delay = 180){
     syncScreenEditorOrientation();
   }, delay);
 }
-
 // Android/WebView can emit several resize passes during one physical rotation.
 // Wait until the viewport settles, then switch to the other saved dataset once.
 window.addEventListener('resize', () => scheduleScreenEditorOrientationSync(180));
@@ -1536,11 +1376,9 @@ window.addEventListener('orientationchange', () => scheduleScreenEditorOrientati
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', () => scheduleScreenEditorOrientationSync(180));
 }
-
 let activeScreenEdgeResize = null;
 let pendingScreenEdgeResizeSample = null;
 let screenEdgeResizeAnimationFrame = 0;
-
 function hitTestScreenResizeEdge(event){
   if (!previewScreenFrame) return null;
   const rect = previewScreenFrame.getBoundingClientRect();
@@ -1555,7 +1393,6 @@ function hitTestScreenResizeEdge(event){
   distances.sort((a, b) => a[1] - b[1]);
   return distances[0][0];
 }
-
 function beginScreenEdgeResize(event, edge){
   if (!edge || !emulatorPreview || !previewScreenFrame) return false;
   const previewRect = emulatorPreview.getBoundingClientRect();
@@ -1582,7 +1419,6 @@ function beginScreenEdgeResize(event, edge){
   window.addEventListener('pointercancel', stopScreenEdgeResize);
   return true;
 }
-
 function applyScreenEdgeResizeMove(event){
   const state = activeScreenEdgeResize;
   if (!state || !emulatorPreview) return;
@@ -1594,12 +1430,10 @@ function applyScreenEdgeResizeMove(event){
   const aspect = 3 / 2;
   const dx = event.clientX - state.startX;
   const dy = event.clientY - state.startY;
-
   let left = state.left;
   let top = state.top;
   let width = state.width;
   let height = state.height;
-
   if (!state.preserveAspect) {
     if (state.edge === 'left') {
       const right = state.left + state.width;
@@ -1637,7 +1471,6 @@ function applyScreenEdgeResizeMove(event){
     top = state.edge === 'top' ? anchoredBottom - height : state.top;
     left = clampPreviewValue(centerX - width / 2, 0, maxW - width);
   }
-
   enterCustomScreenGestureMode();
   setCurrentCustomFrame({
     left: left / maxW,
@@ -1648,7 +1481,6 @@ function applyScreenEdgeResizeMove(event){
   updateResponsiveScreenFrame();
   updateScaleHandle();
 }
-
 function handleScreenEdgeResizeMove(event){
   if (!activeScreenEdgeResize) return;
   pendingScreenEdgeResizeSample = latestPointerSample(event);
@@ -1660,7 +1492,6 @@ function handleScreenEdgeResizeMove(event){
     if (sample) applyScreenEdgeResizeMove(sample);
   });
 }
-
 function stopScreenEdgeResize(){
   if (!activeScreenEdgeResize) return;
   const orientation = activeScreenEdgeResize.orientation || currentEditorOrientation();
@@ -1676,26 +1507,22 @@ function stopScreenEdgeResize(){
   persistScreenSizeState(orientation);
   updateScaleHandle();
 }
-
 screenPreviewSurface?.addEventListener('pointerdown', event => {
   const edge = hitTestScreenResizeEdge(event);
   if (!edge) return;
   if (beginScreenEdgeResize(event, edge)) event.stopImmediatePropagation();
 }, true);
-
 screenPreviewSurface?.addEventListener('pointerdown', event => {
   longPressTriggered = false;
   clearPreviewLongPress();
   beginScreenDrag(event);
   longPressTimer = setTimeout(openScreenContextMenu, 380);
 });
-
 ['pointerup','pointerleave','pointercancel'].forEach(eventName => {
   screenPreviewSurface?.addEventListener(eventName, () => {
     clearPreviewLongPress();
   });
 });
-
 screenPreviewSurface?.addEventListener('click', (event) => {
   if (longPressTriggered || shouldIgnorePreviewReleaseClick()) {
     event.preventDefault();
@@ -1710,31 +1537,26 @@ screenPreviewSurface?.addEventListener('click', (event) => {
   persistScreenSizeState();
   showToast('Screen selected — drag it to move, or use the resize handle');
 });
-
 screenPreviewSurface?.addEventListener('contextmenu', (event) => {
   event.preventDefault();
   markPreviewReleaseClickIgnored();
   screenContextMenu?.classList.add('open');
 });
-
 document.addEventListener('click', (event) => {
   if (!screenContextMenu || !screenPreviewShell) return;
   if (!screenContextMenu.contains(event.target) && !screenPreviewShell.contains(event.target)) {
     screenContextMenu.classList.remove('open');
   }
 });
-
 screenContextMenu?.addEventListener('click', (event) => {
   event.stopPropagation();
 });
-
 emulatorPreview?.addEventListener('click', event => {
   if (shouldIgnorePreviewReleaseClick()) {
     event.preventDefault();
     event.stopPropagation();
     return;
   }
-
   if (
     event.target.closest('[data-layout-control]') ||
     event.target.closest('#previewScaleHandle') ||
@@ -1744,51 +1566,43 @@ emulatorPreview?.addEventListener('click', event => {
   ) {
     return;
   }
-
   clearPreviewSelection();
   clearScreenFrameSelection();
   screenContextMenu?.classList.remove('open');
   hideControlRemoveMenu();
   persistScreenSizeState();
 });
-
 controlRemoveMenu?.addEventListener('click', event => {
   event.preventDefault();
   event.stopPropagation();
 });
-
 removeSelectedControlBtn?.addEventListener('click', event => {
   event.preventDefault();
   event.stopPropagation();
   const controlId = controlRemoveMenu?.dataset.controlId || previewLayoutState.selectedId;
   if (controlId) removePreviewControl(controlId);
 });
-
 document.addEventListener('pointerdown', event => {
   if (!controlRemoveMenu?.classList.contains('open')) return;
   if (controlRemoveMenu.contains(event.target) || event.target.closest('[data-layout-control]')) return;
   hideControlRemoveMenu();
 });
-
 addControlFab?.addEventListener('click', event => {
   event.preventDefault();
   event.stopPropagation();
   openAddControlModal();
 });
-
 closeAddControlModalBtn?.addEventListener('click', closeAddControlModal);
-
 addControlModal?.addEventListener('click', event => {
   if (event.target === addControlModal) closeAddControlModal();
 });
-
 addControlItems.forEach(item => {
   item.addEventListener('click', () => addPreviewControl(item.dataset.controlType));
 });
-
 resetPreviewLayoutBtn?.addEventListener('click', () => {
   resetPreviewLayout();
   closeAddControlModal();
   showToast('Preview button layout reset');
 });
-
+// Persisted editor-only grid; never affects gameplay rendering.
+applyScreenEditorGrid();
