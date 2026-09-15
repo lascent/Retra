@@ -7,7 +7,8 @@ import java.util.Locale
 /**
  * Conservative compatibility gate for Retra's supported GBA multiplayer scope.
  *
- * Retra supports only normal GBA Multi-Pak/link-cable sessions. There is no
+ * Retra supports normal GBA Multi-Pak/link-cable sessions plus Local
+ * Single-Pak/Multiboot through a BIOS-only receiver core. There is no
  * reliable universal bit in a GBA ROM header saying that a game exposes a link
  * menu, so this detector validates the cartridge/platform/patch requirements
  * and surfaces the ROM header identity. The game itself still decides whether
@@ -63,7 +64,8 @@ class GbaMultiplayerCompatibility {
             reason = if (header?.checksumValid == true) "Verified GBA cartridge header" else "GBA ROM detected; header could not be fully verified",
             localSupported = true,
             wifiSupported = true,
-            bluetoothSupported = true
+            bluetoothSupported = true,
+            singlePakSupported = true
         )
     }
 

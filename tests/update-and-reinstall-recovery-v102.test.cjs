@@ -43,7 +43,10 @@ test('native updater is bounded, official-repository-only, and off the UI thread
   const updater = read('app/src/main/java/com/retra/emulator/AppUpdateController.kt');
   const activity = read('app/src/main/java/com/retra/emulator/MainActivity.kt');
   assert.match(updater, /api\.github\.com\/repos\/lascent\/Retra\/releases\/latest/);
-  assert.match(updater, /AUTO_CHECK_COOLDOWN_MS = 6L \* 60L \* 60L \* 1000L/);
+  assert.match(updater, /automaticCheckStartedThisProcess = AtomicBoolean\(false\)/);
+  assert.match(updater, /!manual && !automaticCheckStartedThisProcess\.compareAndSet\(false, true\)/);
+  assert.doesNotMatch(updater, /AUTO_CHECK_COOLDOWN_MS/);
+  assert.doesNotMatch(updater, /PREF_LAST_SUCCESSFUL_CHECK_MS/);
   assert.match(updater, /connectTimeout = CONNECT_TIMEOUT_MS/);
   assert.match(updater, /readTimeout = READ_TIMEOUT_MS/);
   assert.match(updater, /networkExecutor\.execute/);

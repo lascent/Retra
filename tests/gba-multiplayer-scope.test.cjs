@@ -12,14 +12,15 @@ const compatibility = read('app/src/main/java/com/retra/emulator/GbaMultiplayerC
 const remote = read('app/src/main/java/com/retra/emulator/RemoteLinkTransport.kt');
 const native = read('app/src/main/cpp/native-lib.cpp');
 
-test('Retra multiplayer scope is normal GBA Link Cable only', () => {
+test('Retra multiplayer scope supports Multi-Pak plus Local Single-Pak while RFU stays unsupported', () => {
   assert.match(native, /GBASIOLockstepCoordinator/);
   assert.match(multiplayerSurface, /Wi-Fi \(server\)/);
   assert.match(multiplayerSurface, /Wi-Fi \(client\)/);
   assert.match(multiplayerSurface, /Bluetooth \(server\)/);
   assert.match(multiplayerSurface, /Bluetooth \(client\)/);
-  assert.match(multiplayerSurface, /Single-Pak\/Multiboot and Wireless Adapter\/RFU are intentionally not supported/);
-  assert.doesNotMatch(multiplayerSurface, /startSinglePak|startMultiboot|startRfu|startWirelessAdapter/i);
+  assert.match(multiplayerSurface, /Single-Pak \/ Multiboot/);
+  assert.match(multiplayerSurface, /startLocalSinglePak/);
+  assert.doesNotMatch(multiplayerSurface, /startRfu|startWirelessAdapter/i);
 });
 
 test('automatic GBA multiplayer compatibility validates ROM identity and link eligibility', () => {
@@ -31,6 +32,7 @@ test('automatic GBA multiplayer compatibility validates ROM identity and link el
   assert.match(compatibility, /wifiSupported = true/);
   assert.match(compatibility, /bluetoothSupported = true/);
   assert.match(compatibility, /singlePakSupported: Boolean = false/);
+  assert.match(compatibility, /singlePakSupported = true/);
   assert.match(compatibility, /wirelessRfuSupported: Boolean = false/);
   assert.match(multiplayerSurface, /multiplayerCompatibility\.detect\(/);
   assert.match(multiplayerSurface, /multiplayerCompatibility\.detectCandidate\(/);

@@ -52,6 +52,7 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 - Draggable and resizable on-screen controls.
 - Emulator-screen resizing and edge-aware layout editing.
 - Controller opacity controls.
+- Optional controller tap sound under **Sound**.
 - Automatic artwork with persistent manual cover and background overrides.
 - Lightweight gameplay color presets: **Classic**, **Vivid**, **Warm**, and **Muted**.
 
@@ -65,7 +66,7 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 
 ### Updates & project quality
 
-- Automatic GitHub Releases update checks.
+- Automatic GitHub Releases update checks on each fresh app process, so newly published versions are discovered on the next launch.
 - Manual **Check for updates** action in About.
 - Modular Android architecture.
 - Release validation, regression tests, lint checks, and CI quality gates.
@@ -110,18 +111,15 @@ Retra includes lightweight gameplay color presets that affect only the rendered 
 
 ## Multiplayer scope
 
-Retra v1.0.3 supports normal GBA Link Cable-style multiplayer through:
+Retra v1.0.3 supports normal GBA Link Cable-style multiplayer and two-player Local Single-Pak/Multiboot through:
 
 - **Local Link** on one Android device.
+- **Single-Pak / Multiboot** on one Android device using a user-provided 16 KiB GBA BIOS for the cartridge-less receiver.
 - **Wi-Fi Remote Link** between supported devices.
 - **Bluetooth Remote Link** between supported Android devices.
 
 Remote Link includes connection health metrics, heartbeat/timeouts, state-hash validation, jitter-aware input delay, host-authoritative recovery, bounded recovery retries, and deterministic input reseeding.
 
-### Not supported in v1.0.3
-
-- GBA Single-Pak / Multiboot
-- GBA Wireless Adapter / RFU emulation
 
 ## Persistent game data
 

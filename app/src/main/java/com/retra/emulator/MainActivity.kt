@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         internal const val ROM_PATCHING_PREF = "rom_patching_v1"
         internal const val ENABLE_CHEATS_PREF = "enable_cheats_v1"
         internal const val CONFIRM_CLOSE_RESET_PREF = "confirm_close_reset_v1"
+        internal const val CONTROLLER_SOUND_PREF = "controller_sound_v1"
         internal const val FULLSCREEN_PREF = "fullscreen_mode_v1"
         internal const val IMMERSIVE_PREF = "immersive_mode_v1"
         internal const val STRETCH_TO_FIT_PREF = "stretch_to_fit_v1"
@@ -180,6 +181,7 @@ class MainActivity : AppCompatActivity() {
     // (1 shl KEY_*), so high-rate ACTION_MOVE events never allocate Sets.
     internal var activeDpadMask = 0
     internal var activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
+    internal var lastControllerSoundAtMs = 0L
     // Logical Android-side key state. It suppresses duplicate JNI / Remote Link
     // transitions and makes releaseAllKeys proportional to keys actually held.
     internal var activeGameplayKeyMask = 0
@@ -219,6 +221,7 @@ class MainActivity : AppCompatActivity() {
     internal var currentRomPath: String? = null
     internal var currentPatchPath: String? = null
     internal var localLinkActive = false
+    internal var localLinkSinglePakActive = false
     internal var localLinkPlayer = 0
     internal var localLinkPlayer1Title = "Player 1"
     internal var localLinkPlayer2Title = "Player 2"
@@ -365,7 +368,6 @@ class MainActivity : AppCompatActivity() {
     internal val appUpdateController: AppUpdateController by lazy {
         AppUpdateController(
             activity = this,
-            prefs = prefs,
             networkExecutor = taskExecutors.network,
             onResult = { payloadJson, manual ->
                 runOnUiThread {
@@ -977,6 +979,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class RetraBridge {
+
         @JavascriptInterface
         fun launchRom(id: String, title: String, fileName: String, system: String) {
             pendingStateLoadRomId = null
@@ -1450,6 +1453,7 @@ class MainActivity : AppCompatActivity() {
     external fun loadRomWithPatch(path: String, patchPath: String, savePath: String): Boolean
     external fun materializePatchedRom(path: String, patchPath: String, outputPath: String): Boolean
     external fun startLocalLink(firstRomPath: String, secondRomPath: String, firstSavePath: String, secondSavePath: String): Boolean
+    external fun startLocalSinglePak(firstRomPath: String, firstSavePath: String, gbaBiosPath: String): Boolean
     external fun stopLocalLink(): Boolean
     external fun isNativeLocalLinkActive(): Boolean
     external fun getLocalLinkPlayer(): Int

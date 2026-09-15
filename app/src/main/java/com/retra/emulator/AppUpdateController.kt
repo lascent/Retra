@@ -14,14 +14,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Lightweight GitHub Releases update checker for Retra's sideload/GitHub builds.
  *
- * Checks always run away from the UI/emulation thread. The public GitHub latest
- * release endpoint is polled at most once per cooldown window unless the user
- * explicitly taps Check for updates. Installation remains user-confirmed: Retra
- * opens the official GitHub APK/release URL and Android owns the install flow.
+ * Checks always run away from the UI/emulation thread. Retra performs one
+ * automatic check per fresh app process so a newly published release is
+ * discovered the next time the user opens the app. Manual checks always bypass
+ * the per-process guard. Installation remains user-confirmed: Retra opens the
+ * official GitHub APK/release URL and Android owns the install flow.
  */
 class AppUpdateController(
     private val activity: MainActivity,
-    private val prefs: RetraPreferences,
     private val networkExecutor: ExecutorService,
     private val onResult: (payloadJson: String, manual: Boolean) -> Unit
 ) {
@@ -34,11 +34,11 @@ class AppUpdateController(
     }.toString()
 
     fun checkForUpdates(manual: Boolean) {
-        val now = System.currentTimeMillis()
-        if (!manual) {
-            val lastChecked = prefs.getLong(PREF_LAST_SUCCESSFUL_CHECK_MS, 0L)
-            if (lastChecked > 0L && now - lastChecked < AUTO_CHECK_COOLDOWN_MS) return
-        }
+        // Automatic checks are once per fresh app process, not once per persisted
+        // time window. This prevents the old failure mode where a successful
+        // check on v1.0.3 could suppress discovery of v1.0.4 for several hours.
+        // The guard resets naturally when Android starts a new Retra process.
+        if (!manual && !automaticCheckStartedThisProcess.compareAndSet(false, true)) return
 
         if (!inFlight.compareAndSet(false, true)) {
             if (manual) {
@@ -54,7 +54,6 @@ class AppUpdateController(
             try {
                 val installed = installedVersion()
                 val release = fetchLatestRelease(installed.name)
-                prefs.edit().putLong(PREF_LAST_SUCCESSFUL_CHECK_MS, System.currentTimeMillis()).apply()
 
                 val newer = compareVersions(release.versionName, installed.name) > 0
                 val payload = JSONObject().apply {
@@ -207,8 +206,7 @@ class AppUpdateController(
     companion object {
         private const val LATEST_RELEASE_API = "https://api.github.com/repos/lascent/Retra/releases/latest"
         private const val OFFICIAL_RELEASES_URL = "https://github.com/lascent/Retra/releases/latest"
-        private const val PREF_LAST_SUCCESSFUL_CHECK_MS = "update_last_checked_at_v1"
-        private const val AUTO_CHECK_COOLDOWN_MS = 6L * 60L * 60L * 1000L
+        private val automaticCheckStartedThisProcess = AtomicBoolean(false)
         private const val CONNECT_TIMEOUT_MS = 6000
         private const val READ_TIMEOUT_MS = 7000
         private const val MAX_RESPONSE_CHARS = 512 * 1024

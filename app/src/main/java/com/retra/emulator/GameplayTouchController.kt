@@ -1,5 +1,9 @@
 package com.retra.emulator
 
+import android.content.Context
+import android.media.AudioManager
+import android.os.SystemClock
+import android.view.SoundEffectConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -13,6 +17,7 @@ import com.retra.emulator.MainActivity.Companion.KEY_UP
 import com.retra.emulator.MainActivity.Companion.KEY_DOWN
 import com.retra.emulator.MainActivity.Companion.KEY_R
 import com.retra.emulator.MainActivity.Companion.KEY_L
+import com.retra.emulator.MainActivity.Companion.CONTROLLER_SOUND_PREF
 
 /**
  * Low-latency, pointer-owned gameplay touch input.
@@ -20,6 +25,24 @@ import com.retra.emulator.MainActivity.Companion.KEY_L
  * Kept separate from layout/presentation code so multi-touch correctness can be
  * hardened independently without growing GameplayLayoutController.
  */
+/**
+ * One shared low-volume click profile for every gameplay control.
+ *
+ * A small global gap prevents overlapping multi-touch taps from becoming loud,
+ * while still letting fast D-pad rolls and repeated A/B presses sound responsive.
+ */
+internal fun MainActivity.performControllerSound(view: View) {
+    if (!prefs.getBoolean(CONTROLLER_SOUND_PREF, true)) return
+    if (!view.isSoundEffectsEnabled) return
+
+    val now = SystemClock.uptimeMillis()
+    if (now - lastControllerSoundAtMs < 28L) return
+    lastControllerSoundAtMs = now
+
+    val audio = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+    audio.playSoundEffect(SoundEffectConstants.CLICK, 0.060f)
+}
+
 internal fun MainActivity.bindControls() {
     bindKey(binding.buttonA, KEY_A)
     bindKey(binding.buttonB, KEY_B)
@@ -68,6 +91,8 @@ internal fun MainActivity.bindDpad() {
                 }
                 activeDpadPointerId = event.getPointerId(event.actionIndex)
                 view.parent?.requestDisallowInterceptTouchEvent(true)
+                // Give a fresh D-pad touch the same optional controller click sound.
+                performControllerSound(view)
                 updateDpadFromMotionEvent(event)
                 true
             }
@@ -190,6 +215,7 @@ internal fun MainActivity.setActiveDpadMask(nextMask: Int) {
     syncDirection(KEY_DOWN, binding.buttonDown)
     syncDirection(KEY_LEFT, binding.buttonLeft)
     syncDirection(KEY_RIGHT, binding.buttonRight)
+    if (nextMask != 0) performControllerSound(binding.dpadContainer)
     activeDpadMask = nextMask
 }
 
@@ -203,7 +229,8 @@ internal fun MainActivity.bindKey(view: View, key: Int) {
     fun applyPressedState(v: View, nextPressed: Boolean) {
         if (pressed == nextPressed) return
         pressed = nextPressed
-        setGameplayKeyHeld(key, nextPressed) // input first; visual redraw second
+        setGameplayKeyHeld(key, nextPressed) // input first; optional sound/visual feedback second
+        if (nextPressed) performControllerSound(v)
         v.isPressed = nextPressed
     }
 

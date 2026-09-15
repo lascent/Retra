@@ -94,6 +94,7 @@ internal fun MainActivity.loadRomFile(file: File, requestedTitle: String, patchF
     applyGameplayVisualSettings()
 
     localLinkActive = false
+    localLinkSinglePakActive = false
     localLinkPlayer = 0
     currentRomPath = file.absolutePath
     currentPatchPath = patchFile?.absolutePath
@@ -542,6 +543,7 @@ internal fun MainActivity.closeEmulator() {
 
     audioController.release()
     localLinkActive = false
+    localLinkSinglePakActive = false
     localLinkPlayer = 0
     currentRomPath = null
     currentPatchPath = null

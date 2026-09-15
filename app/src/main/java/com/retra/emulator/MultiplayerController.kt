@@ -25,6 +25,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
 import java.util.Locale
+import com.retra.emulator.MainActivity.Companion.BIOS_GBA_PATH_PREF
 import com.retra.emulator.MainActivity.Companion.BLUETOOTH_CONNECT_REQUEST
 import com.retra.emulator.MainActivity.Companion.MAX_ROM_BYTES
 import com.retra.emulator.MainActivity.Companion.PLATFORM_GBA
@@ -73,7 +74,7 @@ internal fun MainActivity.renderLinkRemoteScreen(dialog: Dialog) {
                     "${compatibility.availabilityLabel}. Retra supports normal GBA Multi-Pak/Link Cable only: Local, Wi-Fi Remote, and Bluetooth Remote. " +
                         "Wi-Fi/Bluetooth use state-hash desync detection with automatic host-authoritative recovery. " +
                         "Different GBA games can link when both ROMs exist on both phones and match by SHA-256. " +
-                        "Single-Pak/Multiboot and Wireless Adapter/RFU are intentionally not supported."
+                        "Single-Pak/Multiboot is available through Local Link; Wireless Adapter/RFU is not supported."
                 )
                 .setPositiveButton("OK", null)
                 .show()
@@ -488,6 +489,7 @@ internal fun MainActivity.establishRemoteLink(
         val started = startLocalLink(pairFirstPath, pairSecondPath, firstSavePath, secondSavePath)
         if (!started) throw IOException("mGBA could not create the two-player link session")
         localLinkActive = true
+        localLinkSinglePakActive = false
         activeLinkFirstRomId = pairFirstId
         activeLinkSecondRomId = pairSecondId
         activeLinkSecondSavePlayer = secondSavePlayer
@@ -632,6 +634,7 @@ internal fun MainActivity.disconnectRemoteLinkAndRestore(message: String = "Remo
     commitActiveWorkingSaves()
     clearActiveLinkSaveTracking()
     localLinkActive = false
+    localLinkSinglePakActive = false
     localLinkPlayer = 0
     if (!firstPath.isNullOrBlank()) finalizeRemoteRoleSave(firstPath, role)
 
@@ -670,8 +673,27 @@ internal fun MainActivity.renderLinkLocalScreen(dialog: Dialog) {
             pendingLocalLinkPicker = true
             localLinkGamePicker.launch(arrayOf("*/*"))
         }
+        val singlePakBios = selectedGbaBiosForSinglePak()
+        addMenuAction(
+            content,
+            "Single-Pak / Multiboot",
+            if (singlePakBios != null) "One cartridge • BIOS receiver for Player 2" else "Requires a selected 16 KiB GBA BIOS"
+        ) {
+            if (singlePakBios == null) {
+                AlertDialog.Builder(this)
+                    .setTitle("GBA BIOS required")
+                    .setMessage(
+                        "Single-Pak/Multiboot needs Player 2 to boot the real GBA BIOS with no cartridge attached. " +
+                            "Select your legally obtained GBA BIOS in Settings → BIOS, then try again."
+                    )
+                    .setPositiveButton("OK", null)
+                    .show()
+            } else {
+                startLocalSinglePakSession(singlePakBios.absolutePath)
+            }
+        }
         addMenuAction(content, "Detected compatibility", compatibility.availabilityLabel) {
-            RetraNotice.makeText(this, "Normal GBA Link Cable only • Single-Pak and RFU are not supported", RetraNotice.LENGTH_LONG).show()
+            RetraNotice.makeText(this, "Normal Multi-Pak and Local Single-Pak/Multiboot are supported • RFU is not supported", RetraNotice.LENGTH_LONG).show()
         }
     }
     addMenuAction(content, "Cancel") { renderGameplayMainMenu(dialog) }
@@ -730,6 +752,100 @@ internal fun MainActivity.presentLatestGameplayFrame() {
         videoHeight
     )
     binding.gameScreen.invalidate()
+}
+
+internal fun MainActivity.selectedGbaBiosForSinglePak(): File? {
+    val path = prefs.getString(BIOS_GBA_PATH_PREF, null)?.takeIf { it.isNotBlank() } ?: return null
+    val file = File(path)
+    // The official GBA BIOS is exactly 16 KiB. mGBA performs its own BIOS
+    // validation again natively before the receiver core is started.
+    return file.takeIf { it.isFile && it.length() == 16_384L }
+}
+
+internal fun MainActivity.startLocalSinglePakSession(gbaBiosPath: String) {
+    if (!romLoaded || currentPlatform != PLATFORM_GBA) {
+        RetraNotice.makeText(this, "Single-Pak requires a running GBA game", RetraNotice.LENGTH_SHORT).show()
+        return
+    }
+    if (currentPatchPath != null) {
+        RetraNotice.makeText(this, "Single-Pak currently supports unpatched GBA ROMs", RetraNotice.LENGTH_LONG).show()
+        return
+    }
+
+    val bios = File(gbaBiosPath)
+    if (!bios.isFile || bios.length() != 16_384L) {
+        RetraNotice.makeText(this, "Select a valid 16 KiB GBA BIOS first", RetraNotice.LENGTH_LONG).show()
+        return
+    }
+
+    val firstRomPath = currentRomPath
+    if (firstRomPath.isNullOrBlank()) {
+        RetraNotice.makeText(this, "Current ROM path is unavailable", RetraNotice.LENGTH_SHORT).show()
+        return
+    }
+
+    val firstTitle = currentRomTitle
+    val firstId = currentRomId
+    stopEmulation()
+    releaseAllKeys()
+
+    val firstSavePath = try {
+        saveData.commitWorkingSave(firstId, 0)
+        saveData.prepareWorkingSave(firstId, 0, File(firstRomPath)).absolutePath
+    } catch (e: Exception) {
+        RetraNotice.makeText(this, "Could not prepare Single-Pak save data: ${e.message ?: "storage error"}", RetraNotice.LENGTH_LONG).show()
+        startEmulation()
+        return
+    }
+
+    val started = try {
+        startLocalSinglePak(firstRomPath, firstSavePath, bios.absolutePath)
+    } catch (_: Throwable) {
+        false
+    }
+
+    if (!started) {
+        localLinkActive = false
+        localLinkSinglePakActive = false
+        RetraNotice.makeText(
+            this,
+            "Could not start Single-Pak. Check the GBA BIOS and confirm this game supports Single-Pak/Multiboot.",
+            RetraNotice.LENGTH_LONG
+        ).show()
+        loadRomFile(File(firstRomPath), firstTitle, null, firstId)
+        return
+    }
+
+    localLinkActive = true
+    localLinkSinglePakActive = true
+    activeLinkFirstRomId = firstId
+    activeLinkSecondRomId = null
+    activeLinkSecondSavePlayer = 0
+    localLinkPlayer = 0
+    localLinkPlayer1Title = firstTitle
+    localLinkPlayer2Title = "Single-Pak Client"
+    activeEmulationSpeed = 1.0
+    updateFastForwardUi()
+    configureVideoSurfaceFromNative()
+    applyGameplayVisualSettings()
+    audioController.configure(romLoaded)
+
+    binding.gameTitle.text = localLinkPlayer1Title
+    binding.systemLabel.text = "Game Boy Advance • Single-Pak • P1"
+    binding.buttonL.visibility = View.VISIBLE
+    binding.buttonR.visibility = View.VISIBLE
+
+    // The receiver core boots a real GBA BIOS with no cartridge. Native code
+    // temporarily holds START+SELECT so the BIOS enters multiboot receive mode.
+    try { setLocalLinkPaused(true) } catch (_: Throwable) {}
+    RetraNotice.makeText(this, "Single-Pak ready • choose Single-Pak mode in the game", RetraNotice.LENGTH_LONG).show()
+
+    val openMenu = gameplayMenuDialog
+    if (openMenu?.isShowing == true) {
+        openMenu.dismiss()
+    } else {
+        startEmulation()
+    }
 }
 
 internal fun MainActivity.startLocalLinkSession(secondRomPath: String, secondTitle: String, secondRomId: String) {
@@ -794,6 +910,7 @@ internal fun MainActivity.startLocalLinkSession(secondRomPath: String, secondTit
     }
 
     localLinkActive = true
+    localLinkSinglePakActive = false
     activeLinkFirstRomId = firstId
     activeLinkSecondRomId = secondRomId
     activeLinkSecondSavePlayer = secondSavePlayer
@@ -841,7 +958,7 @@ internal fun MainActivity.switchLocalLinkPlayer() {
     audioController.configure(romLoaded)
     val title = if (nextPlayer == 0) localLinkPlayer1Title else localLinkPlayer2Title
     binding.gameTitle.text = title
-    binding.systemLabel.text = "Game Boy Advance • Local Link • P${nextPlayer + 1}"
+    binding.systemLabel.text = "Game Boy Advance • ${if (localLinkSinglePakActive) "Single-Pak" else "Local Link"} • P${nextPlayer + 1}"
     RetraNotice.makeText(this, "Player ${nextPlayer + 1}", RetraNotice.LENGTH_SHORT).show()
 }
 
@@ -859,6 +976,7 @@ internal fun MainActivity.disconnectLocalLinkAndRestore(dialog: Dialog? = gamepl
     commitActiveWorkingSaves()
     clearActiveLinkSaveTracking()
     localLinkActive = false
+    localLinkSinglePakActive = false
     localLinkPlayer = 0
     localLinkPlayer2Title = "Player 2"
     romLoaded = false

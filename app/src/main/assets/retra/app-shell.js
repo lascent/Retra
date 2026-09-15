@@ -1384,7 +1384,6 @@ function bindRomCardLongPress(article, rom){
       article.classList.remove('holding');
       article.classList.add('long-pressed');
       enterLibrarySelection(rom.id);
-      if (navigator.vibrate) navigator.vibrate(10);
     }, libraryCardLongPressMs);
   });
 
@@ -1462,4 +1461,5 @@ function escapeXmlText(value){
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
+
 

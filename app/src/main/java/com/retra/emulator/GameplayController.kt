@@ -38,10 +38,7 @@ import kotlin.math.roundToInt
 import com.retra.emulator.MainActivity.Companion.CONFIRM_CLOSE_RESET_PREF
 import com.retra.emulator.MainActivity.Companion.ENABLE_CHEATS_PREF
 
-/**
- * Gameplay menu, save-state, cheat, reset, screenshot and in-game settings
- * orchestration extracted from MainActivity. JNI/core behavior is unchanged.
- */
+/** Gameplay menu and in-game settings orchestration. */
 internal fun MainActivity.showGameplayMenu() {
     if (!romLoaded || gameplayMenuDialog?.isShowing == true) return
 
@@ -57,8 +54,7 @@ internal fun MainActivity.showGameplayMenu() {
         attrs.dimAmount = 0.48f
         dialogWindow.attributes = attrs
     }
-    // Tapping the dimmed game area outside the rounded menu frame should
-    // behave like My Boy!: close the menu and immediately resume gameplay.
+    // Outside taps close the menu and resume gameplay.
     dialog.setCancelable(true)
     dialog.setCanceledOnTouchOutside(true)
     dialog.setOnDismissListener {
@@ -134,7 +130,7 @@ internal fun MainActivity.buildMenuShell(title: String, showBack: Boolean, trail
             setTextColor(Color.WHITE)
             contentDescription = uiText("Back")
             setPadding(0, 0, dpInt(12), 0)
-            setOnClickListener {
+            setOnClickListener { tapped ->
                 gameplayMenuBackHandler?.invoke() ?: gameplayMenuDialog?.let(::renderGameplayMainMenu)
             }
         }
@@ -192,7 +188,9 @@ internal fun MainActivity.addMenuAction(
         isClickable = true
         isFocusable = true
         setPadding(dpInt(14), dpInt(12), dpInt(14), dpInt(12))
-        setOnClickListener { onClick() }
+        setOnClickListener { tapped ->
+            onClick()
+        }
     }
 
     val label = TextView(this).apply {
@@ -222,9 +220,7 @@ internal fun MainActivity.renderGameplayMainMenu(dialog: Dialog) {
     gameplayMenuSubscreen = false
     gameplayMenuBackHandler = null
     val (panel, content) = buildMenuShell("Menu", showBack = false)
-    // Reconcile the Activity mirror with the native mGBA link state before
-    // building the menu. A stale true value used to leave Speed mode showing
-    // "Disabled while linked" after the native link had already ended.
+    // Reconcile the Activity mirror with native link state before rendering.
     val speedRestrictedByLink = isLocalLinkSpeedRestricted()
 
     addMenuAction(
@@ -292,7 +288,7 @@ internal fun MainActivity.renderGameplayMainMenu(dialog: Dialog) {
             switchLocalLinkPlayer()
             dialog.dismiss()
         }
-        addMenuAction(content, "Disconnect local link", "Return to Player 1") {
+        addMenuAction(content, if (localLinkSinglePakActive) "Disconnect Single-Pak" else "Disconnect local link", "Return to Player 1") {
             disconnectLocalLinkAndRestore(dialog)
         }
     } else {
@@ -358,7 +354,7 @@ internal fun MainActivity.renderStateScreen(dialog: Dialog, saveMode: Boolean) {
         copy.addView(meta)
         row.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
-        row.setOnClickListener {
+        row.setOnClickListener { tapped ->
             if (saveMode) {
                 if (state.exists()) {
                     AlertDialog.Builder(this)
@@ -660,7 +656,9 @@ internal fun MainActivity.renderCheatsScreen(dialog: Dialog) {
                 }
             }
             row.addView(enabledSwitch)
-            row.setOnClickListener { renderCheatEditor(dialog, cheat) }
+            row.setOnClickListener { tapped ->
+                renderCheatEditor(dialog, cheat)
+            }
             content.addView(row)
             content.addView(View(this).apply { setBackgroundColor(Color.argb(30, 255, 255, 255)) },
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpInt(1)))
@@ -681,7 +679,9 @@ internal fun MainActivity.renderCheatsScreen(dialog: Dialog) {
             setColor(Color.rgb(132, 213, 207))
         }
         elevation = dp(8f)
-        setOnClickListener { renderCheatEditor(dialog, null) }
+        setOnClickListener { tapped ->
+            renderCheatEditor(dialog, null)
+        }
     }
     shell.addView(addButton, FrameLayout.LayoutParams(dpInt(58), dpInt(58), Gravity.END or Gravity.BOTTOM).apply {
         rightMargin = dpInt(18)
@@ -700,7 +700,7 @@ internal fun MainActivity.renderCheatEditor(dialog: Dialog, existing: CheatEntry
 
     val header = panel.getChildAt(0) as? LinearLayout
     val overflow = header?.getChildAt(header.childCount - 1) as? TextView
-    overflow?.setOnClickListener {
+    overflow?.setOnClickListener { tapped ->
         val choices = if (existing == null) arrayOf("Discard") else arrayOf("Delete cheat")
         AlertDialog.Builder(this)
             .setItems(choices) { _, which ->
@@ -729,7 +729,9 @@ internal fun MainActivity.renderCheatEditor(dialog: Dialog, existing: CheatEntry
             setPadding(dpInt(12), dpInt(16), dpInt(12), dpInt(16))
             isClickable = true
             isFocusable = true
-            setOnClickListener { onClick() }
+            setOnClickListener { tapped ->
+                onClick()
+            }
         }
         row.addView(TextView(this).apply {
             text = title
@@ -788,7 +790,7 @@ internal fun MainActivity.renderCheatEditor(dialog: Dialog, existing: CheatEntry
             cornerRadius = dp(18f)
             setColor(Color.rgb(132, 213, 207))
         }
-        setOnClickListener {
+        setOnClickListener { tapped ->
             if (draft.name.isBlank()) {
                 RetraNotice.makeText(this@renderCheatEditor, "Enter a cheat name", RetraNotice.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -899,7 +901,9 @@ internal fun MainActivity.showTextEntryDialog(title: String, initial: String, mu
             cornerRadius = dp(14f)
             setColor(if (primary) Color.rgb(132, 213, 207) else Color.rgb(43, 50, 51))
         }
-        setOnClickListener { action() }
+        setOnClickListener { tapped ->
+            action()
+        }
     }
     actions.addView(actionButton("Cancel", false) { dialog.dismiss() })
     actions.addView(actionButton("OK", true) {
@@ -963,7 +967,7 @@ internal fun MainActivity.showCheatTypeDialog(current: Int, onSelected: (Int) ->
                 cornerRadius = dp(12f)
                 setColor(if (selected) Color.rgb(42, 64, 64) else Color.TRANSPARENT)
             }
-            setOnClickListener {
+            setOnClickListener { tapped ->
                 dialog.dismiss()
                 onSelected(index)
             }

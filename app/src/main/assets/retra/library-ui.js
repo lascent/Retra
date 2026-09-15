@@ -825,7 +825,6 @@ function bindRecentSaveLongPress(item, card, save){
       suppressRecentSaveClickUntil = Date.now() + 750;
       item.classList.remove('holding');
       item.classList.add('long-pressed');
-      if (navigator.vibrate) navigator.vibrate(12);
       openRecentSaveActions(card, save);
     }, recentSaveLongPressMs);
   });

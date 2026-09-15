@@ -411,7 +411,7 @@
 </button>
 <button class="settings-item" data-setting="Audio">
 <div class="settings-item-icon"><svg viewbox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5Z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"></path></svg></div>
-<div class="settings-item-copy"><strong>Audio</strong><span>Volume, latency, synchronization</span></div>
+<div class="settings-item-copy"><strong>Sound</strong><span>Game audio and controller sound</span></div>
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
 <button class="settings-item" data-setting="Layouts">
@@ -421,7 +421,7 @@
 </button>
 <button class="settings-item" data-setting="Misc">
 <div class="settings-item-icon"><svg viewbox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path><circle cx="12" cy="12" r="4"></circle></svg></div>
-<div class="settings-item-copy"><strong>Misc</strong><span>Saves, screenshots, vibration, library</span></div>
+<div class="settings-item-copy"><strong>Misc</strong><span>Saves, gameplay, library tools</span></div>
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
 <button class="settings-item" data-setting="Advanced">
@@ -869,11 +869,12 @@
 <button aria-label="Back" class="back-btn" data-back-to="settingsHomePage">
 <svg viewbox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
 </button>
-<h2>Audio</h2>
+<h2>Sound</h2>
 </div>
 <div class="detail-list">
 <div class="detail-row"><div><strong>Enable sound</strong><span>Turn emulator audio on or off</span></div><label class="switch"><input checked="" id="enableSoundToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-range-row"><div class="range-copy"><strong>Sound volume</strong><span>Master emulator volume</span></div><div class="range-line"><input id="volumeRange" max="100" min="0" type="range" value="100"/><output id="volumeValue">100%</output></div></div>
+<div class="detail-row"><div><strong>Controller sound</strong><span>Soft low-volume tap sound for on-screen controls and D-pad</span></div><label class="switch"><input checked="" id="controllerSoundToggle" type="checkbox"/><span class="slider"></span></label></div>
 <button class="detail-row tappable frequency-toggle" id="soundFrequencyBtn">
 <div>
 <strong>Sound frequency</strong>

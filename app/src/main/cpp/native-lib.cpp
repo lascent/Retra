@@ -583,7 +583,10 @@ static GBASIOLockstepCoordinator localCoordinator{};
 static bool localCoordinatorInitialized = false;
 static std::atomic<bool> localLinkActive{false};
 static std::atomic<bool> localLinkPaused{false};
+static std::atomic<bool> localLinkSinglePakActive{false};
 static std::atomic<int> activeLocalPlayer{0};
+static constexpr uint32_t SINGLE_PAK_BOOT_KEYS = (1u << 2) | (1u << 3); // SELECT + START
+static constexpr uint64_t SINGLE_PAK_BOOT_HOLD_FRAMES = 120;
 
 struct ScheduledLinkInput {
     uint64_t frame = 0;
@@ -1019,6 +1022,13 @@ static void localLinkFrameEnded(struct mCoreThread* threadContext) {
     }
 
     const uint64_t completedFrame = player->frameNumber.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (localLinkSinglePakActive.load(std::memory_order_relaxed) &&
+        player->playerId == 1 && completedFrame >= SINGLE_PAK_BOOT_HOLD_FRAMES) {
+        // Hold START+SELECT only through the receiver BIOS boot window. This
+        // enters multiboot receive mode without leaking those buttons into the
+        // downloaded client program once the transfer begins.
+        player->keys.fetch_and(~SINGLE_PAK_BOOT_KEYS, std::memory_order_relaxed);
+    }
     syncGbaMosaicRenderer(player->core);
 
     const uint64_t interval = linkCheckpointIntervalFrames();
@@ -1165,6 +1175,79 @@ static bool prepareLocalPlayer(
     return true;
 }
 
+static bool prepareLocalSinglePakClient(
+        LocalLinkPlayer& player,
+        const char* biosPath,
+        int preferredId) {
+    clearLocalPlayer(player);
+    player.playerId = preferredId;
+
+    // Single-Pak's receiving GBA has no cartridge. Create a bare GBA core and
+    // boot the user-provided BIOS so the sender can transfer its multiboot image
+    // over the same mGBA lockstep SIO cable used by normal Local Link.
+    player.core = mCoreCreate(mPLATFORM_GBA);
+    if (!player.core || !player.core->init(player.core)) {
+        player.core = nullptr;
+        return false;
+    }
+
+    mCoreInitConfig(player.core, "retra-singlepak");
+    player.configInitialized = true;
+    player.core->setVideoBuffer(player.core, player.videoBuffer, VIDEO_STRIDE);
+
+    for (const auto& option : runtimeConfigOptions) {
+        if (!isRetraPrivateConfigKey(option.first)) {
+            mCoreConfigSetOverrideValue(&player.core->config, option.first.c_str(), option.second.c_str());
+        }
+    }
+    mCoreConfigSetOverrideValue(&player.core->config, "useBios", "1");
+    mCoreConfigSetOverrideValue(&player.core->config, "skipBios", "0");
+    mCoreConfigSetOverrideValue(&player.core->config, "gba.bios", biosPath);
+    mCoreLoadConfig(player.core);
+    player.core->opts.useBios = true;
+    player.core->opts.skipBios = false;
+
+    VFile* bios = VFileOpen(biosPath, O_RDONLY);
+    if (!bios) {
+        return false;
+    }
+    if (!player.core->loadBIOS(player.core, bios, 0)) {
+        bios->close(bios);
+        return false;
+    }
+
+    installGbaVideoHook(player.core);
+    if (player.core->setAudioBufferSize) {
+        player.core->setAudioBufferSize(player.core, 8192);
+    }
+    syncGbaMosaicRenderer(player.core);
+    player.core->opts.videoSync = false;
+    player.core->opts.audioSync = false;
+    player.core->opts.rewindEnable = false;
+
+    unsigned width = 0;
+    unsigned height = 0;
+    player.core->baseVideoSize(player.core, &width, &height);
+    if (width == 0 || height == 0 || width > MAX_VIDEO_WIDTH || height > MAX_VIDEO_HEIGHT) {
+        return false;
+    }
+    player.width = width;
+    player.height = height;
+
+    player.inputCallbacks.context = &player;
+    player.inputCallbacks.keysRead = localLinkKeysRead;
+    player.core->addCoreCallbacks(player.core, &player.inputCallbacks);
+    player.thread.core = player.core;
+    player.thread.userData = &player;
+    player.thread.frameCallback = localLinkFrameEnded;
+
+    mLockstepThreadUserInit(&player.lockstepUser.base, &player.thread);
+    player.lockstepUser.preferredId = preferredId;
+    player.lockstepUser.base.d.requestedId = localLinkRequestedId;
+    GBASIOLockstepDriverCreate(&player.linkDriver, &player.lockstepUser.base.d);
+    return true;
+}
+
 static void destroyPreparedLocalPlayer(LocalLinkPlayer& player) {
     if (player.configInitialized && player.core) {
         mCoreConfigDeinit(&player.core->config);
@@ -1181,6 +1264,7 @@ static void destroyPreparedLocalPlayer(LocalLinkPlayer& player) {
 static void destroyLocalLinkLocked() {
     resetRetraAudioResamplerLocked();
     const bool hadLink = localLinkActive.exchange(false, std::memory_order_acq_rel);
+    localLinkSinglePakActive.store(false, std::memory_order_relaxed);
     localLinkPaused.store(false, std::memory_order_relaxed);
     activeLocalPlayer.store(0, std::memory_order_relaxed);
     clearLocalLinkInputScheduleLocked();
@@ -1222,6 +1306,44 @@ static void destroyLocalLinkLocked() {
     (void) hadLink;
 }
 
+static bool startPreparedLocalLinkLocked(bool singlePak) {
+    GBASIOLockstepCoordinatorInit(&localCoordinator);
+    localCoordinatorInitialized = true;
+    for (int i = 0; i < LOCAL_LINK_PLAYERS; ++i) {
+        GBASIOLockstepCoordinatorAttach(&localCoordinator, &localPlayers[i].linkDriver);
+        localPlayers[i].core->setPeripheral(
+                localPlayers[i].core,
+                mPERIPH_GBA_LINK_PORT,
+                &localPlayers[i].linkDriver.d);
+    }
+
+    // A cartridge-less GBA enters the official multiboot receiver path when
+    // START+SELECT are held during BIOS boot. Holding before either CPU starts
+    // makes the handshake deterministic; the frame callback releases them.
+    localLinkSinglePakActive.store(singlePak, std::memory_order_relaxed);
+    if (singlePak) {
+        localPlayers[1].keys.store(SINGLE_PAK_BOOT_KEYS, std::memory_order_relaxed);
+    }
+
+    for (int i = 0; i < LOCAL_LINK_PLAYERS; ++i) {
+        if (!mCoreThreadStart(&localPlayers[i].thread)) {
+            destroyLocalLinkLocked();
+            return false;
+        }
+        localPlayers[i].threadStarted = true;
+    }
+
+    for (auto& player : localPlayers) {
+        std::lock_guard<std::mutex> frameLock(player.frameMutex);
+        std::memcpy(player.snapshot, player.videoBuffer, sizeof(player.snapshot));
+    }
+
+    activeLocalPlayer.store(0, std::memory_order_relaxed);
+    localLinkPaused.store(false, std::memory_order_relaxed);
+    localLinkActive.store(true, std::memory_order_release);
+    return true;
+}
+
 static bool startLocalLinkLocked(
         const char* firstRomPath,
         const char* secondRomPath,
@@ -1238,36 +1360,25 @@ static bool startLocalLinkLocked(
         return false;
     }
 
-    GBASIOLockstepCoordinatorInit(&localCoordinator);
-    localCoordinatorInitialized = true;
-    for (int i = 0; i < LOCAL_LINK_PLAYERS; ++i) {
-        GBASIOLockstepCoordinatorAttach(&localCoordinator, &localPlayers[i].linkDriver);
-        localPlayers[i].core->setPeripheral(
-                localPlayers[i].core,
-                mPERIPH_GBA_LINK_PORT,
-                &localPlayers[i].linkDriver.d);
-    }
-
     // Both drivers are attached before either CPU starts, matching mGBA's
     // desktop multiplayer topology and avoiding an unlinked first reset.
-    for (int i = 0; i < LOCAL_LINK_PLAYERS; ++i) {
-        if (!mCoreThreadStart(&localPlayers[i].thread)) {
-            destroyLocalLinkLocked();
-            return false;
-        }
-        localPlayers[i].threadStarted = true;
-    }
+    return startPreparedLocalLinkLocked(false);
+}
 
-    // Seed snapshots immediately. The frame callbacks will refresh them.
-    for (auto& player : localPlayers) {
-        std::lock_guard<std::mutex> frameLock(player.frameMutex);
-        std::memcpy(player.snapshot, player.videoBuffer, sizeof(player.snapshot));
-    }
+static bool startLocalSinglePakLocked(
+        const char* firstRomPath,
+        const char* firstSavePath,
+        const char* gbaBiosPath) {
+    destroyLocalLinkLocked();
+    destroyCoreLocked();
+    clearLinkCheckpointsLocked();
 
-    activeLocalPlayer.store(0, std::memory_order_relaxed);
-    localLinkPaused.store(false, std::memory_order_relaxed);
-    localLinkActive.store(true, std::memory_order_release);
-    return true;
+    if (!prepareLocalPlayer(localPlayers[0], firstRomPath, firstSavePath, 0, 1) ||
+        !prepareLocalSinglePakClient(localPlayers[1], gbaBiosPath, 1)) {
+        destroyLocalLinkLocked();
+        return false;
+    }
+    return startPreparedLocalLinkLocked(true);
 }
 
 static bool setLocalLinkPausedLocked(bool paused) {
@@ -1485,6 +1596,37 @@ Java_com_retra_emulator_MainActivity_startLocalLink(
     env->ReleaseStringUTFChars(secondSavePathString, secondSavePath);
     env->ReleaseStringUTFChars(firstSavePathString, firstSavePath);
     env->ReleaseStringUTFChars(secondPathString, secondPath);
+    env->ReleaseStringUTFChars(firstPathString, firstPath);
+    return started ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_retra_emulator_MainActivity_startLocalSinglePak(
+        JNIEnv* env,
+        jobject,
+        jstring firstPathString,
+        jstring firstSavePathString,
+        jstring biosPathString) {
+    const char* firstPath = env->GetStringUTFChars(firstPathString, nullptr);
+    if (!firstPath) return JNI_FALSE;
+    const char* firstSavePath = env->GetStringUTFChars(firstSavePathString, nullptr);
+    if (!firstSavePath) {
+        env->ReleaseStringUTFChars(firstPathString, firstPath);
+        return JNI_FALSE;
+    }
+    const char* biosPath = env->GetStringUTFChars(biosPathString, nullptr);
+    if (!biosPath) {
+        env->ReleaseStringUTFChars(firstSavePathString, firstSavePath);
+        env->ReleaseStringUTFChars(firstPathString, firstPath);
+        return JNI_FALSE;
+    }
+
+    std::lock_guard<std::mutex> lock(coreMutex);
+    const bool started = startLocalSinglePakLocked(firstPath, firstSavePath, biosPath);
+
+    env->ReleaseStringUTFChars(biosPathString, biosPath);
+    env->ReleaseStringUTFChars(firstSavePathString, firstSavePath);
     env->ReleaseStringUTFChars(firstPathString, firstPath);
     return started ? JNI_TRUE : JNI_FALSE;
 }
@@ -2462,7 +2604,11 @@ Java_com_retra_emulator_MainActivity_resetCore(
         clearLocalLinkInputScheduleLocked();
         clearLinkCheckpointsLocked();
         for (auto& player : localPlayers) {
-            player.keys.store(0, std::memory_order_relaxed);
+            player.keys.store(
+                    localLinkSinglePakActive.load(std::memory_order_relaxed) && player.playerId == 1
+                        ? SINGLE_PAK_BOOT_KEYS
+                        : 0,
+                    std::memory_order_relaxed);
             player.keyPressLatch.store(0, std::memory_order_relaxed);
             player.frameNumber.store(0, std::memory_order_relaxed);
             if (player.threadStarted && player.thread.impl) {

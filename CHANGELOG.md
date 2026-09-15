@@ -1,3 +1,18 @@
+## v1.0.3
+
+- Local GBA Single-Pak / Multiboot support.
+- Added two-player Local Single-Pak / Multiboot using one cartridge-host core and one BIOS-only receiving GBA core.
+- Player 2 boots from a user-selected 16 KiB GBA BIOS with no cartridge attached, then joins the same mGBA lockstep SIO cable used by normal Local Link.
+- Retra automatically holds Start + Select during the receiving GBA BIOS boot and releases them after startup so compatible games can enter their Single-Pak transfer flow.
+- Normal Multi-Pak Local Link remains unchanged. Remote Link remains Multi-Pak-only, and GBA Wireless Adapter / RFU emulation is still not supported.
+
+## v1.0.3 — Unified controller feedback
+- Unified D-pad, A/B, L/R, Start/Select, combo/turbo, Menu, Screenshot, Quick Save/Load, and Speed controls on one controller-feedback profile.
+- D-pad rolling still gives feedback only on real direction changes, while rapid multi-touch feedback is rate-limited to stay smooth instead of buzzing or stacking loud clicks.
+
+## v1.0.3 — Soft controller feedback tuning
+- Action buttons keep a subtle tap feel, while rapid D-pad jitter and multi-touch chords are prevented from stacking harsh click sounds.
+
 ## v1.0.3 — Library title and options cleanup
 - Capped Compact Grid ROM titles at two lines, including 5–6 items-per-row layouts, so long names stay compact and consistent.
 - Merged the separate Library Sort and Display header controls into one icon-only Library Options button; Sort and Display remain available as tabs in the same sheet.
@@ -70,7 +85,6 @@
 - Added Android 12+ PerformanceHintManager workload hints for the long-lived mGBA worker.
 - Full regression + release gate: 325/325 tests passing.
 
-
 ### True 16x turbo follow-up
 - Rebuilt 8x/16x pacing around a cumulative throughput governor so 16x is not slowed by scheduler oversleep.
 - Added 8-frame native 16x batches, an 8192-frame audio ring, and turbo-only mGBA renderer frameskip.
@@ -112,7 +126,6 @@
 - Caps Android framebuffer publication to the useful 60/90/120 Hz presentation cadence, reducing wasted work and improving frame pacing on high-refresh displays.
 - Keeps normal-speed emulation timing unchanged.
 
-
 ## v1.0.2 — 2026-09-13 — Update checking and reinstall recovery
 
 - Fixed GitHub Actions Android 17 provisioning by installing the published `platforms;android-37.0` SDK package into the runner SDK root while keeping app `compileSdk`/`targetSdk` at API 37.
@@ -133,7 +146,6 @@
 - Missing ROMs appear as `ROM file required` placeholders and reconnect automatically to the same `romId` when the matching SHA-256 ROM is imported.
 - Portable play-history metadata now restores Started/Recently Played statistics and History alongside save/battery-state counts.
 - Restored global settings and per-ROM `Config` data continue to use the existing portable settings/config restore path.
-
 
 ### v1.0.1 performance hardening
 - Triple-buffered gameplay presentation keeps Bitmap/GL upload work off the emulator frame lock.
@@ -179,7 +191,6 @@
 - Kept mGBA's original mixer, game pitch, tempo, stereo image, speed synchronization, AudioTrack writer, and adaptive underrun handling unchanged.
 - Added regression coverage for DC removal, smoothing strength, post-resampler placement, and output headroom.
 
-
 ### Backup UI alignment / fixed action bar
 
 - Vertically centered the Create backup / Restore backup icons and copy in their action rows.
@@ -207,7 +218,6 @@
 - Aligned the default grouped A and B gameplay buttons to the same vertical centerline.
 - Updated the Screen Editor preview so A no longer sits lower than B.
 - Preserved the existing A/B group size and saved layout coordinates to avoid shifting user layouts.
-
 
 All notable Retra changes are documented here. Public release numbering follows Semantic Versioning beginning with `v1.0.0`.
 

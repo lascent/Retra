@@ -223,8 +223,9 @@ appUpdateInstallBtn?.addEventListener('click', () => {
 
 hydrateRetraVersion();
 // Automatic checks are intentionally delayed until the bundled UI has settled.
-// Native code applies a six-hour success cooldown, so frequent launches do not
-// hammer GitHub or compete with gameplay startup.
+// Native code runs this once per fresh Retra process. A new GitHub release is
+// therefore discovered on the next cold launch without requiring the manual
+// Check for updates action.
 window.setTimeout(() => requestRetraUpdateCheck(false), 1400);
 
 const appShell = document.querySelector('.app-shell');
@@ -985,6 +986,7 @@ const cloudBackupNowSummary = document.getElementById('cloudBackupNowSummary');
 const syncSettingsBtn = document.getElementById('syncSettingsBtn');
 const syncSettingsSummary = document.getElementById('syncSettingsSummary');
 const enableCheatsToggle = document.getElementById('enableCheatsToggle');
+const controllerSoundToggle = document.getElementById('controllerSoundToggle');
 const romPatchingToggle = document.getElementById('romPatchingToggle');
 const automaticArtworkToggle = document.getElementById('automaticArtworkToggle');
 const artworkWifiOnlyToggle = document.getElementById('artworkWifiOnlyToggle');
@@ -1048,6 +1050,7 @@ function applyNativeSettingsState(state){
   const bool = (el, key, fallback) => { if (el) el.checked = key in state ? !!state[key] : fallback; };
   bool(cloudSyncToggle, 'cloudSync', false);
   bool(enableCheatsToggle, 'enableCheats', true);
+  bool(controllerSoundToggle, 'controllerSound', true);
   bool(romPatchingToggle, 'romPatching', true);
   bool(automaticArtworkToggle, 'automaticArtwork', true);
   bool(artworkWifiOnlyToggle, 'artworkWifiOnly', false);
@@ -1295,6 +1298,7 @@ syncSettingsBtn?.addEventListener('click', () => {
 
 [
   [enableCheatsToggle, 'enableCheats'],
+  [controllerSoundToggle, 'controllerSound'],
   [romPatchingToggle, 'romPatching'],
   [automaticArtworkToggle, 'automaticArtwork'],
   [artworkWifiOnlyToggle, 'artworkWifiOnly'],
