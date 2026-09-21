@@ -1,3 +1,89 @@
+## v1.0.4 — SmoothTurbo frame/audio hardening
+
+- Promoted the hardened SmoothTurbo pipeline to the v1.0.4 stable release metadata (`versionName 1.0.4`, `versionCode 451`).
+- Expanded `GameplayFrameMailbox` to four permanently preallocated pixel buffers: producer, pending, rendering, and spare.
+- Removed normal per-frame mailbox result allocation by reusing producer `PublishResult` and GL `RenderFrame` holders.
+- Preserved latest-frame-only presentation: stale pending frames are recycled, and an unexpected pool starvation condition drops the visual publish instead of allocating a framebuffer during a GPU stall.
+- Hardened `GameplayFramePresenter` with reusable posted Runnables, CAS-based generation coalescing, direct Choreographer rescheduling from the VSync callback, and per-session generation reset.
+- Speed changes now reset frame pacing, cumulative turbo timing, fractional slice planning, and audio transform state before the first frame at the new multiplier.
+- Kept native speed-aware 32-tap FIR turbo audio so only wall-clock PCM crosses JNI at 2×/4×/8×/16×.
+- Retained the stable 60/120 Hz gameplay presentation policy while emulation throughput remains independent from display presentation.
+- Added v1.0.4 release notes, architecture documentation, and regression guards for release metadata and SmoothTurbo hardening.
+
+## v1.0.3 — Latest-frame GPU presentation architecture
+
+- Reworked gameplay video into a producer/consumer pipeline: mGBA publishes completed frames into a triple-buffer `GameplayFrameMailbox`, while the OpenGL render thread consumes only the newest pending frame.
+- Normal gameplay now uses the pass-through `ShaderGameView` GPU surface even when GLSL shaders are Off; the legacy `ImageView` path remains only as an OEM compatibility fallback.
+- Stale fast-forward frames are recycled instead of queued, preventing visible catch-up bursts and the dragging/low-FPS feel caused by presentation backlog.
+- Speed Mode keeps exact cumulative 2×/4×/8×/16× timing while visible presentation uses one stable 60 or 120 Hz cadence for the session.
+- Removed active 144/165 Hz turbo mode switching and automatic Speed Mode renderer-frameskip escalation; the user's Frameskip setting remains authoritative.
+- Fast-forward audio stays independent from video presentation, and the emulation worker yields display priority to Android's RenderThread.
+- Preserved the architecture/haptics refactor: `ControllerFeedbackManager`, `GameplayInputState`, and `RetraModels` remain the authoritative owners for feedback, input state, and shared domain models.
+
+## v1.0.3 — Architecture and smooth controller feedback pass
+
+- Moved shared ROM/import models out of `MainActivity` into `RetraModels.kt`, reducing Activity-domain coupling and keeping `MainActivity` below 1,500 lines.
+- Added `ControllerFeedbackManager` as the single owner of controller sound and haptic policy; pointer ownership remains in `GameplayTouchController`.
+- Moved shared D-pad/key-hold/generation bookkeeping into `GameplayInputState`, further reducing mutable gameplay state owned directly by `MainActivity`.
+- Added optional **Controller haptics** under Sound, independent from Controller sound.
+- All D-pad, A/B, L/R, Start/Select, Menu, speed, save/load, screenshot, and combo controls use the same light system-tuned tick profile with short anti-buzz/anti-stack rate limits.
+- Haptics respect Android's global touch-feedback preference and use system feedback APIs instead of raw vibrator pulses.
+- Added current architecture and controller-feedback documentation plus stricter architecture regression guardrails.
+
+## v1.0.3 — Native gameplay L/R curve parity fix
+
+- Applied the restored asymmetric **L** and **R** shoulder-button curves to the actual Android gameplay overlay, not only the Screen Editor preview.
+- Added dedicated left/right shoulder drawables so **Start/Select** keep their original pill shape.
+- Kept the existing 72×30dp shoulder size, transparency, border thickness, pressed-state styling, and Screen Editor parity.
+
+## v1.0.3 — Fast-forward audio continuity fix
+
+- Removed the automatic throughput fallback that could mute all PCM during 4×, 8×, or 16× fast-forward on constrained devices.
+- Fast-forward audio now stays enabled at every supported speed; performance fallback sheds renderer work instead of sacrificing sound.
+- Turbo speed changes use a shorter 16 ms playback prebuffer so audio resumes more quickly after entering or changing fast-forward speed.
+- Preserved the lightweight integer-averaging turbo transform and dedicated audio-writer thread to keep high-speed audio inexpensive and gameplay pacing smooth.
+
+## v1.0.3 — Screen Editor shoulder-button curve restore
+
+- Restored the previous curved shape for the Screen Editor **L** and **R** shoulder buttons instead of the flatter full-pill parity version.
+- Kept the current parity sizing, opacity, borders, and label treatment, while bringing back the older asymmetric shoulder-button silhouette.
+- Updated the **Add Control** shoulder preview to match the restored curved look.
+
+## v1.0.3 — Screen Editor / gameplay controller visual parity
+
+- Made the Screen Editor controller preview use the same native gameplay control geometry, corner radii, translucency, border weights, and button typography as the Android emulator overlay.
+- Matched the exact gameplay D-pad chevron artwork, Menu icon, Quick Load, Quick Save, Fast Forward, and Screenshot vector styling instead of editor-specific substitutes.
+- Kept native sizes in sync: L/R 72×30, Menu 42 inside a 44 wrapper, D-pad 44×44 in a 150×150 group, Start/Select 50×24, grouped A/B 54×54, utility controls 44×44, combo controls 56×56, and Turbo A/B 122×58.
+- Removed editor-only gradients, inner decorations, and light-theme recoloring from controller faces so the Screen Editor visually matches what appears during gameplay.
+- Updated restored-control thumbnails in Add Control so D-pad, L/R, and Start/Select preview the real gameplay shapes instead of generic cross/circle/SS placeholders.
+
+## v1.0.3 — Multi-select More menu polish
+
+- Enlarged the multi-select **Remove from Library** popup action for easier tapping.
+- Refined the popup card with a softer rounded container, stronger spacing, and a cleaner highlighted icon tile.
+- Increased the title/subtitle readability so the action looks more polished and clearer in the Library multi-select menu.
+
+## v1.0.3 — Multi-select action icons cleanup
+
+- Removed the visible text labels from the Library multi-select action bar so Categories, Favourite, and More show as icon-only actions.
+- Increased the action icon size for better tap clarity and visual balance.
+- Replaced the Categories action icon with a cleaner four-tile categories/collection glyph.
+
+## v1.0.3 — Multi-select cover-only curved highlight
+
+- Changed Library multi-select highlighting so the selected border hugs only the ROM cover artwork instead of wrapping the title block.
+- Replaced the WebView-sensitive shadow/outline effect with a real 3 px accent border on the cover image or fallback artwork, making selection visible on more Android WebView versions.
+- Added a smoother 16 px selected-cover curve in Compact Grid while keeping the title completely outside the highlight.
+- Cards without artwork keep the same cover-only selection treatment through the fallback cover placeholder.
+
+## v1.0.3 — Library multi-select visual and touch smoothness hotfix
+
+- Replaced the selected-ROM outline with a paint-contained inset highlight so every selected card stays visibly highlighted after selecting multiple ROMs, including cards without cover artwork.
+- Added touch/pen pointer-up selection so additional ROMs toggle before Android WebView dispatches the synthetic click.
+- Added a lightweight pressed state and faster selection/check transitions for more responsive multi-select feedback.
+- Avoids rebuilding the complete valid-ROM Set on every additional tap and defers Favourite/Unfavourite accessory bookkeeping until the next animation frame.
+- Preserves scrolling gestures, long-press entry into selection mode, keyboard selection, and click suppression.
+
 ## v1.0.3
 
 - Local GBA Single-Pak / Multiboot support.
@@ -5,6 +91,15 @@
 - Player 2 boots from a user-selected 16 KiB GBA BIOS with no cartridge attached, then joins the same mGBA lockstep SIO cable used by normal Local Link.
 - Retra automatically holds Start + Select during the receiving GBA BIOS boot and releases them after startup so compatible games can enter their Single-Pak transfer flow.
 - Normal Multi-Pak Local Link remains unchanged. Remote Link remains Multi-Pak-only, and GBA Wireless Adapter / RFU emulation is still not supported.
+
+## v1.0.3 — Gameplay smoothness and performance pass
+
+- Added adaptive native-speed frame pacing that learns Android scheduler oversleep while keeping the precision spin window strictly bounded.
+- Re-anchors timing after a substantial one-off hitch so GC/audio/OS stalls are not followed by visible back-to-back catch-up frames.
+- Android Performance Hint sessions now report the full emulation-thread frame cost, including PCM draining/resampling and adaptive gameplay bookkeeping.
+- Reuses steady-state audio output packets to reduce ShortArray allocation/GC pressure during long gameplay sessions.
+- Recycles expired rewind-state buffers so the 5/10/15-second rewind ring no longer performs a large native allocation/free cycle every capture once warmed up.
+- Added dedicated regression guards for the gameplay timing, audio-packet reuse, full-workload performance hints, and rewind-buffer reuse paths.
 
 ## v1.0.3 — Unified controller feedback
 - Unified D-pad, A/B, L/R, Start/Select, combo/turbo, Menu, Screenshot, Quick Save/Load, and Speed controls on one controller-feedback profile.

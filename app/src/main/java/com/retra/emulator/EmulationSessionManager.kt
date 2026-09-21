@@ -172,157 +172,89 @@ internal fun MainActivity.startEmulation() {
     statistics.begin(romLoaded)
     audioController.play()
 
-    val initialSpeed = EmulationSpeedPolicy.sanitize(activeEmulationSpeed)
+    // Pick one cadence-compatible gameplay mode for the whole session. Speed-mode
+    // changes never switch the physical panel mode; that avoids a compositor hitch
+    // every time fast-forward is toggled.
     if (hasDisplayPerformanceManager()) {
-        displayPerformanceManager.applyGameplayMode(extremeTurbo = initialSpeed >= 4.0)
+        displayPerformanceManager.applyGameplayMode(extremeTurbo = false)
     }
-
-    // Resolve both normal-gameplay and high-refresh turbo display cadences on the UI
-    // thread. 4x/8x/16x may use 144/165 Hz when the panel exposes it; normal/2x
-    // gameplay still prefers cadence-compatible 60/120 Hz modes.
     val gameplayPresentationHz = if (hasDisplayPerformanceManager()) {
         displayPerformanceManager.preferredGameplayRefreshRateHz(extremeTurbo = false)
+            .coerceAtMost(120f)
     } else {
         60f
     }
-    val extremePresentationHz = if (hasDisplayPerformanceManager()) {
-        displayPerformanceManager.preferredGameplayRefreshRateHz(extremeTurbo = true)
-    } else {
-        gameplayPresentationHz
-    }
+    // Retra presents turbo at a stable 60 or 120 Hz cadence. 90 Hz is deliberately
+    // treated as 60 here because ~59.73 FPS GBA timing does not map evenly to 90 Hz.
+    val turboPresentationHz = if (gameplayPresentationHz >= 100f) 120.0 else 60.0
+    binding.shaderGameScreen.setPresentationFrameRate(turboPresentationHz.toFloat())
 
-    if (hasGameplayFramePresenter()) gameplayFramePresenter.start()
+    if (hasGameplayFramePresenter()) {
+        gameplayFramePresenter.start()
+        gameplayFramePresenter.setContinuousVsync(false)
+    }
     emulatorRunning = true
     emulatorThread = Thread {
         val cpuProfile = prefs.getString(CPU_CORE_PREF, "Automatic")
         val userFrameSkip = prefs.getInt(FRAME_SKIP_PREF, 0).coerceIn(0, 10)
         val framePacer = EmulationFramePacer()
-        val extremeGovernor = TurboThroughputGovernor(FRAME_TIME_NS)
-        val throughputMonitor = TurboPerformanceMonitor(FRAME_TIME_NS)
-        val turboBatchSequencer = TurboBatchSequencer(FRAME_TIME_NS)
+        val turboGovernor = TurboThroughputGovernor(FRAME_TIME_NS)
+        val turboSlicePlanner = TurboSlicePlanner()
         val performanceHints = EmulationPerformanceHints(this)
+        val framePublishResult = GameplayFrameMailbox.PublishResult()
         val normalPrecisionWindow = EmulationFramePacer.precisionWindowForProfile(cpuProfile)
         framePacer.reset()
-        extremeGovernor.reset()
-        throughputMonitor.reset()
+        turboGovernor.reset()
         performanceHints.start(FRAME_TIME_NS)
 
-        var lastSpeed = -1.0
+        // Automatic turbo renderer frameskip made the core advance correctly while
+        // leaving an old framebuffer visible. That looked like dragging/low FPS.
+        // Keep the user's configured value authoritative for the whole session.
         var activeCoreFrameSkip = -1
-        var adaptiveQualityFallbackEngaged = false
-        var turboAudioMuted = false
-        var governorAlignedToVsync = false
-        var presentationIntervalNs = TurboFramePolicy.presentationIntervalNs(gameplayPresentationHz, 1.0)
-        var nextVideoDeadlineNs = System.nanoTime()
-        var forceNextVideoCapture = true
+        var lastSpeed = -1.0
 
         while (emulatorRunning) {
             val speed = EmulationSpeedPolicy.sanitize(activeEmulationSpeed)
             val turbo = speed > 1.0
-            val highRefreshTurbo = speed >= 4.0
 
             if (kotlin.math.abs(speed - lastSpeed) > 0.0001) {
                 framePacer.reset()
-                extremeGovernor.reset()
-                throughputMonitor.reset()
-                turboBatchSequencer.reset()
-                adaptiveQualityFallbackEngaged = false
-                governorAlignedToVsync = false
-                forceNextVideoCapture = true
-                val targetPresentationHz = if (highRefreshTurbo) extremePresentationHz else gameplayPresentationHz
-                presentationIntervalNs = TurboFramePolicy.presentationIntervalNs(
-                    targetPresentationHz,
-                    speed
-                )
-                nextVideoDeadlineNs = System.nanoTime()
-
+                turboGovernor.reset()
+                turboSlicePlanner.reset(speed, FRAME_TIME_NS, turboPresentationHz)
+                audioController.onSpeedChanged(speed)
                 if (hasGameplayFramePresenter()) {
-                    gameplayFramePresenter.setContinuousVsync(speed >= 4.0)
-                }
-                if (hasDisplayPerformanceManager()) {
-                    // applyGameplayMode posts the window-mode change onto the UI thread.
-                    displayPerformanceManager.applyGameplayMode(extremeTurbo = highRefreshTurbo)
-                }
-
-                // Protect the selected multiplier immediately: mGBA may skip internal
-                // renderer work that the display cannot use, while every CPU/game
-                // frame still executes. Additional skipping is only added on a measured miss.
-                val desiredCoreFrameSkip = TurboFramePolicy.speedProtectingCoreFrameSkip(
-                    speed = speed,
-                    userFrameSkip = userFrameSkip,
-                    frameTimeNs = FRAME_TIME_NS,
-                    presentationHz = targetPresentationHz
-                )
-                if (desiredCoreFrameSkip != activeCoreFrameSkip) {
-                    runCatching { setCoreConfigOption("frameskip", desiredCoreFrameSkip.toString()) }
-                    activeCoreFrameSkip = desiredCoreFrameSkip
+                    // During Speed Mode, keep one Choreographer callback armed per
+                    // display VSync. The callback samples the mailbox generation and
+                    // draws only when a newer frame exists, decoupling presentation
+                    // cadence from producer-thread wake-up jitter.
+                    gameplayFramePresenter.setContinuousVsync(turbo)
                 }
 
-                // Keep v1.0.1-style turbo audio audible by default. The controller
-                // now uses its lightweight integer averaging path instead of the newer
-                // native FIR; only a severe measured throughput failure may mute it.
-                if (turboAudioMuted) {
-                    audioController.setTurboMuted(false)
-                    turboAudioMuted = false
+                if (activeCoreFrameSkip != userFrameSkip) {
+                    runCatching { setCoreConfigOption("frameskip", userFrameSkip.toString()) }
+                    activeCoreFrameSkip = userFrameSkip
                 }
 
-                runCatching {
-                    Process.setThreadPriority(TurboFramePolicy.processThreadPriority(speed, cpuProfile))
+                // Leave Android's RenderThread above fast-forward work. The emulator
+                // still runs flat-out when needed, but it no longer starves the GL
+                // consumer that makes the game screen look smooth.
+                val priority = when {
+                    turbo -> Process.THREAD_PRIORITY_MORE_FAVORABLE
+                    cpuProfile.equals("Performance", ignoreCase = true) -> Process.THREAD_PRIORITY_DISPLAY
+                    cpuProfile.equals("Compatibility", ignoreCase = true) -> Process.THREAD_PRIORITY_DEFAULT
+                    else -> Process.THREAD_PRIORITY_MORE_FAVORABLE
                 }
+                runCatching { Process.setThreadPriority(priority) }
                 lastSpeed = speed
             }
 
-            val presentationNowNs = System.nanoTime()
-            val baselineFramesThisSlice = if (turbo) {
-                // Quality fallback never enlarges the native batch. Keeping short
-                // batches preserves fresh visual states and input cadence even if
-                // the ROM temporarily misses its requested throughput.
-                TurboFramePolicy.framesPerSlice(speed, FRAME_TIME_NS)
+            val framesThisSlice = if (turbo) {
+                // Fractional batching removes the slow cadence beat caused by
+                // rounding every 60/120 Hz slice to one fixed integer size. The
+                // cumulative governor still owns the exact 2x/4x/8x/16x speed.
+                turboSlicePlanner.nextFrames()
             } else {
                 1
-            }
-
-            // At 4x/8x/16x, align useful native batches to the selected display mode
-            // whenever the CPU has headroom. This unlocks fresh 144/165 Hz snapshots
-            // instead of being capped near 119.455 short batches/s and removes the
-            // slow beat against 120 Hz. Cumulative emulation time remains governed
-            // by the exact selected speed.
-            val syncExtremeCandidate = TurboFramePolicy.canSynchronizeExtremeTurboBatchToDisplay(
-                speed = speed,
-                frameTimeNs = FRAME_TIME_NS,
-                refreshRateHz = extremePresentationHz
-            )
-            val lastVsyncNs = if (syncExtremeCandidate && hasGameplayFramePresenter()) {
-                gameplayFramePresenter.latestVsyncNanos()
-            } else {
-                0L
-            }
-            val syncExtremeToDisplay = syncExtremeCandidate && lastVsyncNs > 0L
-
-            if (syncExtremeToDisplay && !governorAlignedToVsync) {
-                // Rebase the cumulative extreme-turbo clock once to a real Choreographer
-                // timestamp. From here, the fractional batch sequence stays phase-
-                // bounded around VSync without altering the requested game speed.
-                extremeGovernor.reset(lastVsyncNs)
-                turboBatchSequencer.reset()
-                governorAlignedToVsync = true
-                forceNextVideoCapture = true
-            } else if (!syncExtremeToDisplay && governorAlignedToVsync) {
-                extremeGovernor.reset()
-                turboBatchSequencer.reset()
-                governorAlignedToVsync = false
-                nextVideoDeadlineNs = presentationNowNs
-                forceNextVideoCapture = true
-            }
-
-            val framesThisSlice = if (syncExtremeToDisplay) {
-                turboBatchSequencer.nextFrames(
-                    speed = speed,
-                    refreshRateHz = extremePresentationHz,
-                    maxFrames = 8
-                )
-            } else {
-                baselineFramesThisSlice
             }
             val sliceCadenceNs = TurboFramePolicy.sliceCadenceNs(
                 speed = speed,
@@ -330,137 +262,50 @@ internal fun MainActivity.startEmulation() {
                 framesPerSlice = framesThisSlice
             )
 
-            // A display-synchronized extreme-turbo batch represents one panel
-            // interval on average, so every completed batch is a useful unique
-            // state. Other modes retain the wall-clock copy limiter.
-            val captureVideo = when {
-                !turbo -> true
-                forceNextVideoCapture -> true
-                syncExtremeToDisplay -> true
-                else -> presentationNowNs >= nextVideoDeadlineNs
-            }
-
-            if (captureVideo && turbo) {
-                val wasForced = forceNextVideoCapture
-                forceNextVideoCapture = false
-                if (!syncExtremeToDisplay) {
-                    nextVideoDeadlineNs = if (wasForced ||
-                        presentationNowNs - nextVideoDeadlineNs >= presentationIntervalNs) {
-                        presentationNowNs + presentationIntervalNs
-                    } else {
-                        nextVideoDeadlineNs + presentationIntervalNs
-                    }
-                }
-            }
-
             val workStartedNs = System.nanoTime()
             val successful = if (turbo) {
-                // One native call advances the whole batch. Hidden frames stay native;
-                // only a display-timed final state crosses JNI as pixels.
+                // Hidden frames stay entirely native. Only the final state of this
+                // display-sized slice crosses JNI, matching mature emulator designs.
                 runTurboSlice(
                     framePixels,
                     framesThisSlice,
-                    captureVideo,
-                    discardAudio = turboAudioMuted
+                    captureVideo = true,
+                    discardAudio = false
                 )
             } else {
                 runFrame(framePixels)
             }
-            val actualWorkNs = (System.nanoTime() - workStartedNs).coerceAtLeast(1L)
-
-            // Publish the newest completed image immediately. Audio resampling,
-            // adaptive monitoring and performance-hint bookkeeping happen after
-            // this hand-off so none of them can make a ready turbo frame miss the
-            // next Choreographer deadline. Game speed is unchanged.
-            if (successful && captureVideo) {
-                synchronized(frameLock) {
-                    val completedFrame = framePixels
-                    framePixels = displayPixels
-                    displayPixels = completedFrame
-                }
-
-                if (hasGameplayFramePresenter()) {
-                    gameplayFramePresenter.requestPresent()
-                }
-            }
-
-            performanceHints.report(
-                actualWorkNs = actualWorkNs,
-                desiredTargetNs = sliceCadenceNs
-            )
+            val coreWorkNs = (System.nanoTime() - workStartedNs).coerceAtLeast(1L)
 
             if (successful) {
-                audioController.pump(
-                    speed = speed,
-                    flushOutput = !turbo || captureVideo
-                )
-
-                throughputMonitor.onFramesCompleted(speed, framesThisSlice)?.let { sample ->
-                    if (turbo && sample.constrained) {
-                        val fallbackSkip = TurboFramePolicy.adaptiveCoreFrameSkip(
-                            speed = speed,
-                            userFrameSkip = userFrameSkip,
-                            utilization = sample.utilization,
-                            frameTimeNs = FRAME_TIME_NS,
-                            presentationHz = if (highRefreshTurbo) extremePresentationHz else gameplayPresentationHz
-                        )
-                        if (fallbackSkip != activeCoreFrameSkip) {
-                            runCatching { setCoreConfigOption("frameskip", fallbackSkip.toString()) }
-                            activeCoreFrameSkip = fallbackSkip
-                        }
-                        adaptiveQualityFallbackEngaged = true
-                        // Do not break display synchronization here. A throughput
-                        // miss may reduce invisible renderer/audio work, but the
-                        // high-refresh turbo presenter must keep sampling at panel cadence.
-                        // Preserve the selected game-speed target above all else.
-                        // If renderer adaptation still reports a sustained miss,
-                        // temporarily remove turbo-audio work; hysteresis restores
-                        // it only after measured throughput has genuinely recovered.
-                        val shouldProtectSpeedByMutingAudio = when {
-                            // Preserve the older v1.0.1 audible-turbo behavior whenever
-                            // practical. Mute only on a severe sustained miss after
-                            // renderer adaptation; exact emulation speed still wins.
-                            speed >= 16.0 -> sample.utilization < 0.78
-                            speed >= 8.0 -> sample.utilization < 0.70
-                            speed >= 4.0 -> sample.utilization < 0.62
-                            else -> false
-                        }
-                        if (!turboAudioMuted && shouldProtectSpeedByMutingAudio) {
-                            audioController.setTurboMuted(true)
-                            turboAudioMuted = true
-                        }
-                    } else if (turbo && sample.recovered && adaptiveQualityFallbackEngaged) {
-                        // Restore full renderer quality after a sustained recovery.
-                        val restoredSkip = TurboFramePolicy.speedProtectingCoreFrameSkip(
-                            speed = speed,
-                            userFrameSkip = userFrameSkip,
-                            frameTimeNs = FRAME_TIME_NS,
-                            presentationHz = if (highRefreshTurbo) extremePresentationHz else gameplayPresentationHz
-                        )
-                        if (restoredSkip != activeCoreFrameSkip) {
-                            runCatching { setCoreConfigOption("frameskip", restoredSkip.toString()) }
-                            activeCoreFrameSkip = restoredSkip
-                        }
-                        adaptiveQualityFallbackEngaged = false
-                        // The high-refresh sequencer stayed active during fallback,
-                        // so recovery does not need to throw away VSync phase.
-                        forceNextVideoCapture = true
-                        if (turboAudioMuted) {
-                            audioController.setTurboMuted(false)
-                            turboAudioMuted = false
-                        }
-                    }
+                // Producer -> latest-frame mailbox. Stale pending video is recycled;
+                // the renderer never receives a queue of old fast-forward frames.
+                gameplayFrameMailbox.publishLatest(framePixels, framePublishResult)
+                framePixels = framePublishResult.producerBuffer
+                if (hasGameplayFramePresenter()) {
+                    gameplayFramePresenter.requestPresent(framePublishResult.generation)
                 }
+
+                // Audio is independent from presentation. Turbo time-compression is
+                // performed natively so only playable wall-clock PCM crosses JNI;
+                // AudioTrack writes remain isolated on the dedicated audio thread,
+                // so audio cannot hold a completed video frame on the UI thread.
+                audioController.pump(speed = speed, flushOutput = true)
             } else {
                 audioController.flushPendingOutput()
             }
 
+            val totalWorkNs = (System.nanoTime() - workStartedNs).coerceAtLeast(coreWorkNs)
+            performanceHints.report(
+                actualWorkNs = totalWorkNs,
+                desiredTargetNs = sliceCadenceNs
+            )
+
             if (turbo && successful) {
-                // One cumulative wall-clock governor is used for every fast-forward
-                // multiplier and every ROM. Android oversleep is repaid by later
-                // batches; if the hardware cannot sustain the request, waiting drops
-                // to zero and mGBA runs flat-out while quality work is shed first.
-                extremeGovernor.onBatchComplete(speed, framesThisSlice)
+                // Exact cumulative wall-clock timing remains separate from rendering.
+                // If a device cannot sustain the selected multiplier, waiting reaches
+                // zero and the core runs flat-out; presentation still stays ordered.
+                turboGovernor.onBatchComplete(speed, framesThisSlice)
             } else {
                 framePacer.waitForNext(
                     sliceCadenceNs,
@@ -471,10 +316,7 @@ internal fun MainActivity.startEmulation() {
 
         performanceHints.close()
         if (hasGameplayFramePresenter()) gameplayFramePresenter.setContinuousVsync(false)
-        audioController.setTurboMuted(false)
         if (hasDisplayPerformanceManager()) displayPerformanceManager.applyGameplayMode(extremeTurbo = false)
-
-        // Never leave a turbo-only mGBA frameskip applied to the next session.
         if (activeCoreFrameSkip != userFrameSkip) {
             runCatching { setCoreConfigOption("frameskip", userFrameSkip.toString()) }
         }
@@ -487,6 +329,7 @@ internal fun MainActivity.startEmulation() {
         }
         start()
     }
+
 }
 
 internal fun MainActivity.stopEmulation() {

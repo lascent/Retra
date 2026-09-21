@@ -22,6 +22,7 @@
 <link href="style-appearance-accent.css" rel="stylesheet"/>
 <link href="style-appearance-light.css" rel="stylesheet"/>
 <link href="style-scroll-performance.css" rel="stylesheet"/>
+<link href="style-gameplay-controller-parity.css" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -445,7 +446,7 @@
 <svg class="chevron" viewbox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
 </button>
 </div>
-<div class="version" id="settingsVersionLabel">Retra v1.0.3</div>
+<div class="version" id="settingsVersionLabel">Retra v1.0.4</div>
 </section>
 <!-- APPEARANCE -->
 <section class="page settings-detail-page" id="appearanceSettingsPage">
@@ -875,6 +876,7 @@
 <div class="detail-row"><div><strong>Enable sound</strong><span>Turn emulator audio on or off</span></div><label class="switch"><input checked="" id="enableSoundToggle" type="checkbox"/><span class="slider"></span></label></div>
 <div class="detail-range-row"><div class="range-copy"><strong>Sound volume</strong><span>Master emulator volume</span></div><div class="range-line"><input id="volumeRange" max="100" min="0" type="range" value="100"/><output id="volumeValue">100%</output></div></div>
 <div class="detail-row"><div><strong>Controller sound</strong><span>Soft low-volume tap sound for on-screen controls and D-pad</span></div><label class="switch"><input checked="" id="controllerSoundToggle" type="checkbox"/><span class="slider"></span></label></div>
+<div class="detail-row"><div><strong>Controller haptics</strong><span>Light smooth vibration feedback for every on-screen control</span></div><label class="switch"><input checked="" id="controllerHapticsToggle" type="checkbox"/><span class="slider"></span></label></div>
 <button class="detail-row tappable frequency-toggle" id="soundFrequencyBtn">
 <div>
 <strong>Sound frequency</strong>
@@ -1046,10 +1048,10 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version" data-retra-version-label>Retra v1.0.3</p>
+<p class="about-version" data-retra-version-label>Retra v1.0.4</p>
 <div class="about-update-list">
   <div class="about-update-row about-version-row">
-    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.3</span></div>
+    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.4</span></div>
   </div>
   <button class="about-update-row about-update-button" data-check-updates type="button">
     <div><strong>Check for updates</strong><span data-update-status>Automatically checked in the background</span></div>
@@ -1070,7 +1072,7 @@
 </div>
 <div class="about-panel privacy-policy-panel">
 <h3>Retra Privacy Policy</h3>
-<p class="about-version">Effective for Retra v1.0.3</p>
+<p class="about-version">Effective for Retra v1.0.4</p>
 <p class="disclaimer"><strong>Local game data.</strong> Retra stores your library metadata, settings, save files, save states, cheats, controller layouts, artwork preferences, and play statistics on your device. Retra does not include ROMs or copyrighted game software.</p>
 <p class="disclaimer"><strong>Network features.</strong> Internet access is used for features such as automatic artwork lookup, optional Google Drive synchronization, Wi-Fi Remote Link, and the lightweight GitHub Releases update check. Update checks contact Retra's official GitHub repository and do not include your ROMs, saves, or library contents. Bluetooth access is used only for Bluetooth Remote Link.</p>
 <p class="disclaimer"><strong>Google Drive.</strong> If you enable automatic Drive backup or explicitly choose Restore from Google Drive, Retra uses the authorization granted by you to synchronize supported saves, save states, library metadata, statistics, and portable settings with your own Drive storage. ROM and BIOS files are not uploaded. Drive backup can be disabled at any time.</p>
@@ -1228,10 +1230,10 @@
 <div class="about-panel">
 <img alt="Retra logo" class="about-logo" src="assets/branding/retra-logo.png"/>
 <h3>Retra</h3>
-<p class="about-version" data-retra-version-label>Retra v1.0.3</p>
+<p class="about-version" data-retra-version-label>Retra v1.0.4</p>
 <div class="about-update-list">
   <div class="about-update-row about-version-row">
-    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.3</span></div>
+    <div><strong>Version</strong><span data-retra-version-detail>Stable 1.0.4</span></div>
   </div>
   <button class="about-update-row about-update-button" data-check-updates type="button">
     <div><strong>Check for updates</strong><span data-update-status>Automatically checked in the background</span></div>
@@ -1532,16 +1534,16 @@
   </div>
   <div class="library-selection-actions">
     <button class="library-selection-action" id="librarySelectionCategories" type="button" aria-label="Set categories">
-      <svg viewBox="0 0 24 24"><path d="M4 6h7l2 2h7v10H4z"></path></svg>
-      <span>Categories</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="4.5" width="6" height="6" rx="1.5"></rect><rect x="13.5" y="4.5" width="6" height="6" rx="1.5"></rect><rect x="4.5" y="13.5" width="6" height="6" rx="1.5"></rect><rect x="13.5" y="13.5" width="6" height="6" rx="1.5"></rect></svg>
+      <span class="sr-only">Categories</span>
     </button>
     <button class="library-selection-action" id="librarySelectionFavorite" type="button" aria-label="Add selected ROMs to favourites">
-      <svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"></path></svg>
-      <span id="librarySelectionFavoriteLabel">Favourite</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"></path></svg>
+      <span class="sr-only" id="librarySelectionFavoriteLabel">Favourite</span>
     </button>
     <button class="library-selection-action" id="librarySelectionMore" type="button" aria-label="More selected ROM actions" aria-expanded="false">
-      <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg>
-      <span>More</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg>
+      <span class="sr-only">More</span>
     </button>
   </div>
   <div class="library-selection-more-menu" id="librarySelectionMoreMenu" aria-hidden="true">

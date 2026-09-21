@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.view.MotionEvent
 import android.view.View
 import android.webkit.JavascriptInterface
 import androidx.activity.result.ActivityResultLauncher
@@ -70,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         internal const val ENABLE_CHEATS_PREF = "enable_cheats_v1"
         internal const val CONFIRM_CLOSE_RESET_PREF = "confirm_close_reset_v1"
         internal const val CONTROLLER_SOUND_PREF = "controller_sound_v1"
+        internal const val CONTROLLER_HAPTICS_PREF = "controller_haptics_v1"
         internal const val FULLSCREEN_PREF = "fullscreen_mode_v1"
         internal const val IMMERSIVE_PREF = "immersive_mode_v1"
         internal const val STRETCH_TO_FIT_PREF = "stretch_to_fit_v1"
@@ -115,44 +115,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    internal data class NativeLibraryItem(
-        val id: String,
-        val title: String,
-        val fileName: String,
-        val size: Long,
-        val lastModified: Long,
-        val system: String,
-        val sourceExtension: String,
-        val launchPath: String?,
-        val patchPath: String?,
-        val contentHash: String,
-        val sourceUri: String?,
-        val legacyIdentityHash: String? = null,
-        val importTransactionId: String? = null,
-        val reusedExisting: Boolean = false,
-        val restoredArchived: Boolean = false
-    )
-
-    internal data class PendingPatchLaunch(
-        val id: String,
-        val title: String,
-        val patchFile: File
-    )
-
-    internal data class PendingLocate(
-        val id: String,
-        val title: String,
-        val fileName: String,
-        val system: String
-    )
 
     internal var videoWidth = 240
     internal var videoHeight = 160
-    internal var framePixels = IntArray(videoWidth * videoHeight)
+    internal val gameplayFrameMailbox = GameplayFrameMailbox()
+    // JNI writes into the producer-owned buffer. Completed frames are published
+    // to the latest-frame mailbox, which recycles stale pending video instead of
+    // queueing it during fast-forward.
+    internal var framePixels = gameplayFrameMailbox.configure(videoWidth, videoHeight)
+    // Legacy buffers remain only for compatibility/fallback paths; the active
+    // single-player presenter no longer copies them on every frame.
     internal var displayPixels = IntArray(videoWidth * videoHeight)
-    // Third framebuffer owned by the UI presenter. Keeping this separate from
-    // the emulation write/publish buffers means Bitmap/GL uploads never hold
-    // frameLock and can never stall the mGBA frame thread.
     internal var presentationPixels = IntArray(videoWidth * videoHeight)
     internal var bitmap: Bitmap? = null
 
@@ -177,22 +150,8 @@ class MainActivity : AppCompatActivity() {
     internal var currentPlatform = PLATFORM_GBA
     internal var preferredOrientationValue = "Auto rotate"
     internal var preferredButtonsOpacity = 1f
-    // Allocation-free D-pad state. Direction bits use the native mGBA key indexes
-    // (1 shl KEY_*), so high-rate ACTION_MOVE events never allocate Sets.
-    internal var activeDpadMask = 0
-    internal var activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
-    internal var lastControllerSoundAtMs = 0L
-    // Logical Android-side key state. It suppresses duplicate JNI / Remote Link
-    // transitions and makes releaseAllKeys proportional to keys actually held.
-    internal var activeGameplayKeyMask = 0
-    // Number of independent on-screen control sources currently holding each key.
-    // This prevents one control (for example A) from releasing a key that is still
-    // held by another source such as AB / LA / RA / Turbo AB.
-    internal val gameplayKeyHoldCounts = IntArray(10)
-    // Incremented whenever gameplay input is force-released (pause/menu/close).
-    // Touch streams captured under an older generation are abandoned locally
-    // and are never allowed to alter the new generation's key holds.
-    internal var controllerInputGeneration = 0L
+    // Shared touch/key bookkeeping lives outside Activity lifecycle state.
+    internal val gameplayInputState = GameplayInputState()
     internal var screenEditorPresentationActive = false
 
     // Controller coordinates are persisted independently for portrait and landscape.
@@ -260,12 +219,21 @@ class MainActivity : AppCompatActivity() {
         RetraPreferences(this)
     }
 
+    internal val controllerFeedback: ControllerFeedbackManager by lazy {
+        ControllerFeedbackManager(
+            context = this,
+            soundEnabled = { prefs.getBoolean(CONTROLLER_SOUND_PREF, true) },
+            hapticsEnabled = { prefs.getBoolean(CONTROLLER_HAPTICS_PREF, true) }
+        )
+    }
+
     internal val audioController: AudioController by lazy {
         AudioController(
             isEnabled = { prefs.getBoolean(ENABLE_SOUND_PREF, true) },
             sampleRate = { prefs.getInt(SOUND_FREQUENCY_PREF, 44100) },
             volume = { prefs.getInt(VOLUME_PREF, 100).coerceIn(0, 100) / 100f },
             readSamples = { buffer -> readAudioSamples(buffer) },
+            readSamplesAtSpeed = { buffer, speed -> readAudioSamplesAtSpeed(buffer, speed) },
             onOutputRateChanged = { rate ->
                 try { setCoreConfigOption("retra.outputSampleRate", rate.toString()) } catch (_: Throwable) {}
             }
@@ -322,11 +290,8 @@ class MainActivity : AppCompatActivity() {
             shaderView = binding.shaderGameScreen,
             onSettingsChanged = { notifyWebSettingsState() },
             latestFrame = {
-                synchronized(frameLock) {
-                    // Capture what is actually on screen. presentationPixels is
-                    // never written by the emulator until the presenter returns
-                    // it to the free-buffer pool on a later VSync.
-                    ShaderController.FrameSnapshot(presentationPixels.copyOf(), videoWidth, videoHeight)
+                gameplayFrameMailbox.copyPresentedOrLatest()?.let { frame ->
+                    ShaderController.FrameSnapshot(frame.pixels, frame.width, frame.height)
                 }
             },
             isGameplayVisible = {
@@ -761,7 +726,8 @@ class MainActivity : AppCompatActivity() {
 
         displayPerformanceManager = DisplayPerformanceManager(this)
         displayPerformanceManager.applyPreferredMode()
-        gameplayFramePresenter = GameplayFramePresenter(binding.gameScreen) {
+        binding.shaderGameScreen.attachFrameMailbox(gameplayFrameMailbox)
+        gameplayFramePresenter = GameplayFramePresenter(binding.shaderGameScreen) {
             presentLatestGameplayFrame()
         }
 

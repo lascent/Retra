@@ -69,7 +69,7 @@ internal fun MainActivity.launchNativeItem(id: String, title: String, fileName: 
             }
         }
 
-        pendingPatchLaunch = MainActivity.PendingPatchLaunch(id, title, patchFile)
+        pendingPatchLaunch = PendingPatchLaunch(id, title, patchFile)
         RetraNotice.makeText(
             this,
             "Select the clean/base ROM for this ${patchFile.extension.uppercase(Locale.US)} patch",
@@ -93,7 +93,7 @@ internal fun MainActivity.launchNativeItem(id: String, title: String, fileName: 
 }
 
 internal fun MainActivity.requestLocate(id: String, title: String, fileName: String, system: String) {
-    pendingLocate = MainActivity.PendingLocate(id, title, fileName, system)
+    pendingLocate = PendingLocate(id, title, fileName, system)
     prefs.edit().putBoolean(fileAvailableKey(id), false).apply()
     romIdentityStore.setFileAvailable(id, false)
     RetraNotice.makeText(this, "ROM file unavailable • locate $fileName to reconnect your existing data", RetraNotice.LENGTH_LONG).show()
@@ -179,7 +179,7 @@ internal fun MainActivity.importUri(
     uri: Uri,
     forcedId: String? = null,
     forcedTitle: String? = null
-): MainActivity.NativeLibraryItem {
+): NativeLibraryItem {
     val fileInfo = fileOps.queryFileInfo(uri)
     val displayName = fileInfo.first ?: "game.gba"
     val reportedSize = fileInfo.second
@@ -331,7 +331,7 @@ internal fun MainActivity.importUri(
         val sourceUri = uri.toString()
         fileOps.tryPersistReadPermission(uri)
 
-        return MainActivity.NativeLibraryItem(
+        return NativeLibraryItem(
             id = resolvedId,
             title = title,
             fileName = displayName,
@@ -495,7 +495,7 @@ internal fun MainActivity.inferSystemFromExtension(extension: String): String {
     }
 }
 
-internal fun MainActivity.persistNativeItem(item: MainActivity.NativeLibraryItem) {
+internal fun MainActivity.persistNativeItem(item: NativeLibraryItem) {
     val editor = prefs.edit()
         .putString(titleKey(item.id), item.title)
         .putString(fileNameKey(item.id), item.fileName)
@@ -555,7 +555,7 @@ internal fun MainActivity.persistNativeItem(item: MainActivity.NativeLibraryItem
     }
 }
 
-internal fun MainActivity.notifyWebImported(item: MainActivity.NativeLibraryItem, replaceExisting: Boolean = false) {
+internal fun MainActivity.notifyWebImported(item: NativeLibraryItem, replaceExisting: Boolean = false) {
     val json = JSONObject().apply {
         put("id", item.id)
         put("title", item.title)

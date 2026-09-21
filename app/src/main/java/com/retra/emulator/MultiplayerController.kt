@@ -568,7 +568,7 @@ internal fun MainActivity.establishRemoteLink(
 internal fun MainActivity.setGameplayKeyHeld(key: Int, pressed: Boolean) {
     if (key !in 0..9) return
 
-    val previousCount = gameplayKeyHoldCounts[key]
+    val previousCount = gameplayInputState.keyHoldCounts[key]
     val nextCount = if (pressed) {
         (previousCount + 1).coerceAtMost(32)
     } else {
@@ -576,7 +576,7 @@ internal fun MainActivity.setGameplayKeyHeld(key: Int, pressed: Boolean) {
     }
     if (previousCount == nextCount) return
 
-    gameplayKeyHoldCounts[key] = nextCount
+    gameplayInputState.keyHoldCounts[key] = nextCount
     // Only cross JNI / Remote Link on the effective 0 <-> 1 transition.
     if (previousCount == 0 || nextCount == 0) {
         setGameplayKey(key, nextCount > 0)
@@ -587,13 +587,13 @@ internal fun MainActivity.setGameplayKey(key: Int, pressed: Boolean) {
     if (key !in 0..9) return
 
     val bit = 1 shl key
-    val wasPressed = activeGameplayKeyMask and bit != 0
+    val wasPressed = gameplayInputState.activeGameplayKeyMask and bit != 0
     if (wasPressed == pressed) return
 
-    activeGameplayKeyMask = if (pressed) {
-        activeGameplayKeyMask or bit
+    gameplayInputState.activeGameplayKeyMask = if (pressed) {
+        gameplayInputState.activeGameplayKeyMask or bit
     } else {
-        activeGameplayKeyMask and bit.inv()
+        gameplayInputState.activeGameplayKeyMask and bit.inv()
     }
 
     if (remoteTransport.handleGameplayKey(key, pressed)) return
@@ -713,44 +713,38 @@ internal fun MainActivity.showLocalLinkStateRestriction() {
 internal fun MainActivity.configureVideoSurfaceFromNative() {
     videoWidth = getVideoWidth().coerceAtLeast(1)
     videoHeight = getVideoHeight().coerceAtLeast(1)
-    framePixels = IntArray(videoWidth * videoHeight)
+    framePixels = gameplayFrameMailbox.configure(videoWidth, videoHeight)
+    // Keep legacy buffers/Bitmap available only for the rare ImageView fallback.
     displayPixels = IntArray(videoWidth * videoHeight)
     presentationPixels = IntArray(videoWidth * videoHeight)
     bitmap?.recycle()
     bitmap = Bitmap.createBitmap(videoWidth, videoHeight, Bitmap.Config.ARGB_8888).apply {
-        // Treat the emulator framebuffer as raw pixels. Device density must not
-        // introduce an extra implicit scaling step before ImageView/GL scaling.
         density = Bitmap.DENSITY_NONE
     }
     binding.gameScreen.setImageBitmap(bitmap)
+    binding.shaderGameScreen.attachFrameMailbox(gameplayFrameMailbox)
 }
 
 /** Called by GameplayFramePresenter on Android's display VSync. */
 internal fun MainActivity.presentLatestGameplayFrame() {
-    // Claim the newest completed frame with a pointer swap only. The previous
-    // presentation buffer becomes the producer's next free publish buffer.
-    // Crucially, expensive Bitmap.setPixels()/GL upload work happens after the
-    // lock is released, so a slow UI frame cannot block mGBA from advancing.
-    val pixelsToPresent = synchronized(frameLock) {
-        val newest = displayPixels
-        displayPixels = presentationPixels
-        presentationPixels = newest
-        presentationPixels
-    }
+    // Choreographer only schedules the GL draw. The GL thread consumes the
+    // newest pending mailbox frame, so the UI thread never copies hot video.
+    if (shaderController.requestPresentLatest()) return
 
-    if (shaderController.presentIfActive(pixelsToPresent, videoWidth, videoHeight)) return
-
+    // OEM compatibility fallback if the GLSurfaceView could not be created.
+    val frame = gameplayFrameMailbox.acquireLatestForRender() ?: return
     val targetBitmap = bitmap ?: return
     if (targetBitmap.isRecycled) return
     targetBitmap.setPixels(
-        pixelsToPresent,
+        frame.pixels,
         0,
-        videoWidth,
+        frame.width,
         0,
         0,
-        videoWidth,
-        videoHeight
+        frame.width,
+        frame.height
     )
+    presentationPixels = frame.pixels.copyOf()
     binding.gameScreen.invalidate()
 }
 

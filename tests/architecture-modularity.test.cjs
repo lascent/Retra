@@ -10,9 +10,9 @@ const exists = rel => fs.existsSync(path.join(root, rel));
 const main = read('app/src/main/java/com/retra/emulator/MainActivity.kt');
 const html = read('app/src/main/assets/retra/index.html');
 
-test('MainActivity is below 3k lines and delegates major responsibilities', () => {
+test('MainActivity remains a bounded composition root and delegates major responsibilities', () => {
   const lines = main.split(/\r?\n/).length;
-  assert.ok(lines < 3000, `MainActivity is ${lines} lines; expected < 3000`);
+  assert.ok(lines < 1500, `MainActivity is ${lines} lines; expected < 1500`);
   for (const component of [
     'RetraFileOps',
     'GameplayLayoutRepository',
@@ -29,10 +29,13 @@ test('MainActivity is below 3k lines and delegates major responsibilities', () =
     'GoogleDriveApiRepository',
     'CloudSyncCoordinator',
     'EmulationSpeedPolicy',
+    'ControllerFeedbackManager',
+    'GameplayInputState',
   ]) {
     assert.ok(exists(`app/src/main/java/com/retra/emulator/${component}.kt`), `${component}.kt missing`);
     assert.match(main, new RegExp(component));
   }
+  assert.ok(exists('app/src/main/java/com/retra/emulator/RetraModels.kt'), 'RetraModels.kt missing');
 });
 
 test('activity-scale subsystems are split into focused controller modules', () => {
@@ -59,6 +62,9 @@ test('activity-scale subsystems are split into focused controller modules', () =
   assert.doesNotMatch(main, /fun importUri\(/);
   assert.doesNotMatch(main, /fun startEmulation\(/);
   assert.doesNotMatch(main, /fun migrateLegacyRomIdentityIfNeeded\(/);
+  assert.doesNotMatch(main, /internal data class NativeLibraryItem/);
+  assert.doesNotMatch(main, /internal data class PendingPatchLaunch/);
+  assert.doesNotMatch(main, /internal data class PendingLocate/);
 });
 
 test('Web UI JavaScript is feature-split and loaded in deterministic order', () => {

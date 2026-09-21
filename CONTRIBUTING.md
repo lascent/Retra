@@ -46,3 +46,9 @@ Retra public releases use Semantic Versioning:
 - `2.0.0` — major changes that intentionally break compatibility or substantially redefine public behavior.
 
 Do not reintroduce legacy internal build identifiers as public release versions. Pre-v1.0 milestones are maintained in `docs/DEVELOPMENT_HISTORY.md`.
+
+## Architecture boundaries
+
+Before adding behavior to `MainActivity`, check whether it belongs in an existing controller/repository or a new focused component. Keep `MainActivity` as lifecycle/composition glue, keep controller feedback out of pointer-input code, and keep shared domain models outside Activity nested classes.
+
+Run `python3 tools/release_gate.py` before submitting changes; the architecture regression tests enforce these boundaries. See `docs/ARCHITECTURE.md`.

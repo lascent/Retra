@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
+import android.os.Build
+import android.view.Surface
 import android.util.AttributeSet
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -14,8 +16,12 @@ import javax.microedition.khronos.opengles.GL10
 import kotlin.math.min
 
 /**
- * On-demand OpenGL ES 2.0 game-screen renderer used only when a shader is selected.
- * RENDERMODE_WHEN_DIRTY means idle/low-end devices do no continuous GPU work.
+ * On-demand OpenGL ES 2.0 gameplay renderer.
+ *
+ * The GL thread is the only consumer of GameplayFrameMailbox. Normal gameplay and
+ * shader gameplay therefore share the same producer/consumer presentation path;
+ * the Android UI thread only schedules VSync-sized draws and never copies pixels.
+ * RENDERMODE_WHEN_DIRTY keeps idle/background GPU work at zero.
  */
 class ShaderGameView @JvmOverloads constructor(
     context: Context,
@@ -30,8 +36,40 @@ class ShaderGameView @JvmOverloads constructor(
         preserveEGLContextOnPause = true
     }
 
+    internal fun attachFrameMailbox(mailbox: GameplayFrameMailbox) {
+        rendererImpl.attachFrameMailbox(mailbox)
+    }
+
+    /** Schedule one GL draw; the render thread will consume only the newest frame. */
+    fun requestLatestFrame() {
+        requestRender()
+    }
+
+    /**
+     * Give Android a stable surface cadence hint without switching display modes when
+     * Speed Mode changes. The hint is advisory; older Android versions simply ignore it.
+     */
+    fun setPresentationFrameRate(frameRateHz: Float) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        val rate = frameRateHz.coerceIn(30f, 120f)
+        post {
+            runCatching {
+                holder.surface?.takeIf { it.isValid }?.setFrameRate(
+                    rate,
+                    Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
+                )
+            }
+        }
+    }
+
+    /** Legacy/snapshot path used outside the hot emulator producer path. */
     fun submitFrame(pixels: IntArray, width: Int, height: Int) {
         rendererImpl.submitFrame(pixels, width, height)
+        requestRender()
+    }
+
+    fun usePassthrough(onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+        rendererImpl.stagePassthrough { ok, detail -> post { onResult(ok, detail) } }
         requestRender()
     }
 
@@ -58,6 +96,9 @@ class ShaderGameView @JvmOverloads constructor(
     }
 
     private class GameRenderer : GLSurfaceView.Renderer {
+        @Volatile
+        private var frameMailbox: GameplayFrameMailbox? = null
+        private val reusableMailboxFrame = GameplayFrameMailbox.RenderFrame()
         private val frameLock = Any()
         private var pendingPixels = IntArray(0)
         private var frameWidth = 0
@@ -98,6 +139,10 @@ class ShaderGameView @JvmOverloads constructor(
         private val vertexBuffer: FloatBuffer = ByteBuffer.allocateDirect(vertexData.size * 4)
             .order(ByteOrder.nativeOrder())
             .asFloatBuffer()
+
+        internal fun attachFrameMailbox(mailbox: GameplayFrameMailbox) {
+            frameMailbox = mailbox
+        }
 
         fun submitFrame(pixels: IntArray, width: Int, height: Int) {
             if (width <= 0 || height <= 0) return
@@ -232,6 +277,10 @@ class ShaderGameView @JvmOverloads constructor(
             GLES20.glDisableVertexAttribArray(tex)
         }
 
+        fun stagePassthrough(onResult: (Boolean, String?) -> Unit) {
+            stageFragmentShader(PASSTHROUGH_FRAGMENT, onResult)
+        }
+
         fun stageFragmentShader(source: String, onResult: (Boolean, String?) -> Unit) {
             synchronized(shaderRequestLock) {
                 // Only the most recent selection matters. Settings closes the
@@ -358,17 +407,53 @@ class ShaderGameView @JvmOverloads constructor(
         }
 
         private fun uploadLatestFrameIfNeeded() {
+            // Hot path: the GL thread acquires the newest completed frame directly
+            // from the four-buffer mailbox. No UI-thread System.arraycopy and no
+            // backlog of stale turbo frames can form.
+            val mailbox = frameMailbox
+            if (mailbox != null && mailbox.acquireLatestForRender(reusableMailboxFrame)) {
+                uploadPixels(
+                    reusableMailboxFrame.pixels,
+                    reusableMailboxFrame.width,
+                    reusableMailboxFrame.height
+                )
+                return
+            }
+
+            // Compatibility path for one-off snapshots submitted outside the normal
+            // emulator producer/consumer flow (for example after a shader change).
             val bitmap = synchronized(frameLock) {
                 if (!frameDirty || frameWidth <= 0 || frameHeight <= 0) return
-                val reusable = frameBitmap?.takeIf { it.width == frameWidth && it.height == frameHeight && !it.isRecycled }
-                    ?: Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888).also {
-                        frameBitmap?.recycle()
-                        frameBitmap = it
-                    }
+                val reusable = frameBitmap?.takeIf {
+                    it.width == frameWidth && it.height == frameHeight && !it.isRecycled
+                } ?: Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888).also {
+                    frameBitmap?.recycle()
+                    frameBitmap = it
+                }
                 reusable.setPixels(pendingPixels, 0, frameWidth, 0, 0, frameWidth, frameHeight)
                 frameDirty = false
                 reusable
             }
+            uploadBitmap(bitmap)
+        }
+
+        private fun uploadPixels(pixels: IntArray, width: Int, height: Int) {
+            if (width <= 0 || height <= 0 || pixels.size < width * height) return
+            val reusable = frameBitmap?.takeIf {
+                it.width == width && it.height == height && !it.isRecycled
+            } ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+                frameBitmap?.recycle()
+                frameBitmap = it
+            }
+            // This conversion now happens on GLSurfaceView's dedicated render thread,
+            // never on Android's UI/Choreographer thread.
+            reusable.setPixels(pixels, 0, width, 0, 0, width, height)
+            frameWidth = width
+            frameHeight = height
+            uploadBitmap(reusable)
+        }
+
+        private fun uploadBitmap(bitmap: Bitmap) {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
             if (textureWidth != bitmap.width || textureHeight != bitmap.height) {
                 GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)

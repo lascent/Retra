@@ -73,7 +73,7 @@ test('gameplay presentation is VSync-driven without changing native emulator tim
   assert.match(gameplayPresenter, /Choreographer\.FrameCallback/);
   assert.match(gameplayPresenter, /requestPresent\(\)/);
   assert.match(gameplayPresenter, /postFrameCallback\(this\)/);
-  assert.match(session, /gameplayFramePresenter\.requestPresent\(\)/);
+  assert.match(session, /gameplayFramePresenter\.requestPresent\(framePublishResult\.generation\)/);
   assert.match(activity, /FRAME_TIME_NS = 16_742_706L/);
   assert.doesNotMatch(activity, /renderPending/);
 });
@@ -85,7 +85,7 @@ test('mGBA exclusively owns frame-skip so presentation does not double-skip fram
   assert.doesNotMatch(activity, /renderFrameCounter/);
   assert.doesNotMatch(session, /activeFrameSkip/);
   assert.doesNotMatch(session, /renderFrameCounter/);
-  assert.match(session, /runTurboSlice\([\s\S]*discardAudio = turboAudioMuted[\s\S]*\)/);
+  assert.match(session, /runTurboSlice\([\s\S]*discardAudio = false[\s\S]*\)/);
 });
 
 test('adaptive display policy protects low-end, battery-saver and thermal-constrained devices', () => {

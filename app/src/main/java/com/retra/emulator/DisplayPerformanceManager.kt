@@ -22,7 +22,7 @@ import kotlin.math.abs
 class DisplayPerformanceManager(
     private val activity: Activity,
     private val maxUiRefreshRateHz: Float = 120f,
-    private val maxTurboRefreshRateHz: Float = 165f
+    private val maxTurboRefreshRateHz: Float = 120f
 ) {
     private var originalModeId: Int? = null
     private var originalRefreshRate: Float? = null
@@ -41,12 +41,11 @@ class DisplayPerformanceManager(
 
     fun applyGameplayMode(extremeTurbo: Boolean) {
         gameplayModeRequested = true
-        extremeTurboModeRequested = extremeTurbo
-        applyAdaptiveMode(
-            if (extremeTurbo) "extreme-turbo" else "gameplay",
-            gameplay = true,
-            extremeTurbo = extremeTurbo
-        )
+        // Fast-forward no longer changes the physical display mode. A stable
+        // 60/120 Hz surface cadence is smoother than switching to 144/165 Hz
+        // when the user presses the Speed button.
+        extremeTurboModeRequested = false
+        applyAdaptiveMode("gameplay", gameplay = true, extremeTurbo = false)
     }
 
     fun reapplyAfterConfigurationChange() {
@@ -69,14 +68,9 @@ class DisplayPerformanceManager(
 
     fun preferredGameplayRefreshRateHz(extremeTurbo: Boolean): Float {
         val display = activity.window.decorView.display ?: return 60f
-        val capHz = adaptiveRefreshCapHz(gameplay = true, extremeTurbo = extremeTurbo)
-        val selected = if (extremeTurbo) {
-            selectBestExtremeTurboMode(display.supportedModes, display.mode, capHz)
-        } else {
-            selectBestGameplayMode(display.supportedModes, display.mode, capHz)
-        }
-        val ceiling = if (extremeTurbo) maxTurboRefreshRateHz else maxUiRefreshRateHz
-        return selected?.refreshRate?.coerceIn(60f, ceiling) ?: 60f
+        val capHz = adaptiveRefreshCapHz(gameplay = true, extremeTurbo = false)
+        val selected = selectBestGameplayMode(display.supportedModes, display.mode, capHz)
+        return selected?.refreshRate?.coerceIn(60f, minOf(maxUiRefreshRateHz, 120f)) ?: 60f
     }
 
     fun restoreSystemDefault() {
@@ -227,18 +221,11 @@ class DisplayPerformanceManager(
         modes: Array<Display.Mode>,
         currentMode: Display.Mode,
         capHz: Float = maxTurboRefreshRateHz
-    ): Display.Mode? {
-        if (modes.isEmpty()) return null
-        val sameResolution = modes.filter {
-            it.physicalWidth == currentMode.physicalWidth &&
-                it.physicalHeight == currentMode.physicalHeight
-        }
-        val candidates = if (sameResolution.isNotEmpty()) sameResolution else modes.toList()
-        val effectiveCap = minOf(capHz, maxTurboRefreshRateHz)
-        val capped = candidates.filter { it.refreshRate <= effectiveCap + RATE_TOLERANCE_HZ }
-        return (if (capped.isNotEmpty()) capped else candidates)
-            .maxByOrNull { it.refreshRate }
-    }
+    ): Display.Mode? = selectBestGameplayMode(
+        modes = modes,
+        currentMode = currentMode,
+        capHz = minOf(capHz, 120f)
+    )
 
     internal fun selectBestMode(
         modes: Array<Display.Mode>,

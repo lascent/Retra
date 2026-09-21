@@ -191,6 +191,7 @@ function createRomCard(rom){
     article.appendChild(placeholder);
   }
   article.append(badge, info);
+  bindRomCardSelectionTap(article, rom);
   bindRomCardLongPress(article, rom);
   article.addEventListener('click', event => {
     if (shouldSuppressLibraryCardClick(rom.id)) {

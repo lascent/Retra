@@ -140,13 +140,13 @@ function makeAddControlItemInnerMarkup(type){
     case 'menu':
       return `<span class="add-control-icon square"><svg class="control-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.75 7.5h12.5M5.75 12h12.5M5.75 16.5h12.5"></path></svg></span><span class="add-control-label">${label}</span>`;
     case 'shoulderLeft':
-      return `<span class="add-control-icon circle">L</span><span class="add-control-label">${label}</span>`;
+      return `<span class="add-control-icon native-shoulder-preview">L</span><span class="add-control-label">${label}</span>`;
     case 'shoulderRight':
-      return `<span class="add-control-icon circle">R</span><span class="add-control-label">${label}</span>`;
+      return `<span class="add-control-icon native-shoulder-preview">R</span><span class="add-control-label">${label}</span>`;
     case 'dpad':
-      return `<span class="add-control-icon square"><svg class="control-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"></path></svg></span><span class="add-control-label">${label}</span>`;
+      return `<span class="add-control-icon native-dpad-preview" aria-hidden="true"><i class="up"></i><i class="left"></i><i class="right"></i><i class="down"></i></span><span class="add-control-label">${label}</span>`;
     case 'startSelect':
-      return `<span class="add-control-icon circle">SS</span><span class="add-control-label">${label}</span>`;
+      return `<span class="add-control-icon native-start-select-preview" aria-hidden="true"><i></i><i></i></span><span class="add-control-label">${label}</span>`;
     case 'ab':
       return `<span class="add-control-icon duo"><span>B</span><span>A</span></span><span class="add-control-label">${label}</span>`;
     case 'buttonA':

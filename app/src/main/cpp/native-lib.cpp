@@ -632,6 +632,10 @@ struct RetraRewindSnapshot {
     std::vector<uint8_t> state;
 };
 static std::deque<RetraRewindSnapshot> rewindSnapshots;
+// Recycle a few raw state buffers once the rewind window starts rolling. This
+// avoids a large malloc/free pair every 500 ms during gameplay, which can show
+// up as a periodic frame-time spike on memory-constrained Android devices.
+static std::deque<std::vector<uint8_t>> rewindSpareBuffers;
 static size_t rewindBytes = 0;
 static int64_t rewindActiveTimelineMs = 0;
 static int64_t lastRewindCaptureTimelineMs = -1;
@@ -640,9 +644,28 @@ static constexpr int64_t RETRA_REWIND_CAPTURE_INTERVAL_MS = 500;
 static constexpr int64_t RETRA_REWIND_MAX_AGE_MS = 16'500;
 static constexpr int64_t RETRA_REWIND_MAX_FRAME_GAP_MS = 100;
 static constexpr size_t RETRA_REWIND_MAX_BYTES = 32u * 1024u * 1024u;
+static constexpr size_t RETRA_REWIND_MAX_SPARE_BUFFERS = 3u;
+
+static void recycleRewindBufferLocked(std::vector<uint8_t>&& buffer) {
+    if (buffer.empty() || rewindSpareBuffers.size() >= RETRA_REWIND_MAX_SPARE_BUFFERS) return;
+    rewindSpareBuffers.emplace_back(std::move(buffer));
+}
+
+static std::vector<uint8_t> acquireRewindBufferLocked(size_t stateSize) {
+    for (auto it = rewindSpareBuffers.begin(); it != rewindSpareBuffers.end(); ++it) {
+        if (it->capacity() >= stateSize) {
+            std::vector<uint8_t> buffer = std::move(*it);
+            rewindSpareBuffers.erase(it);
+            buffer.resize(stateSize);
+            return buffer;
+        }
+    }
+    return std::vector<uint8_t>(stateSize);
+}
 
 static void clearRewindLocked() {
     rewindSnapshots.clear();
+    rewindSpareBuffers.clear();
     rewindBytes = 0;
     rewindActiveTimelineMs = 0;
     lastRewindCaptureTimelineMs = -1;
@@ -669,22 +692,31 @@ static void captureRewindSnapshotLocked() {
         return;
     }
 
+    // Prune old snapshots before allocating the next one so their backing
+    // storage can be reused immediately by this capture.
+    while (!rewindSnapshots.empty() &&
+           rewindActiveTimelineMs - rewindSnapshots.front().activeTimelineMs > RETRA_REWIND_MAX_AGE_MS) {
+        rewindBytes -= rewindSnapshots.front().state.size();
+        auto buffer = std::move(rewindSnapshots.front().state);
+        rewindSnapshots.pop_front();
+        recycleRewindBufferLocked(std::move(buffer));
+    }
+
     const size_t stateSize = core->stateSize(core);
     if (stateSize == 0 || stateSize > RETRA_REWIND_MAX_BYTES) return;
 
-    std::vector<uint8_t> bytes(stateSize);
+    std::vector<uint8_t> bytes = acquireRewindBufferLocked(stateSize);
     core->saveState(core, bytes.data());
 
     rewindBytes += bytes.size();
     rewindSnapshots.push_back({rewindActiveTimelineMs, std::move(bytes)});
     lastRewindCaptureTimelineMs = rewindActiveTimelineMs;
 
-    while (!rewindSnapshots.empty()) {
-        const bool tooOld = rewindActiveTimelineMs - rewindSnapshots.front().activeTimelineMs > RETRA_REWIND_MAX_AGE_MS;
-        const bool tooLarge = rewindBytes > RETRA_REWIND_MAX_BYTES;
-        if (!tooOld && !tooLarge) break;
+    while (!rewindSnapshots.empty() && rewindBytes > RETRA_REWIND_MAX_BYTES) {
         rewindBytes -= rewindSnapshots.front().state.size();
+        auto buffer = std::move(rewindSnapshots.front().state);
         rewindSnapshots.pop_front();
+        recycleRewindBufferLocked(std::move(buffer));
     }
 }
 

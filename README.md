@@ -37,6 +37,16 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 - BIOS support, ROM patches, cheats, statistics, and per-ROM configuration.
 - Optional GLSL shaders and gameplay Color Style presets.
 
+#### v1.0.4 SmoothTurbo hardening
+
+- Four-buffer latest-frame mailbox with dedicated producer, pending, rendering, and spare roles.
+- Allocation-free producer and GL-consumer result holders during normal gameplay.
+- Stale turbo frames are dropped instead of queued, so high-speed emulation does not create a visual catch-up backlog.
+- Fractional `TurboSlicePlanner` scheduling keeps 2×/4×/8×/16× timing smooth against the GBA's ~59.73 Hz base cadence.
+- Hitch-safe cumulative turbo timing re-anchors after substantial Android/GC stalls instead of paying the delay back as a burst.
+- Native speed-aware FIR audio keeps high-speed PCM work out of the Kotlin/JNI hot path, with deterministic reset when the speed multiplier changes.
+- VSync scheduling reuses callback Runnables, coalesces real mailbox generations, and resets generation state for each new gameplay session.
+
 ### Saves & persistent data
 
 - Battery saves, save states, and automatic resume.
@@ -52,7 +62,7 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 - Draggable and resizable on-screen controls.
 - Emulator-screen resizing and edge-aware layout editing.
 - Controller opacity controls.
-- Optional controller tap sound under **Sound**.
+- Optional light controller tap sound and smooth haptics under **Sound**.
 - Automatic artwork with persistent manual cover and background overrides.
 - Lightweight gameplay color presets: **Classic**, **Vivid**, **Warm**, and **Muted**.
 
@@ -77,11 +87,11 @@ The latest stable APK and release notes are available from:
 
 ### **[GitHub Releases →](https://github.com/lascent/Retra/releases)**
 
-Current stable release: **Retra v1.0.3**
+Current stable release: **Retra v1.0.4**
 
 | Item | Current status |
 |---|---|
-| Version | `v1.0.3` |
+| Version | `v1.0.4` |
 | Release channel | Stable |
 | Minimum Android | API 26 / Android 8.0+ |
 | License | Mozilla Public License 2.0 |
@@ -96,6 +106,7 @@ Current stable release: **Retra v1.0.3**
 | **v1.0.1** | Added Create Backup and Restore Backup |
 | **v1.0.2** | Added in-app update checking and Android reinstall-recovery hardening |
 | **v1.0.3** | Added persistent ROM title editing plus controller, rewind, save-import, and Google Drive restore polish |
+| **v1.0.4** | SmoothTurbo hardening: four-buffer latest-frame handoff, allocation-free gameplay hot paths, safer VSync/session recovery, and cleaner turbo audio transitions |
 
 Public release numbering follows Semantic Versioning. Earlier project work is organized in [`docs/DEVELOPMENT_HISTORY.md`](docs/DEVELOPMENT_HISTORY.md).
 
@@ -111,7 +122,7 @@ Retra includes lightweight gameplay color presets that affect only the rendered 
 
 ## Multiplayer scope
 
-Retra v1.0.3 supports normal GBA Link Cable-style multiplayer and two-player Local Single-Pak/Multiboot through:
+Retra v1.0.4 supports normal GBA Link Cable-style multiplayer and two-player Local Single-Pak/Multiboot through:
 
 - **Local Link** on one Android device.
 - **Single-Pak / Multiboot** on one Android device using a user-provided 16 KiB GBA BIOS for the cartridge-less receiver.
@@ -174,12 +185,12 @@ CMake also accepts the legacy sibling `../mgba/` location or an explicit `RETRA_
 ### Android release metadata
 
 ```text
-versionName = 1.0.3
-versionCode = 450
+versionName = 1.0.4
+versionCode = 451
 minSdk      = 26
 ```
 
-`versionCode 450` upgrades cleanly over v1.0.2 (`449`), v1.0.1 (`448`), and v1.0.0 (`447`).
+`versionCode 451` upgrades cleanly over v1.0.3 (`450`), v1.0.2 (`449`), v1.0.1 (`448`), and v1.0.0 (`447`).
 
 ### Open and build
 
@@ -227,7 +238,7 @@ Retra/
 └─ LICENSE                      MPL-2.0
 ```
 
-See [`docs/README.md`](docs/README.md) for the documentation index.
+See [`docs/README.md`](docs/README.md) for the documentation index and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the current architecture.
 
 ## Validation
 
@@ -253,6 +264,8 @@ Before publishing an APK/AAB, complete the physical-device checks in:
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution requirements.
 - [`SECURITY.md`](SECURITY.md) — vulnerability reporting and security boundaries.
 - [`docs/DEVELOPMENT_HISTORY.md`](docs/DEVELOPMENT_HISTORY.md) — organized pre-v1.0 development history.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current Android/runtime architecture and module boundaries.
+- [`docs/CONTROLLER_FEEDBACK.md`](docs/CONTROLLER_FEEDBACK.md) — controller sound/haptic behavior and design constraints.
 - [`docs/PERSISTENT_STORAGE_ARCHITECTURE.md`](docs/PERSISTENT_STORAGE_ARCHITECTURE.md) — persistent storage design.
 
 ## License

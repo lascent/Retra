@@ -1,0 +1,449 @@
+/* Retra v1.0.3 — Screen Editor / gameplay controller visual parity.
+   Keep this file loaded last. The editor canvas uses the same base dimensions,
+   face geometry, alpha, corner radii and glyph artwork as activity_main.xml and
+   the bg_controller_* / ic_controller_* Android drawables.
+
+   Editor-only selection/resize chrome is intentionally not duplicated in the
+   gameplay overlay; it remains outside these controller faces. */
+
+/* --------------------------------------------------------------------------
+   Native drawable constants
+   -------------------------------------------------------------------------- */
+#screenSizePage {
+  --native-controller-solid: rgba(17, 23, 29, .361);   /* #5C11171D */
+  --native-controller-pill-solid: rgba(17, 23, 29, .322); /* #5211171D */
+  --native-controller-pressed: rgba(69, 82, 90, .459); /* #7545525A */
+  --native-controller-pill-pressed: rgba(69, 82, 90, .439); /* #7045525A */
+  --native-controller-circle-border: rgba(255,255,255,.839); /* #D6FFFFFF */
+  --native-controller-square-border: rgba(255,255,255,.800); /* #CCFFFFFF */
+  --native-controller-round-border: rgba(255,255,255,.784); /* #C8FFFFFF */
+  --native-controller-pill-border: rgba(255,255,255,.749); /* #BFFFFFFF */
+  --native-controller-glyph: #fff;
+  --native-controller-icon: #f7f9fc;
+}
+
+/* Remove visual decoration that doesn't exist on the native gameplay views. */
+#screenSizePage .preview-shoulder,
+#screenSizePage .preview-dpad .dpad,
+#screenSizePage .preview-start-select span,
+#screenSizePage .preview-ab span,
+#screenSizePage .preview-toolbar .toolbar-icon,
+#screenSizePage .extra-control-face,
+#screenSizePage .extra-control-face > span {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+}
+
+/* L/R — activity_main.xml: 72 x 30dp, bg_controller_pill. */
+#screenSizePage .preview-shoulder {
+  width: 72px !important;
+  height: 30px !important;
+  border: 1.4px solid var(--native-controller-pill-border) !important;
+  background: var(--native-controller-pill-solid) !important;
+  box-shadow: none !important;
+  color: var(--native-controller-glyph) !important;
+  font: 700 17px/1 sans-serif !important;
+  letter-spacing: 0 !important;
+}
+#screenSizePage .preview-shoulder.left {
+  border-radius: 12px 28px 16px 12px !important;
+}
+#screenSizePage .preview-shoulder.right {
+  border-radius: 28px 12px 12px 16px !important;
+}
+#screenSizePage .preview-shoulder:active {
+  background: var(--native-controller-pill-pressed) !important;
+  border-color: rgba(255,255,255,.973) !important; /* #F8FFFFFF */
+}
+
+/* Menu wrapper is 44dp; the native ImageButton face inside is 42dp. */
+#screenSizePage .preview-toolbar.top.landscape-only {
+  width: 44px !important;
+  height: 44px !important;
+  display: grid !important;
+  place-items: center !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#screenSizePage .preview-toolbar.top.landscape-only .toolbar-icon,
+#screenSizePage .preview-toolbar.top.landscape-only .myboy-menu-button {
+  position: relative !important;
+  width: 42px !important;
+  height: 42px !important;
+  border: 1.5px solid var(--native-controller-round-border) !important;
+  border-radius: 14px !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+  color: var(--native-controller-icon) !important;
+}
+#screenSizePage .preview-toolbar.top.landscape-only .toolbar-icon::before,
+#screenSizePage .preview-toolbar.top.landscape-only .myboy-menu-button::before {
+  content: none !important;
+}
+#screenSizePage .preview-toolbar.top.landscape-only .toolbar-icon:active {
+  background: rgba(65,79,88,.439) !important; /* #70414F58 */
+  border-color: #fff !important;
+}
+#screenSizePage .myboy-menu-icon {
+  width: 24px !important;
+  height: 24px !important;
+  fill: none !important;
+  stroke: var(--native-controller-icon) !important;
+  stroke-width: 2.45 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  filter: none !important;
+}
+
+/* D-pad — four native 44dp rounded-square ImageButtons in a 150dp container. */
+#screenSizePage .preview-dpad {
+  width: 150px !important;
+  height: 150px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#screenSizePage .preview-dpad::before,
+#screenSizePage .preview-dpad::after {
+  content: none !important;
+}
+#screenSizePage .preview-dpad .dpad {
+  width: 44px !important;
+  height: 44px !important;
+  border: 1.5px solid var(--native-controller-square-border) !important;
+  border-radius: 13px !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+}
+#screenSizePage .preview-dpad .dpad:active {
+  background: var(--native-controller-pressed) !important;
+  border-color: #fff !important;
+}
+#screenSizePage .preview-dpad .up { left: 53px !important; top: 0 !important; right: auto !important; bottom: auto !important; }
+#screenSizePage .preview-dpad .left { left: 0 !important; top: 53px !important; right: auto !important; bottom: auto !important; }
+#screenSizePage .preview-dpad .right { left: 106px !important; top: 53px !important; right: auto !important; bottom: auto !important; }
+#screenSizePage .preview-dpad .down { left: 53px !important; top: 106px !important; right: auto !important; bottom: auto !important; }
+
+/* Exact ic_controller_dpad_up.xml artwork: M1,11.5 L8,4.5 L15,11.5,
+   3dp white stroke, square caps, miter joins. */
+#screenSizePage .preview-dpad .dpad::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 16px !important;
+  height: 16px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 16px 16px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 11.5 L8 4.5 L15 11.5' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E") !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform-origin: center center !important;
+}
+#screenSizePage .preview-dpad .up::before { transform: translate(-50%,-50%) rotate(0deg) !important; }
+#screenSizePage .preview-dpad .right::before { transform: translate(-50%,-50%) rotate(90deg) !important; }
+#screenSizePage .preview-dpad .down::before { transform: translate(-50%,-50%) rotate(180deg) !important; }
+#screenSizePage .preview-dpad .left::before { transform: translate(-50%,-50%) rotate(-90deg) !important; }
+
+/* Start / Select — same two blank 50 x 24dp native pill buttons. */
+#screenSizePage .preview-start-select {
+  width: 116px !important;
+  height: 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#screenSizePage .preview-start-select span {
+  position: relative !important;
+  width: 50px !important;
+  height: 24px !important;
+  inset: auto !important;
+  border: 1.4px solid var(--native-controller-pill-border) !important;
+  border-radius: 999px !important;
+  background: var(--native-controller-pill-solid) !important;
+  box-shadow: none !important;
+}
+#screenSizePage .preview-start-select span:active {
+  background: var(--native-controller-pill-pressed) !important;
+  border-color: rgba(255,255,255,.973) !important;
+}
+
+/* A/B group — native 54dp circles, 150 x 94dp group. */
+#screenSizePage .preview-ab {
+  width: 150px !important;
+  height: 94px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#screenSizePage .preview-ab span {
+  width: 54px !important;
+  height: 54px !important;
+  border: 1.5px solid var(--native-controller-circle-border) !important;
+  border-radius: 50% !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+  color: var(--native-controller-glyph) !important;
+  font: 700 20px/1 sans-serif !important;
+}
+#screenSizePage .preview-ab span:active,
+#screenSizePage .extra-control-face.circle-text:active,
+#screenSizePage .extra-control-face.turbo-face > span:active {
+  background: var(--native-controller-pressed) !important;
+  border-color: #fff !important;
+}
+#screenSizePage .preview-ab .button-b { left: 0 !important; top: 20px !important; right: auto !important; bottom: auto !important; }
+#screenSizePage .preview-ab .button-a { left: auto !important; right: 0 !important; top: 20px !important; bottom: auto !important; }
+
+/* Separated A/B uses the native TextViews moved to 48 x 48dp. */
+#screenSizePage .extra-control[data-control-type="buttonA"],
+#screenSizePage .extra-control[data-control-type="buttonB"],
+#screenSizePage .extra-control[data-control-type="buttonA"] .extra-control-face,
+#screenSizePage .extra-control[data-control-type="buttonB"] .extra-control-face {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+/* Combo action controls — native makeExtraActionTextView(): 56dp circle. */
+#screenSizePage .extra-control-face.circle-text {
+  width: 56px !important;
+  height: 56px !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1.5px solid var(--native-controller-circle-border) !important;
+  border-radius: 50% !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+  color: var(--native-controller-glyph) !important;
+  font: 700 16px/1 sans-serif !important;
+  letter-spacing: 0 !important;
+}
+#screenSizePage .extra-control[data-control-type="buttonA"] .circle-text,
+#screenSizePage .extra-control[data-control-type="buttonB"] .circle-text {
+  font-size: 20px !important;
+}
+
+/* Turbo A/B is two 56dp native circles inside a 122 x 58dp container. */
+#screenSizePage .extra-control[data-control-type="turboAB"],
+#screenSizePage .extra-control[data-control-type="turboAB"] .turbo-face {
+  width: 122px !important;
+  height: 58px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#screenSizePage .extra-control[data-control-type="turboAB"] .turbo-face {
+  position: relative !important;
+  display: block !important;
+}
+#screenSizePage .extra-control[data-control-type="turboAB"] .turbo-face > span {
+  position: absolute !important;
+  top: 1px !important;
+  width: 56px !important;
+  height: 56px !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1.5px solid var(--native-controller-circle-border) !important;
+  border-radius: 50% !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+  color: var(--native-controller-glyph) !important;
+  font: 700 16px/1 sans-serif !important;
+}
+#screenSizePage .extra-control[data-control-type="turboAB"] .turbo-face > span:first-child { left: 0 !important; }
+#screenSizePage .extra-control[data-control-type="turboAB"] .turbo-face > span:last-child { left: 66px !important; }
+#screenSizePage .extra-control[data-control-type="turboAB"] .turbo-face > span { opacity: 1 !important; }
+
+/* Quick Load / Quick Save / Fast Forward — the exact 44dp native round-rect. */
+#screenSizePage .extra-control[data-control-type="quickLoad"],
+#screenSizePage .extra-control[data-control-type="quickSave"],
+#screenSizePage .extra-control[data-control-type="fastForward"],
+#screenSizePage .extra-control[data-control-type="quickLoad"] .extra-control-face,
+#screenSizePage .extra-control[data-control-type="quickSave"] .extra-control-face,
+#screenSizePage .extra-control[data-control-type="fastForward"] .extra-control-face {
+  width: 44px !important;
+  height: 44px !important;
+}
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1.5px solid var(--native-controller-round-border) !important;
+  border-radius: 14px !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+}
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button::before {
+  content: none !important;
+}
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button:active {
+  background: rgba(65,79,88,.439) !important;
+  border-color: #fff !important;
+}
+#screenSizePage .extra-control-face.square-icon.myboy-menu-button.utility-menu-button .control-svg {
+  width: 24px !important;
+  height: 24px !important;
+  fill: none !important;
+  stroke: var(--native-controller-icon) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  filter: none !important;
+}
+#screenSizePage .quick-load-reference-icon { stroke-width: 2.45 !important; }
+#screenSizePage .quick-save-reference-icon { stroke-width: 2.25 !important; }
+#screenSizePage .fast-forward-reference-icon { stroke-width: 2.75 !important; }
+
+/* Screenshot — GameplayLayoutController.makeScreenshotControl(): 56dp ImageButton
+   with the same bg_controller_round_rect and ic_controller_screenshot vector. */
+#screenSizePage .extra-control[data-control-type="screenshot"],
+#screenSizePage .extra-control[data-control-type="screenshot"] .extra-control-face {
+  width: 56px !important;
+  height: 56px !important;
+}
+#screenSizePage .extra-control[data-control-type="screenshot"] .extra-control-face {
+  display: grid !important;
+  place-items: center !important;
+  border: 1.5px solid var(--native-controller-round-border) !important;
+  border-radius: 14px !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+}
+#screenSizePage .extra-control[data-control-type="screenshot"] .control-svg {
+  width: 24px !important;
+  height: 24px !important;
+  fill: none !important;
+  stroke: var(--native-controller-icon) !important;
+  stroke-width: 1.8 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  filter: none !important;
+}
+
+/* Gameplay always uses the same translucent controller artwork irrespective of
+   Retra's light/dark Web UI appearance. Do not recolor editor controller faces. */
+body[data-resolved-mode="light"] #screenSizePage .preview-shoulder,
+body[data-resolved-mode="light"] #screenSizePage .preview-dpad .dpad,
+body[data-resolved-mode="light"] #screenSizePage .preview-start-select span,
+body[data-resolved-mode="light"] #screenSizePage .preview-ab span,
+body[data-resolved-mode="light"] #screenSizePage .preview-toolbar .toolbar-icon,
+body[data-resolved-mode="light"] #screenSizePage .extra-control-face {
+  color: var(--native-controller-glyph) !important;
+}
+
+/* Add-control chooser thumbnails also use the same native controller language,
+   so the icon shown before adding a control doesn't falsely preview a different
+   shape. These thumbnails remain slightly scaled for the list row. */
+#screenSizePage .add-control-icon.circle {
+  border: 1.5px solid var(--native-controller-circle-border) !important;
+  border-radius: 50% !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+#screenSizePage .add-control-icon.square {
+  border: 1.5px solid var(--native-controller-round-border) !important;
+  border-radius: 14px !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+#screenSizePage .add-control-icon .control-svg {
+  fill: none !important;
+  stroke: var(--native-controller-icon) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  filter: none !important;
+}
+#screenSizePage .add-control-icon .quick-load-reference-icon { stroke-width: 2.45 !important; }
+#screenSizePage .add-control-icon .quick-save-reference-icon { stroke-width: 2.25 !important; }
+#screenSizePage .add-control-icon .fast-forward-reference-icon { stroke-width: 2.75 !important; }
+
+/* Accurate base-control thumbnails when a removed built-in control is offered
+   in Add control again. These deliberately preview the real gameplay geometry
+   rather than generic circle/cross/SS placeholders. */
+#screenSizePage .add-control-icon.native-shoulder-preview {
+  width: 72px !important;
+  height: 30px !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1.4px solid var(--native-controller-pill-border) !important;
+  border-radius: 12px 26px 16px 12px !important;
+  background: var(--native-controller-pill-solid) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  font: 700 17px/1 sans-serif !important;
+}
+#screenSizePage .add-control-icon.native-dpad-preview {
+  position: relative !important;
+  width: 72px !important;
+  height: 72px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#screenSizePage .add-control-icon.native-dpad-preview i {
+  position: absolute !important;
+  width: 22px !important;
+  height: 22px !important;
+  border: 1px solid var(--native-controller-square-border) !important;
+  border-radius: 7px !important;
+  background: var(--native-controller-solid) !important;
+}
+#screenSizePage .add-control-icon.native-dpad-preview i::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  background: center/9px 9px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 11.5 L8 4.5 L15 11.5' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+}
+#screenSizePage .add-control-icon.native-dpad-preview .up { left:25px; top:0; }
+#screenSizePage .add-control-icon.native-dpad-preview .left { left:0; top:25px; }
+#screenSizePage .add-control-icon.native-dpad-preview .right { right:0; top:25px; }
+#screenSizePage .add-control-icon.native-dpad-preview .down { left:25px; bottom:0; }
+#screenSizePage .add-control-icon.native-dpad-preview .up::before { transform:translate(-50%,-50%); }
+#screenSizePage .add-control-icon.native-dpad-preview .right::before { transform:translate(-50%,-50%) rotate(90deg); }
+#screenSizePage .add-control-icon.native-dpad-preview .down::before { transform:translate(-50%,-50%) rotate(180deg); }
+#screenSizePage .add-control-icon.native-dpad-preview .left::before { transform:translate(-50%,-50%) rotate(-90deg); }
+#screenSizePage .add-control-icon.native-start-select-preview {
+  width: 72px !important;
+  height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#screenSizePage .add-control-icon.native-start-select-preview i {
+  width: 30px !important;
+  height: 14px !important;
+  border: 1.2px solid var(--native-controller-pill-border) !important;
+  border-radius: 999px !important;
+  background: var(--native-controller-pill-solid) !important;
+}
+#screenSizePage .add-control-icon.duo {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#screenSizePage .add-control-icon.duo > span {
+  border: 1.5px solid var(--native-controller-circle-border) !important;
+  border-radius: 50% !important;
+  background: var(--native-controller-solid) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  font-family: sans-serif !important;
+  font-weight: 700 !important;
+}

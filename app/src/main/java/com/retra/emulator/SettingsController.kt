@@ -25,6 +25,7 @@ import com.retra.emulator.MainActivity.Companion.CLOUD_SYNC_URI_PREF
 import com.retra.emulator.MainActivity.Companion.COLOR_STYLE_PREF
 import com.retra.emulator.MainActivity.Companion.CONFIRM_CLOSE_RESET_PREF
 import com.retra.emulator.MainActivity.Companion.CONTROLLER_SOUND_PREF
+import com.retra.emulator.MainActivity.Companion.CONTROLLER_HAPTICS_PREF
 import com.retra.emulator.MainActivity.Companion.CPU_CORE_PREF
 import com.retra.emulator.MainActivity.Companion.ENABLE_CHEATS_PREF
 import com.retra.emulator.MainActivity.Companion.ENABLE_SOUND_PREF
@@ -99,6 +100,7 @@ internal fun MainActivity.settingsStateJson(): String = JSONObject().apply {
     put("autoSaveLoad", prefs.getBoolean(AUTO_SAVE_LOAD_PREF, true))
     put("confirmCloseReset", prefs.getBoolean(CONFIRM_CLOSE_RESET_PREF, true))
     put("controllerSound", prefs.getBoolean(CONTROLLER_SOUND_PREF, true))
+    put("controllerHaptics", prefs.getBoolean(CONTROLLER_HAPTICS_PREF, true))
     put("fullScreenMode", prefs.getBoolean(FULLSCREEN_PREF, true))
     put("immersiveMode", prefs.getBoolean(IMMERSIVE_PREF, true))
     put("stretchToFit", prefs.getBoolean(STRETCH_TO_FIT_PREF, false))
@@ -215,6 +217,7 @@ internal fun MainActivity.updateSetting(key: String, value: String): Boolean {
         "autoSaveLoad" -> editor.putBoolean(AUTO_SAVE_LOAD_PREF, value.toBoolean())
         "confirmCloseReset" -> editor.putBoolean(CONFIRM_CLOSE_RESET_PREF, value.toBoolean())
         "controllerSound" -> editor.putBoolean(CONTROLLER_SOUND_PREF, value.toBoolean())
+        "controllerHaptics" -> editor.putBoolean(CONTROLLER_HAPTICS_PREF, value.toBoolean())
         "fullScreenMode" -> editor.putBoolean(FULLSCREEN_PREF, value.toBoolean())
         "immersiveMode" -> editor.putBoolean(IMMERSIVE_PREF, value.toBoolean())
         "stretchToFit" -> editor.putBoolean(STRETCH_TO_FIT_PREF, value.toBoolean())

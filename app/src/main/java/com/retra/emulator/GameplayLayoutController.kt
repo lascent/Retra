@@ -688,7 +688,7 @@ internal fun MainActivity.bindMultiKeyControl(view: View, keys: IntArray) {
         if (pressed == nextPressed) return
         pressed = nextPressed
         keys.forEach { setGameplayKeyHeld(it, nextPressed) }
-        if (nextPressed) performControllerSound(v)
+        if (nextPressed) controllerFeedback.perform(v)
         v.isPressed = nextPressed
     }
 
@@ -701,7 +701,7 @@ internal fun MainActivity.bindMultiKeyControl(view: View, keys: IntArray) {
     }
 
     fun finishGesture(v: View) {
-        if (gestureGeneration == controllerInputGeneration) {
+        if (gestureGeneration == gameplayInputState.generation) {
             applyPressedState(v, false)
         } else {
             pressed = false
@@ -716,16 +716,16 @@ internal fun MainActivity.bindMultiKeyControl(view: View, keys: IntArray) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (activePointerId != MotionEvent.INVALID_POINTER_ID || pressed) {
-                    if (gestureGeneration == controllerInputGeneration) finishGesture(v) else abandonGesture(v)
+                    if (gestureGeneration == gameplayInputState.generation) finishGesture(v) else abandonGesture(v)
                 }
                 activePointerId = event.getPointerId(event.actionIndex)
-                gestureGeneration = controllerInputGeneration
+                gestureGeneration = gameplayInputState.generation
                 v.parent?.requestDisallowInterceptTouchEvent(true)
                 applyPressedState(v, true)
                 true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (gestureGeneration != controllerInputGeneration) {
+                if (gestureGeneration != gameplayInputState.generation) {
                     abandonGesture(v)
                     true
                 } else {
@@ -781,7 +781,7 @@ internal fun MainActivity.bindTurboAbControl(view: View) {
     val pulse = object : Runnable {
         override fun run() {
             if (!active) return
-            if (gestureGeneration != controllerInputGeneration) {
+            if (gestureGeneration != gameplayInputState.generation) {
                 // releaseAllKeys() invalidated this callback. Do not emit an UP
                 // transition here: its old-generation hold was already cleared.
                 abandonGesture(view)
@@ -796,7 +796,7 @@ internal fun MainActivity.bindTurboAbControl(view: View) {
         active = false
         activePointerId = MotionEvent.INVALID_POINTER_ID
         handler.removeCallbacks(pulse)
-        if (gestureGeneration == controllerInputGeneration) {
+        if (gestureGeneration == gameplayInputState.generation) {
             setPulsePressed(false)
         } else {
             pulsePressed = false
@@ -810,12 +810,12 @@ internal fun MainActivity.bindTurboAbControl(view: View) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (active || activePointerId != MotionEvent.INVALID_POINTER_ID || pulsePressed) {
-                    if (gestureGeneration == controllerInputGeneration) finishGesture(v) else abandonGesture(v)
+                    if (gestureGeneration == gameplayInputState.generation) finishGesture(v) else abandonGesture(v)
                 }
                 activePointerId = event.getPointerId(event.actionIndex)
-                gestureGeneration = controllerInputGeneration
+                gestureGeneration = gameplayInputState.generation
                 active = true
-                performControllerSound(v)
+                controllerFeedback.perform(v)
                 v.isPressed = true
                 v.parent?.requestDisallowInterceptTouchEvent(true)
                 handler.removeCallbacks(pulse)
@@ -823,7 +823,7 @@ internal fun MainActivity.bindTurboAbControl(view: View) {
                 true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (gestureGeneration != controllerInputGeneration) {
+                if (gestureGeneration != gameplayInputState.generation) {
                     handler.removeCallbacks(pulse)
                     abandonGesture(v)
                 } else if (event.findPointerIndex(activePointerId) < 0) {
@@ -874,7 +874,7 @@ internal fun MainActivity.makeScreenshotControl(): ImageButton {
         scaleType = ImageView.ScaleType.CENTER_INSIDE
         contentDescription = "Screenshot"
         setOnClickListener {
-            performControllerSound(this)
+            controllerFeedback.perform(this)
             val saved = saveGameplayScreenshot()
             RetraNotice.makeText(
                 activity,
@@ -997,7 +997,7 @@ internal fun MainActivity.bindEmulatorChrome() {
     binding.speedButton.visibility = View.GONE
 
     binding.menuButton.setOnClickListener {
-        performControllerSound(binding.menuButton)
+        controllerFeedback.perform(binding.menuButton)
         showGameplayMenu()
     }
 
@@ -1008,7 +1008,7 @@ internal fun MainActivity.bindEmulatorChrome() {
             .equals("Hold down to activate", ignoreCase = true)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                performControllerSound(view)
+                controllerFeedback.perform(view)
                 if (holdMode && !isLocalLinkSpeedRestricted()) {
                     activeEmulationSpeed = preferredEmulationSpeed
                     updateFastForwardUi()
@@ -1036,11 +1036,11 @@ internal fun MainActivity.bindEmulatorChrome() {
         }
     }
     binding.quickSaveButton.setOnClickListener {
-        performControllerSound(binding.quickSaveButton)
+        controllerFeedback.perform(binding.quickSaveButton)
         quickSave()
     }
     binding.quickLoadButton.setOnClickListener {
-        performControllerSound(binding.quickLoadButton)
+        controllerFeedback.perform(binding.quickLoadButton)
         quickLoad()
     }
 }

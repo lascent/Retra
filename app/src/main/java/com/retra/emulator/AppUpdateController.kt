@@ -36,7 +36,7 @@ class AppUpdateController(
     fun checkForUpdates(manual: Boolean) {
         // Automatic checks are once per fresh app process, not once per persisted
         // time window. This prevents the old failure mode where a successful
-        // check on v1.0.3 could suppress discovery of v1.0.4 for several hours.
+        // check on an older release could suppress discovery of a newly published update for several hours.
         // The guard resets naturally when Android starts a new Retra process.
         if (!manual && !automaticCheckStartedThisProcess.compareAndSet(false, true)) return
 

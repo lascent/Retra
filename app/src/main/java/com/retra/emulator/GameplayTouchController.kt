@@ -1,8 +1,5 @@
 package com.retra.emulator
 
-import android.content.Context
-import android.media.AudioManager
-import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -16,7 +13,6 @@ import com.retra.emulator.MainActivity.Companion.KEY_UP
 import com.retra.emulator.MainActivity.Companion.KEY_DOWN
 import com.retra.emulator.MainActivity.Companion.KEY_R
 import com.retra.emulator.MainActivity.Companion.KEY_L
-import com.retra.emulator.MainActivity.Companion.CONTROLLER_SOUND_PREF
 
 /**
  * Low-latency, pointer-owned gameplay touch input.
@@ -24,24 +20,6 @@ import com.retra.emulator.MainActivity.Companion.CONTROLLER_SOUND_PREF
  * Kept separate from layout/presentation code so multi-touch correctness can be
  * hardened independently without growing GameplayLayoutController.
  */
-/**
- * One shared low-volume click profile for every gameplay control.
- *
- * A small global gap prevents overlapping multi-touch taps from becoming loud,
- * while still letting fast D-pad rolls and repeated A/B presses sound responsive.
- */
-internal fun MainActivity.performControllerSound(view: View) {
-    if (!prefs.getBoolean(CONTROLLER_SOUND_PREF, true)) return
-    if (!view.isSoundEffectsEnabled) return
-
-    val now = SystemClock.uptimeMillis()
-    if (now - lastControllerSoundAtMs < 28L) return
-    lastControllerSoundAtMs = now
-
-    val audio = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-    audio.playSoundEffect(AudioManager.FX_KEY_CLICK, 0.060f)
-}
-
 internal fun MainActivity.bindControls() {
     bindKey(binding.buttonA, KEY_A)
     bindKey(binding.buttonB, KEY_B)
@@ -85,13 +63,11 @@ internal fun MainActivity.bindDpad() {
             MotionEvent.ACTION_DOWN -> {
                 // ACTION_DOWN starts a new gesture. Clear any stale ownership that
                 // survived a malformed/interrupted stream before claiming it.
-                if (activeDpadPointerId != MotionEvent.INVALID_POINTER_ID || activeDpadMask != 0) {
+                if (gameplayInputState.activeDpadPointerId != MotionEvent.INVALID_POINTER_ID || gameplayInputState.activeDpadMask != 0) {
                     finishDpadGesture()
                 }
-                activeDpadPointerId = event.getPointerId(event.actionIndex)
+                gameplayInputState.activeDpadPointerId = event.getPointerId(event.actionIndex)
                 view.parent?.requestDisallowInterceptTouchEvent(true)
-                // Give a fresh D-pad touch the same optional controller click sound.
-                performControllerSound(view)
                 updateDpadFromMotionEvent(event)
                 true
             }
@@ -105,7 +81,7 @@ internal fun MainActivity.bindDpad() {
                 // Never transfer movement to another finger implicitly. If the
                 // controlling pointer leaves, release immediately so no input
                 // can remain latched.
-                if (event.getPointerId(event.actionIndex) == activeDpadPointerId) {
+                if (event.getPointerId(event.actionIndex) == gameplayInputState.activeDpadPointerId) {
                     finishDpadGesture(view)
                 }
                 true
@@ -127,14 +103,14 @@ internal fun MainActivity.bindDpad() {
 }
 
 internal fun MainActivity.finishDpadGesture(view: View? = null) {
-    activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
+    gameplayInputState.activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
     setActiveDpadMask(0)
     view?.parent?.requestDisallowInterceptTouchEvent(false)
 }
 
 internal fun MainActivity.updateDpadFromMotionEvent(event: MotionEvent) {
-    if (activeDpadPointerId == MotionEvent.INVALID_POINTER_ID) return
-    val pointerIndex = event.findPointerIndex(activeDpadPointerId)
+    if (gameplayInputState.activeDpadPointerId == MotionEvent.INVALID_POINTER_ID) return
+    val pointerIndex = event.findPointerIndex(gameplayInputState.activeDpadPointerId)
     if (pointerIndex < 0) {
         // Defensive release for interrupted/malformed pointer streams.
         finishDpadGesture()
@@ -170,7 +146,7 @@ internal fun MainActivity.updateDpadFromLocalPoint(localX: Float, localY: Float)
     // Centre dead-zone hysteresis: entering a direction needs 15% radius,
     // while an already-held direction releases only inside 10%. This removes
     // centre jitter without making direction changes feel sticky.
-    val deadZone = if (activeDpadMask == 0) 0.15f else 0.10f
+    val deadZone = if (gameplayInputState.activeDpadMask == 0) 0.15f else 0.10f
     if (radialDistance < deadZone) {
         setActiveDpadMask(0)
         return
@@ -180,8 +156,8 @@ internal fun MainActivity.updateDpadFromLocalPoint(localX: Float, localY: Float)
     // Tiny thumb jitter can no longer flap RIGHT <-> UP+RIGHT every frame.
     val maxAxis = maxOf(absX, absY).coerceAtLeast(0.0001f)
     val axisRatio = minOf(absX, absY) / maxAxis
-    val wasDiagonal = activeDpadMask != 0 &&
-        (activeDpadMask and (activeDpadMask - 1)) != 0
+    val wasDiagonal = gameplayInputState.activeDpadMask != 0 &&
+        (gameplayInputState.activeDpadMask and (gameplayInputState.activeDpadMask - 1)) != 0
     val diagonalThreshold = if (wasDiagonal) 0.35f else 0.44f
     val diagonal = axisRatio >= diagonalThreshold
 
@@ -197,13 +173,13 @@ internal fun MainActivity.updateDpadFromLocalPoint(localX: Float, localY: Float)
 }
 
 internal fun MainActivity.setActiveDpadMask(nextMask: Int) {
-    if (activeDpadMask == nextMask) return
+    if (gameplayInputState.activeDpadMask == nextMask) return
 
     // Only changed directions cross JNI or touch View state. Duplicate MOVE
     // events for the same direction therefore do essentially no work.
     fun syncDirection(key: Int, view: View) {
         val bit = 1 shl key
-        val wasPressed = activeDpadMask and bit != 0
+        val wasPressed = gameplayInputState.activeDpadMask and bit != 0
         val isPressed = nextMask and bit != 0
         if (wasPressed == isPressed) return
         setGameplayKeyHeld(key, isPressed)
@@ -214,8 +190,8 @@ internal fun MainActivity.setActiveDpadMask(nextMask: Int) {
     syncDirection(KEY_DOWN, binding.buttonDown)
     syncDirection(KEY_LEFT, binding.buttonLeft)
     syncDirection(KEY_RIGHT, binding.buttonRight)
-    if (nextMask != 0) performControllerSound(binding.dpadContainer)
-    activeDpadMask = nextMask
+    if (nextMask != 0) controllerFeedback.perform(binding.dpadContainer)
+    gameplayInputState.activeDpadMask = nextMask
 }
 
 /** Low-latency pointer-owned binding for A/B, L/R, Start and Select. */
@@ -229,7 +205,7 @@ internal fun MainActivity.bindKey(view: View, key: Int) {
         if (pressed == nextPressed) return
         pressed = nextPressed
         setGameplayKeyHeld(key, nextPressed) // input first; optional sound/visual feedback second
-        if (nextPressed) performControllerSound(v)
+        if (nextPressed) controllerFeedback.perform(v)
         v.isPressed = nextPressed
     }
 
@@ -242,7 +218,7 @@ internal fun MainActivity.bindKey(view: View, key: Int) {
     }
 
     fun finishGesture(v: View) {
-        if (gestureGeneration == controllerInputGeneration) {
+        if (gestureGeneration == gameplayInputState.generation) {
             applyPressedState(v, false)
         } else {
             // releaseAllKeys() already cleared this old generation. Never
@@ -259,16 +235,16 @@ internal fun MainActivity.bindKey(view: View, key: Int) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (activePointerId != MotionEvent.INVALID_POINTER_ID || pressed) {
-                    if (gestureGeneration == controllerInputGeneration) finishGesture(v) else abandonGesture(v)
+                    if (gestureGeneration == gameplayInputState.generation) finishGesture(v) else abandonGesture(v)
                 }
                 activePointerId = event.getPointerId(event.actionIndex)
-                gestureGeneration = controllerInputGeneration
+                gestureGeneration = gameplayInputState.generation
                 v.parent?.requestDisallowInterceptTouchEvent(true)
                 applyPressedState(v, true)
                 true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (gestureGeneration != controllerInputGeneration) {
+                if (gestureGeneration != gameplayInputState.generation) {
                     abandonGesture(v)
                     true
                 } else {

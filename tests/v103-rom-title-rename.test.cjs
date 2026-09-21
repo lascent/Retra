@@ -30,10 +30,10 @@ test('ROM rename is persisted natively without changing the ROM file name', () =
   assert.doesNotMatch(main, /renameRomTitle[\s\S]{0,600}(fileNameKey|current_file_uri|launch_path)\(/);
 });
 
-test('Retra release metadata is v1.0.3', () => {
+test('current Retra release metadata is v1.0.4 while retaining the v1.0.3 rename feature', () => {
   const gradle = read('app/build.gradle.kts');
   const html = read('app/src/main/assets/retra/index.html');
-  assert.match(gradle, /versionCode = 450/);
-  assert.match(gradle, /versionName = "1\.0\.3"/);
-  assert.match(html, /Retra v1\.0\.3/);
+  assert.match(gradle, /versionCode = 451/);
+  assert.match(gradle, /versionName = "1\.0\.4"/);
+  assert.match(html, /Retra v1\.0\.4/);
 });

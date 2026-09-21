@@ -1200,16 +1200,37 @@ function patchLibrarySelectionCardImmediately(id, card = null){
   applyLibrarySelectionCardState(target, librarySelectedRomIds.size > 0);
 }
 
-function updateLibrarySelectionUi({ changedId = null, wasActive = null } = {}){
-  const validIds = new Set(libraryRoms.map(rom => String(rom.id)));
-  librarySelectedRomIds = new Set([...librarySelectedRomIds].filter(id => validIds.has(String(id))));
+let librarySelectionAccessoryFrame = 0;
+
+function refreshLibrarySelectionAccessoryUi(){
+  librarySelectionAccessoryFrame = 0;
   const selected = getSelectedLibraryRoms();
   const active = selected.length > 0;
+  const favoriteAll = librarySelectionApi.shouldFavoriteAll(selected);
+  if (librarySelectionFavoriteLabel) librarySelectionFavoriteLabel.textContent = favoriteAll ? 'Favourite' : 'Unfavourite';
+  librarySelectionFavorite?.classList.toggle('active', !favoriteAll && active);
+  librarySelectionFavorite?.setAttribute('aria-label', favoriteAll ? 'Add selected ROMs to favourites' : 'Remove selected ROMs from favourites');
+}
+
+function scheduleLibrarySelectionAccessoryUi(){
+  if (librarySelectionAccessoryFrame) cancelAnimationFrame(librarySelectionAccessoryFrame);
+  librarySelectionAccessoryFrame = requestAnimationFrame(refreshLibrarySelectionAccessoryUi);
+}
+
+function updateLibrarySelectionUi({ changedId = null, wasActive = null } = {}){
+  // Only do the full stale-ID cleanup when the grid/library has been rebuilt.
+  // A tap already comes from a live rendered card, so rebuilding a full Set of
+  // every ROM on each additional selection only adds avoidable touch latency.
+  if (changedId === null) {
+    const validIds = new Set(libraryRoms.map(rom => String(rom.id)));
+    librarySelectedRomIds = new Set([...librarySelectedRomIds].filter(id => validIds.has(String(id))));
+  }
+  const active = librarySelectedRomIds.size > 0;
 
   document.body.classList.toggle('library-selection-mode', active);
   librarySelectionBar?.classList.toggle('open', active);
   librarySelectionBar?.setAttribute('aria-hidden', active ? 'false' : 'true');
-  if (librarySelectionCount) librarySelectionCount.textContent = `${selected.length} selected`;
+  if (librarySelectionCount) librarySelectionCount.textContent = `${librarySelectedRomIds.size} selected`;
 
   // Once selection mode is already open, a normal tap only changes one card.
   // Avoid querying/updating every ROM in the grid on every additional tap.
@@ -1220,10 +1241,10 @@ function updateLibrarySelectionUi({ changedId = null, wasActive = null } = {}){
     renderedLibraryCards.forEach(card => applyLibrarySelectionCardState(card, active));
   }
 
-  const favoriteAll = librarySelectionApi.shouldFavoriteAll(selected);
-  if (librarySelectionFavoriteLabel) librarySelectionFavoriteLabel.textContent = favoriteAll ? 'Favourite' : 'Unfavourite';
-  librarySelectionFavorite?.classList.toggle('active', !favoriteAll && active);
-  librarySelectionFavorite?.setAttribute('aria-label', favoriteAll ? 'Add selected ROMs to favourites' : 'Remove selected ROMs from favourites');
+  // Favourite-state bookkeeping can wait until the next paint. The selected
+  // card and count are already correct in this event turn, which keeps rapid
+  // multi-select taps feeling immediate on Android WebView.
+  scheduleLibrarySelectionAccessoryUi();
 
   if (!active) setLibrarySelectionMoreOpen(false);
 }
@@ -1354,6 +1375,57 @@ function removeSelectedRomsFromLibrary(){
   librarySelectedRomIds.clear();
   renderLibraryFromStorage();
   showToast(`${selected.length} ROM${selected.length === 1 ? '' : 's'} removed • game data kept`);
+}
+
+function bindRomCardSelectionTap(article, rom){
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let moved = false;
+
+  const clearSelectionPress = () => {
+    article.classList.remove('selection-pressing');
+    pointerId = null;
+    moved = false;
+  };
+
+  article.addEventListener('pointerdown', event => {
+    if (!isLibrarySelectionMode()) return;
+    if (event.pointerType === 'mouse') return;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    moved = false;
+    article.classList.add('selection-pressing');
+  });
+
+  article.addEventListener('pointermove', event => {
+    if (pointerId !== event.pointerId || moved) return;
+    if (Math.hypot(event.clientX - startX, event.clientY - startY) > libraryCardMoveTolerance) {
+      moved = true;
+      article.classList.remove('selection-pressing');
+    }
+  });
+
+  article.addEventListener('pointerup', event => {
+    if (pointerId !== event.pointerId) return;
+    const shouldToggle = !moved && isLibrarySelectionMode();
+    clearSelectionPress();
+    if (!shouldToggle) return;
+
+    // Toggle on pointer-up instead of waiting for the synthesized click. This
+    // saves a WebView event round-trip while click suppression prevents a
+    // second toggle from the click that Android emits immediately afterwards.
+    suppressLibraryCardClickFor(rom.id, 360);
+    toggleLibraryRomSelection(rom.id, article);
+  });
+
+  ['pointercancel', 'pointerleave'].forEach(eventName => {
+    article.addEventListener(eventName, event => {
+      if (pointerId !== null && event.pointerId !== undefined && event.pointerId !== pointerId) return;
+      clearSelectionPress();
+    });
+  });
 }
 
 function bindRomCardLongPress(article, rom){

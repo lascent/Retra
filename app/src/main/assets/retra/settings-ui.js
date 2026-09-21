@@ -87,7 +87,7 @@ function applyUiFont(fontName, { persist = false, notify = false } = {}){
   });
 
   if (settingsVersionLabel) {
-    settingsVersionLabel.textContent = 'Retra v1.0.3';
+    settingsVersionLabel.textContent = 'Retra v1.0.4';
   }
 
   if (persist) { localStorage.setItem(fontStorageKey, selected); setNativeUiPreference('font', selected); }
@@ -122,7 +122,7 @@ function setUpdateStatus(text){
 }
 
 function hydrateRetraVersion(){
-  let versionName = '1.0.3';
+  let versionName = '1.0.4';
   try {
     if (window.AndroidBridge && typeof window.AndroidBridge.getAppVersionInfo === 'function') {
       const info = JSON.parse(String(window.AndroidBridge.getAppVersionInfo() || '{}'));
@@ -987,6 +987,7 @@ const syncSettingsBtn = document.getElementById('syncSettingsBtn');
 const syncSettingsSummary = document.getElementById('syncSettingsSummary');
 const enableCheatsToggle = document.getElementById('enableCheatsToggle');
 const controllerSoundToggle = document.getElementById('controllerSoundToggle');
+const controllerHapticsToggle = document.getElementById('controllerHapticsToggle');
 const romPatchingToggle = document.getElementById('romPatchingToggle');
 const automaticArtworkToggle = document.getElementById('automaticArtworkToggle');
 const artworkWifiOnlyToggle = document.getElementById('artworkWifiOnlyToggle');
@@ -1051,6 +1052,7 @@ function applyNativeSettingsState(state){
   bool(cloudSyncToggle, 'cloudSync', false);
   bool(enableCheatsToggle, 'enableCheats', true);
   bool(controllerSoundToggle, 'controllerSound', true);
+  bool(controllerHapticsToggle, 'controllerHaptics', true);
   bool(romPatchingToggle, 'romPatching', true);
   bool(automaticArtworkToggle, 'automaticArtwork', true);
   bool(artworkWifiOnlyToggle, 'artworkWifiOnly', false);
@@ -1299,6 +1301,7 @@ syncSettingsBtn?.addEventListener('click', () => {
 [
   [enableCheatsToggle, 'enableCheats'],
   [controllerSoundToggle, 'controllerSound'],
+  [controllerHapticsToggle, 'controllerHaptics'],
   [romPatchingToggle, 'romPatching'],
   [automaticArtworkToggle, 'automaticArtwork'],
   [artworkWifiOnlyToggle, 'artworkWifiOnly'],

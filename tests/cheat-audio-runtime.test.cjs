@@ -13,7 +13,7 @@ const gameplay = read('app/src/main/java/com/retra/emulator/GameplayController.k
 const native = read('app/src/main/cpp/native-lib.cpp');
 
 test('gameplay actively drains mGBA PCM and speed-syncs it into AudioTrack', () => {
-  assert.match(session, /audioController\.pump\([\s\S]*speed = speed,[\s\S]*flushOutput = !turbo \|\| captureVideo/);
+  assert.match(session, /audioController\.pump\(speed = speed, flushOutput = true\)/);
   assert.match(audio, /readSamples\(nativeScratch\)/);
   assert.match(audio, /Thread\(::audioWriterLoop, "Retra-Audio"\)/);
   assert.match(audio, /Process\.THREAD_PRIORITY_AUDIO/);
@@ -23,7 +23,7 @@ test('gameplay actively drains mGBA PCM and speed-syncs it into AudioTrack', () 
   assert.match(audio, /appendSpeedAdjusted\(nativeScratch, count\)/);
   assert.match(audio, /appendTurboAveraged/);
   assert.match(audio, /appendSlowInterpolated/);
-  assert.doesNotMatch(audio, /readSamplesAtSpeed\(nativeScratch/);
+  assert.match(audio, /readSamplesAtSpeed\(nativeScratch, normalizedSpeed\)/);
 });
 
 test('audio pipeline prevents crackle from dropped partial writes and smooths speed transitions', () => {

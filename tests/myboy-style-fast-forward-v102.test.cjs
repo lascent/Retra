@@ -5,27 +5,23 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('8x and 16x use lower-overhead native batches', () => {
-  const policy = read('app/src/main/java/com/retra/emulator/TurboFramePolicy.kt');
-  const native = read('app/src/main/cpp/native-lib.cpp');
-  assert.match(policy, /MAX_TURBO_BATCH_FRAMES = 16/);
-  assert.match(policy, /speed \/ 2\.0/);
-  assert.match(native, /std::min\(16, static_cast<int>\(frameCount\)\)/);
+test('fast-forward uses display-sized native batches and latest-frame GPU presentation', () => {
+  const session = read('app/src/main/java/com/retra/emulator/EmulationSessionManager.kt');
+  const view = read('app/src/main/java/com/retra/emulator/ShaderGameView.kt');
+  const mailbox = read('app/src/main/java/com/retra/emulator/GameplayFrameMailbox.kt');
+  assert.match(session, /turboSlicePlanner\.nextFrames\(\)/);
+  assert.match(session, /gameplayFrameMailbox\.publish/);
+  assert.match(view, /mailbox\.acquireLatestForRender\(reusableMailboxFrame\)/);
+  assert.match(mailbox, /pending\?\.let \{ stale/);
 });
 
-test('turbo restores the v1.0.1 raw-PCM averaging path and keeps a cheap native mute fallback', () => {
-  const activity = read('app/src/main/java/com/retra/emulator/MainActivity.kt');
+test('turbo audio stays active and independent from video presentation', () => {
   const session = read('app/src/main/java/com/retra/emulator/EmulationSessionManager.kt');
   const audio = read('app/src/main/java/com/retra/emulator/AudioController.kt');
-  const native = read('app/src/main/cpp/native-lib.cpp');
-  assert.match(activity, /external fun readAudioSamplesAtSpeed\(buffer: ShortArray, speed: Double\): Int/);
-  assert.match(audio, /readSamples\(nativeScratch\)/);
-  assert.match(audio, /appendSpeedAdjusted\(nativeScratch, count\)/);
-  assert.match(audio, /appendTurboAveraged/);
-  assert.doesNotMatch(audio, /readSamplesAtSpeed\(nativeScratch/);
-  assert.match(session, /discardAudio = turboAudioMuted/);
-  assert.match(native, /discardAudio == JNI_TRUE/);
-  assert.match(native, /mAudioBufferRead\(audio, nullptr, available\)/);
+  assert.match(session, /discardAudio = false/);
+  assert.match(session, /audioController\.pump\(speed = speed, flushOutput = true\)/);
+  assert.match(audio, /Thread\(::audioWriterLoop, "Retra-Audio"\)/);
+  assert.doesNotMatch(session, /setTurboMuted\(true\)/);
 });
 
 test('frontend exclusively owns pacing so mGBA sync cannot cap turbo', () => {
@@ -33,24 +29,6 @@ test('frontend exclusively owns pacing so mGBA sync cannot cap turbo', () => {
   assert.match(native, /core->opts\.videoSync = false;/);
   assert.match(native, /core->opts\.audioSync = false;/);
 });
-
-test('renderer skipping is adaptive rather than forced immediately at 8x', () => {
-  const policy = read('app/src/main/java/com/retra/emulator/TurboFramePolicy.kt');
-  const session = read('app/src/main/java/com/retra/emulator/EmulationSessionManager.kt');
-  assert.match(policy, /fun coreFrameSkip[\s\S]*userFrameSkip\.coerceIn/);
-  assert.match(policy, /fun constrainedCoreFrameSkip/);
-  assert.match(session, /TurboPerformanceMonitor/);
-  assert.match(session, /sample\.constrained/);
-});
-
-test('smoothness remains independently VSync paced during 4x, 8x and 16x', () => {
-  const session = read('app/src/main/java/com/retra/emulator/EmulationSessionManager.kt');
-  const presenter = read('app/src/main/java/com/retra/emulator/GameplayFramePresenter.kt');
-  assert.match(session, /setContinuousVsync\(speed >= 4\.0\)/);
-  assert.match(presenter, /presentLatestFrame\(\)/);
-  assert.match(presenter, /scheduleNextVsyncDirect\(\)/);
-});
-
 
 test('Android 12+ receives workload hints from the emulation worker', () => {
   const hints = read('app/src/main/java/com/retra/emulator/EmulationPerformanceHints.kt');

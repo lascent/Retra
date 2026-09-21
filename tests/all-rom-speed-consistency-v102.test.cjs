@@ -2,59 +2,40 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-
 const root = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
-
-const policy = read('app/src/main/java/com/retra/emulator/TurboFramePolicy.kt');
-const monitor = read('app/src/main/java/com/retra/emulator/TurboPerformanceMonitor.kt');
-const governor = read('app/src/main/java/com/retra/emulator/TurboThroughputGovernor.kt');
 const session = read('app/src/main/java/com/retra/emulator/EmulationSessionManager.kt');
+const governor = read('app/src/main/java/com/retra/emulator/TurboThroughputGovernor.kt');
 const native = read('app/src/main/cpp/native-lib.cpp');
 
-test('all fast-forward multipliers share the same cumulative wall-clock governor', () => {
-  assert.match(session, /if \(turbo && successful\)[\s\S]*extremeGovernor\.onBatchComplete\(speed, framesThisSlice\)/);
-  assert.match(governor, /every fast-forward multiplier/);
-  assert.match(governor, /completedFrames \+= frameCount/);
+test('all fast-forward multipliers share one cumulative wall-clock governor', () => {
+  assert.match(session, /val turbo = speed > 1\.0/);
+  assert.match(session, /if \(turbo && successful\)[\s\S]*turboGovernor\.onBatchComplete\(speed, framesThisSlice\)/);
+  assert.match(governor, /completedFrames \+= batchFrames\.toLong\(\)/);
   assert.match(governor, /targetNs = epochNs \+/);
 });
 
-test('throughput monitoring applies to every turbo speed without reacting to brief scheduler noise', () => {
-  assert.match(monitor, /if \(speed > 1\.0\)/);
-  assert.match(monitor, /utilization < 0\.97/);
-  assert.match(monitor, /lowWindows >= 2/);
-  assert.match(monitor, /utilization >= 0\.995/);
-  assert.match(monitor, /healthyWindows >= 2/);
-  assert.match(monitor, /achievedMultiplier = actualFps \/ baseFps/);
-  assert.match(session, /if \(turbo && sample\.constrained\)/);
+test('visible slice density is derived only from speed and stable presentation cadence', () => {
+  assert.match(session, /val turboPresentationHz = if \(gameplayPresentationHz >= 100f\) 120\.0 else 60\.0/);
+  assert.match(session, /turboSlicePlanner\.nextFrames\(\)/);
+  assert.doesNotMatch(session, /TurboPerformanceMonitor|adaptiveCoreFrameSkip|sample\.constrained/);
 });
 
-test('heavy ROM fallback never doubles turbo batches and therefore never halves fresh visual cadence', () => {
-  assert.match(policy, /fun smoothFramesPerSlice/);
-  assert.match(policy, /framesPerSlice\(speed, frameTimeNs\)/);
-  assert.doesNotMatch(policy, /baseline \* 2/);
-  assert.match(session, /TurboFramePolicy\.framesPerSlice\(speed, FRAME_TIME_NS\)/);
-  assert.match(native, /std::min\(16, static_cast<int>\(frameCount\)\)/);
+test('user frameskip remains authoritative during turbo', () => {
+  assert.match(session, /userFrameSkip = prefs\.getInt\(FRAME_SKIP_PREF, 0\)/);
+  assert.match(session, /setCoreConfigOption\("frameskip", userFrameSkip\.toString\(\)\)/);
+  assert.doesNotMatch(session, /speedProtectingCoreFrameSkip|adaptiveCoreFrameSkip/);
 });
 
-test('8x and 16x keep display-synchronized fractional batching even while quality fallback is engaged', () => {
-  assert.match(policy, /fun canSynchronizeExtremeTurboBatchToDisplay\([\s\S]*refreshRateHz: Float\n    \): Boolean/);
-  assert.doesNotMatch(policy, /constrained: Boolean/);
-  assert.doesNotMatch(session, /constrained = adaptiveQualityFallbackEngaged/);
-  assert.match(session, /Do not break display synchronization here/);
+test('native turbo advances every hidden CPU frame and only copies the final visible state', () => {
+  const turbo = native.match(/Java_com_retra_emulator_MainActivity_runTurboSlice[\s\S]*?return JNI_TRUE;\n\}/)?.[0] || '';
+  assert.match(turbo, /for \(int i = 0; i < frames; \+\+i\)/);
+  assert.match(turbo, /core->runFrame\(core\);/);
+  assert.match(turbo, /GetPrimitiveArrayCritical/);
 });
 
-test('renderer adaptation is mild and reserved for severe sustained misses', () => {
-  assert.match(policy, /speed >= 16\.0 && utilization < 0\.72 -> 3/);
-  assert.match(policy, /speed >= 8\.0 && utilization < 0\.72 -> 2/);
-  assert.match(policy, /speed >= 4\.0 && utilization < 0\.70 -> 1/);
-  assert.doesNotMatch(policy, /speed >= 2\.0 && utilization/);
-});
-
-test('v1.0.1-style turbo audio is preserved until a severe measured miss threatens exact speed', () => {
-  assert.match(session, /speed >= 16\.0 -> sample\.utilization < 0\.78/);
-  assert.match(session, /speed >= 8\.0 -> sample\.utilization < 0\.70/);
-  assert.match(session, /speed >= 4\.0 -> sample\.utilization < 0\.62/);
-  assert.match(session, /else -> false/);
-  assert.match(session, /shouldProtectSpeedByMutingAudio/);
+test('turbo audio stays audible at every selected multiplier', () => {
+  assert.match(session, /discardAudio = false/);
+  assert.match(session, /audioController\.pump\(speed = speed, flushOutput = true\)/);
+  assert.doesNotMatch(session, /setTurboMuted\(true\)|shouldProtectSpeedByMutingAudio/);
 });

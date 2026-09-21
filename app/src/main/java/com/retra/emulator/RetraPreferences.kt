@@ -297,6 +297,7 @@ class RetraPreferences(context: Context) {
             "enable_cheats_v1",
             "confirm_close_reset_v1",
             "controller_sound_v1",
+            "controller_haptics_v1",
             "fullscreen_mode_v1",
             "immersive_mode_v1",
             "stretch_to_fit_v1",

@@ -29,13 +29,32 @@ internal class TurboThroughputGovernor(
         if (speed <= 1.0 || frameTimeNs <= 0L) return
         if (epochNs == 0L) reset()
 
-        completedFrames += frameCount.coerceAtLeast(1).toLong()
+        val batchFrames = frameCount.coerceAtLeast(1)
+        completedFrames += batchFrames.toLong()
         val targetNs = epochNs + FastForwardSpeedContract.targetElapsedNs(
             frameCount = completedFrames,
             speed = speed,
             frameTimeNs = frameTimeNs
         )
-        var remaining = targetNs - nanoTime()
+        val now = nanoTime()
+        var remaining = targetNs - now
+
+        // Do not repay a large Android/GC/background hitch with a burst of
+        // back-to-back turbo batches. Normal small lateness still self-corrects
+        // cumulatively, preserving the exact selected multiplier in steady state.
+        val batchTargetNs = FastForwardSpeedContract.targetElapsedNs(
+            frameCount = batchFrames.toLong(),
+            speed = speed,
+            frameTimeNs = frameTimeNs
+        )
+        val lateByNs = -remaining
+        val recoveryThresholdNs = maxOf(MIN_HITCH_RECOVERY_NS, batchTargetNs * MAX_LATE_BATCHES)
+        if (lateByNs > recoveryThresholdNs) {
+            epochNs = now
+            completedFrames = 0L
+            return
+        }
+
         if (remaining <= 0L) return
 
         // Park for the inexpensive bulk of the wait. The small final spin avoids
@@ -52,6 +71,8 @@ internal class TurboThroughputGovernor(
     }
 
     companion object {
-        private const val SPIN_WINDOW_NS = 250_000L
+        private const val SPIN_WINDOW_NS = 200_000L
+        private const val MIN_HITCH_RECOVERY_NS = 24_000_000L
+        private const val MAX_LATE_BATCHES = 4L
     }
 }

@@ -14,14 +14,14 @@ function section(id) {
   return indexHtml.slice(start, next === -1 ? undefined : next);
 }
 
-test('More About matches Settings About branding and v1.0.3 version', () => {
+test('More About matches Settings About branding and current v1.0.4 version', () => {
   const moreAbout = section('aboutPage');
   const settingsAbout = section('aboutSettingsPage');
   for (const html of [moreAbout, settingsAbout]) {
     assert.match(html, /class="about-panel"/);
     assert.match(html, /class="about-logo" src="assets\/branding\/retra-logo\.png"/);
     assert.match(html, /<h3>Retra<\/h3>/);
-    assert.match(html, /Retra v1\.0\.3/);
+    assert.match(html, /Retra v1\.0\.4/);
     assert.match(html, /Privacy Policy/);
   }
   assert.doesNotMatch(moreAbout, /Retra v4\.26/);

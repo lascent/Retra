@@ -69,14 +69,39 @@ body.library-selection-mode .cover-card .library-selection-check {
   opacity: 1;
   transform: scale(1);
 }
+/* Draw the multi-select highlight on the cover itself, never on the title.
+   Use a real border instead of outline/color-mix shadows: older Android WebView
+   versions can drop the whole shadow declaration when one color function is
+   unsupported. A physical border remains reliable across WebView versions. */
+.cover-card::before {
+  content: none;
+}
+.cover-card > img,
+.cover-card .cover-art-placeholder {
+  box-sizing: border-box;
+  border: 0 solid transparent;
+  transition: border-color 85ms var(--interaction-easing),
+              border-width 85ms var(--interaction-easing),
+              border-radius 110ms var(--interaction-easing),
+              box-shadow 110ms var(--interaction-easing),
+              transform 110ms var(--interaction-easing),
+              filter 110ms var(--interaction-easing);
+  will-change: border-color, transform;
+}
 body.library-selection-mode .cover-card.library-selected,
 body.library-selection-mode .cover-card[data-selected="true"] {
-  outline: 3px solid color-mix(in srgb, var(--accent) 86%, white 14%);
-  outline-offset: -3px;
-  box-shadow:
-    inset 0 0 0 2px color-mix(in srgb, var(--accent) 58%, white 42%),
-    0 10px 28px rgba(0,0,0,.22);
+  outline: none;
+  box-shadow: none;
   transform: none;
+}
+body.library-selection-mode .cover-card.library-selected > img,
+body.library-selection-mode .cover-card[data-selected="true"] > img,
+body.library-selection-mode .cover-card.library-selected .cover-art-placeholder,
+body.library-selection-mode .cover-card[data-selected="true"] .cover-art-placeholder {
+  border-width: 3px;
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(0,0,0,.28);
+  filter: saturate(1.03);
 }
 body.library-selection-mode .cover-card.library-selected .library-selection-check,
 body.library-selection-mode .cover-card[data-selected="true"] .library-selection-check {
@@ -154,62 +179,86 @@ body.library-selection-mode .cover-card[data-selected="true"] .library-selection
   min-width: 0;
   height: 56px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 18px;
   background: transparent;
   color: var(--nav-text);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 0;
   font-size: 10px;
   font-weight: 750;
 }
 .library-selection-action:active,
 .library-selection-action.active { background: var(--nav-active-bg); color: var(--nav-active-text); }
-.library-selection-action svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.library-selection-action svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 #librarySelectionFavorite svg { fill: color-mix(in srgb, currentColor 22%, transparent); }
+#librarySelectionCategories svg { width: 27px; height: 27px; stroke-width: 1.8; }
+.library-selection-action > span:not(.sr-only) { display: none; }
 .library-selection-more-menu {
   position: absolute;
   /* Anchor the popup closer to the More action: lower and slightly more to
      the RIGHT, even if it overlaps the selected-count helper copy. Keep a
      small responsive inset so the full popup remains visible on narrow phones. */
-  right: max(calc(var(--device-safe-right) + 12px), clamp(16px, 7vw, 28px));
-  bottom: calc(86px + var(--device-safe-bottom));
+  right: max(calc(var(--device-safe-right) + 10px), clamp(14px, 6vw, 24px));
+  bottom: calc(88px + var(--device-safe-bottom));
   z-index: 180;
-  width: min(184px, calc(100vw - 38px));
-  padding: 4px;
+  width: min(220px, calc(100vw - 30px));
+  padding: 6px;
   border: 1px solid color-mix(in srgb, var(--line) 82%, rgba(255,255,255,.08));
-  border-radius: 15px;
+  border-radius: 18px;
   background: linear-gradient(180deg,
-    color-mix(in srgb, var(--header-1) 96%, var(--accent) 4%) 0%,
+    color-mix(in srgb, var(--header-1) 97%, var(--accent) 3%) 0%,
     color-mix(in srgb, var(--header-2) 98%, black 2%) 100%);
-  box-shadow: 0 14px 34px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
+  box-shadow: 0 16px 38px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.05);
   opacity: 0;
-  transform: translateY(6px) scale(.985);
+  transform: translateY(8px) scale(.985);
   pointer-events: none;
-  transition: opacity .12s ease, transform .12s ease;
+  transition: opacity .14s ease, transform .14s ease;
 }
 .library-selection-more-menu.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
 .library-selection-more-menu button {
   width: 100%;
-  min-height: 44px;
+  min-height: 60px;
   display: flex;
   align-items: center;
-  gap: 9px;
-  border: 0;
-  border-radius: 11px;
-  padding: 7px 9px;
-  background: transparent;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 74%, transparent);
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: color-mix(in srgb, var(--panel-2, var(--nav-bg)) 92%, var(--accent) 8%);
   color: var(--text);
   text-align: left;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  transition: background-color var(--interaction-duration) var(--interaction-easing),
+              transform var(--interaction-duration) var(--interaction-easing),
+              border-color var(--interaction-duration) var(--interaction-easing),
+              box-shadow var(--interaction-duration) var(--interaction-easing);
 }
-.library-selection-more-menu button:active { background: var(--accent-soft); }
+.library-selection-more-menu button:active {
+  background: color-mix(in srgb, var(--accent-soft) 80%, white 20%);
+  transform: scale(.985);
+}
+.library-selection-more-menu button:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line) 68%);
+}
 .library-selection-more-menu button.danger { color: var(--danger); }
-.library-selection-more-menu svg { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.library-selection-more-menu button span { display: grid; gap: 2px; }
-.library-selection-more-menu strong { font-size: 11px; }
-.library-selection-more-menu small { color: var(--muted); font-size: 8.5px; line-height: 1.3; }
+.library-selection-more-menu svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  padding: 9px;
+  border-radius: 12px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.9;
+  background: color-mix(in srgb, var(--accent-soft) 78%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+}
+.library-selection-more-menu button span { display: grid; gap: 3px; min-width: 0; }
+.library-selection-more-menu strong { font-size: 13px; line-height: 1.25; }
+.library-selection-more-menu small { color: var(--muted); font-size: 9.5px; line-height: 1.35; }
 body.library-selection-mode .bottom-nav { opacity: 0; pointer-events: none; }
 body.library-selection-mode .add-rom-btn { opacity: 0; transform: scale(.85); pointer-events: none; }
 body.library-selection-mode .toast { bottom: calc(122px + var(--device-safe-bottom)); }
@@ -257,13 +306,22 @@ body.library-selection-mode .toast { bottom: calc(122px + var(--device-safe-bott
   .library-selection-summary span { display: none; }
   .library-selection-actions { width: calc(100% - 16px); gap: 5px; }
   .library-selection-action { height: 54px; font-size: 9.5px; }
-  .library-selection-action svg { width: 22px; height: 22px; }
+  .library-selection-action svg { width: 27px; height: 27px; }
+  #librarySelectionCategories svg { width: 25px; height: 25px; }
 }
 
 /* Keep multi-select taps visually immediate on Android WebView. */
 body.library-selection-mode .cover-card {
   touch-action: manipulation;
-  transition: outline-color 45ms var(--interaction-easing), opacity 45ms var(--interaction-easing);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 70ms var(--interaction-easing),
+              opacity 55ms var(--interaction-easing),
+              box-shadow 80ms var(--interaction-easing);
+}
+body.library-selection-mode .cover-card.selection-pressing {
+  transform: scale(.982);
+  opacity: .965;
+  will-change: transform, opacity;
 }
 @media (pointer: coarse), (max-width: 600px) {
   .library-selection-bar,
@@ -1230,6 +1288,19 @@ body[data-resolved-mode="light"] .library-view-sheet{
     radial-gradient(circle at 28% 78%, rgba(255,255,255,.035) 0 16%, transparent 16.5%),
     linear-gradient(155deg, var(--cover-fallback-a, rgba(68,70,91,.58)), var(--cover-fallback-b, rgba(11,12,22,.94)));
   box-shadow:0 7px 20px rgba(0,0,0,.24);
+}
+#libraryPage .library-grid.library-display-compact .cover-card.library-selected > img,
+#libraryPage .library-grid.library-display-compact .cover-card[data-selected="true"] > img,
+#libraryPage .library-grid.library-display-compact .cover-card.library-selected .cover-art-placeholder,
+#libraryPage .library-grid.library-display-compact .cover-card[data-selected="true"] .cover-art-placeholder{
+  border-radius:16px;
+  transform:translateY(-1px);
+}
+#libraryPage .library-grid.library-display-list .cover-card.library-selected > img,
+#libraryPage .library-grid.library-display-list .cover-card[data-selected="true"] > img,
+#libraryPage .library-grid.library-display-list .cover-card.library-selected .cover-art-placeholder,
+#libraryPage .library-grid.library-display-list .cover-card[data-selected="true"] .cover-art-placeholder{
+  border-radius:12px;
 }
 #libraryPage .library-grid.library-display-compact .cover-info{
   position:static;

@@ -64,9 +64,19 @@ class ShaderController(
         shaderView.configure(stretch, linearFiltering)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun presentIfActive(pixels: IntArray, width: Int, height: Int): Boolean {
         if (shaderView.visibility != View.VISIBLE) return false
-        shaderView.submitFrame(pixels, width, height)
+        // The active gameplay path is mailbox-backed. Keep the parameters for
+        // source compatibility with older callers, but avoid copying the frame
+        // on the UI thread; the GL thread acquires it directly.
+        shaderView.requestLatestFrame()
+        return true
+    }
+
+    fun requestPresentLatest(): Boolean {
+        if (shaderView.visibility != View.VISIBLE) return false
+        shaderView.requestLatestFrame()
         return true
     }
 
@@ -86,9 +96,18 @@ class ShaderController(
         }
         val source = repository.sourceFor(selected)
         if (selected == "none" || source == null) {
-            shaderView.visibility = View.GONE
-            normalView.visibility = View.VISIBLE
+            // Normal gameplay also uses the dedicated GL surface. The ImageView is
+            // retained only as an OEM compatibility fallback, so the UI thread no
+            // longer performs Bitmap.setPixels() on every visible game frame.
+            normalView.visibility = View.INVISIBLE
+            shaderView.visibility = View.VISIBLE
             if (selected != "none") repository.select("none")
+            shaderView.usePassthrough { ok, _ ->
+                if (!ok) {
+                    shaderView.visibility = View.GONE
+                    normalView.visibility = View.VISIBLE
+                }
+            }
             if (showToast) RetraNotice.makeText(activity, "GLSL shader: None", RetraNotice.LENGTH_SHORT).show()
             return
         }
@@ -98,9 +117,15 @@ class ShaderController(
         shaderView.setFragmentShader(source) { ok, error ->
             if (!ok) {
                 repository.select("none")
-                shaderView.visibility = View.GONE
-                normalView.visibility = View.VISIBLE
                 val detail = error?.trim().takeUnless { it.isNullOrEmpty() } ?: "unsupported by this GPU"
+                // Fall back to the same GPU presenter rather than moving gameplay
+                // back onto the UI-thread ImageView path.
+                shaderView.usePassthrough { passthroughOk, _ ->
+                    if (!passthroughOk) {
+                        shaderView.visibility = View.GONE
+                        normalView.visibility = View.VISIBLE
+                    }
+                }
                 RetraNotice.makeText(activity, "Shader unavailable on this device: $detail", RetraNotice.LENGTH_LONG).show()
                 onSettingsChanged()
             } else {

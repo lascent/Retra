@@ -27,11 +27,13 @@ test('native-speed gameplay uses an absolute deadline pacer with bounded precisi
   assert.match(turboPolicy, /Process\.THREAD_PRIORITY_URGENT_DISPLAY/);
 });
 
-test('completed GBA frames are published by buffer swap instead of a second full Java copy', () => {
-  assert.match(session, /val completedFrame = framePixels/);
-  assert.match(session, /framePixels = displayPixels/);
-  assert.match(session, /displayPixels = completedFrame/);
-  assert.doesNotMatch(session, /System\.arraycopy\([\s\S]*framePixels[\s\S]*displayPixels/);
+test('completed GBA frames publish into a latest-frame mailbox without a UI-thread copy', () => {
+  const mailbox = read('app/src/main/java/com/retra/emulator/GameplayFrameMailbox.kt');
+  const shaderView = read('app/src/main/java/com/retra/emulator/ShaderGameView.kt');
+  assert.match(session, /gameplayFrameMailbox\.publishLatest\(framePixels, framePublishResult\)/);
+  assert.match(mailbox, /pending = completed/);
+  assert.match(shaderView, /mailbox\.acquireLatestForRender\(reusableMailboxFrame\)/);
+  assert.doesNotMatch(session, /System\.arraycopy\([\s\S]*framePixels/);
 });
 
 test('gameplay refresh selection prefers 60-or-120 cadence-compatible modes instead of 90 Hz judder', () => {

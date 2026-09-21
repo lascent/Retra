@@ -20,6 +20,16 @@ class GameplayFramePresenter(
     private val callbackScheduled = AtomicBoolean(false)
     private val continuousVsync = AtomicBoolean(false)
     private val latestVsyncTimeNs = AtomicLong(0L)
+    private val postFrameCallbackRunnable = Runnable {
+        if (!active) {
+            callbackScheduled.set(false)
+        } else {
+            Choreographer.getInstance().postFrameCallback(this)
+        }
+    }
+    private val removeFrameCallbackRunnable = Runnable {
+        Choreographer.getInstance().removeFrameCallback(this)
+    }
 
     @Volatile
     private var active = false
@@ -27,6 +37,13 @@ class GameplayFramePresenter(
     private var presentedGeneration = 0L
 
     fun start() {
+        // Mailbox generation restarts for every ROM/video reconfiguration. Reset the
+        // presenter's generation state as well so a new session can never inherit an
+        // equal generation number and accidentally suppress its first completed frame.
+        pendingGeneration.set(0L)
+        presentedGeneration = -1L
+        latestVsyncTimeNs.set(0L)
+        callbackScheduled.set(false)
         active = true
     }
 
@@ -35,9 +52,7 @@ class GameplayFramePresenter(
         continuousVsync.set(false)
         callbackScheduled.set(false)
         latestVsyncTimeNs.set(0L)
-        targetView.post {
-            Choreographer.getInstance().removeFrameCallback(this)
-        }
+        targetView.post(removeFrameCallbackRunnable)
     }
 
     fun setContinuousVsync(enabled: Boolean) {
@@ -49,22 +64,29 @@ class GameplayFramePresenter(
     /** Last real Choreographer VSync timestamp, readable by the emulation worker. */
     fun latestVsyncNanos(): Long = latestVsyncTimeNs.get()
 
-    /** May be called from the emulator thread. */
-    fun requestPresent() {
-        pendingGeneration.incrementAndGet()
+    /** May be called from the emulator thread. Uses the mailbox generation so
+     * repeated/coalesced requests cannot invent presentation work that does not
+     * correspond to a completed emulator frame. */
+    fun requestPresent(generation: Long) {
+        updatePendingGeneration(generation)
         if (!active) return
         scheduleNextVsync()
     }
 
+    /** Compatibility path for one-off callers without a mailbox generation. */
+    fun requestPresent() = requestPresent(pendingGeneration.incrementAndGet())
+
+    private fun updatePendingGeneration(generation: Long) {
+        while (true) {
+            val current = pendingGeneration.get()
+            if (generation <= current) return
+            if (pendingGeneration.compareAndSet(current, generation)) return
+        }
+    }
+
     private fun scheduleNextVsync() {
         if (!callbackScheduled.compareAndSet(false, true)) return
-        targetView.post {
-            if (!active) {
-                callbackScheduled.set(false)
-                return@post
-            }
-            Choreographer.getInstance().postFrameCallback(this)
-        }
+        targetView.post(postFrameCallbackRunnable)
     }
 
     /** Called only from Choreographer's UI-thread callback; avoids another View.post. */

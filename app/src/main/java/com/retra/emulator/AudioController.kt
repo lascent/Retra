@@ -25,6 +25,7 @@ internal class AudioController(
     private val sampleRate: () -> Int,
     private val volume: () -> Float,
     private val readSamples: (ShortArray) -> Int,
+    private val readSamplesAtSpeed: (ShortArray, Double) -> Int,
     private val onOutputRateChanged: (Int) -> Unit
 ) {
     @Volatile
@@ -38,9 +39,6 @@ internal class AudioController(
 
     @Volatile
     private var writerRunning = false
-
-    @Volatile
-    private var turboMuted = false
 
     @Volatile
     private var outputResetSerial = 0
@@ -80,12 +78,17 @@ internal class AudioController(
     // monitor so producer work remains a very short copy + notify operation.
     private val outputLock = Object()
     private val outputQueue = ArrayDeque<ShortArray>()
+    // Reuse the small PCM packets that cross from the emulator thread to the
+    // audio writer. At ~60 FPS, allocating one ShortArray per frame can create
+    // avoidable GC pressure and periodic gameplay hitches during long sessions.
+    private val outputPacketPool = ArrayDeque<ShortArray>()
     private var queuedOutputShorts = 0
 
     // Current speed-transform state. Integer turbo ratios keep an averaging
     // accumulator across core-frame boundaries, preventing timing drift and
     // reducing high-frequency aliasing. Slow-motion keeps the previous stereo
     // frame so interpolation remains continuous between pump calls.
+    @Volatile
     private var transformMode = MODE_NORMAL
     private var transformFactor = 1
     private var turboAccumLeft = 0
@@ -106,7 +109,6 @@ internal class AudioController(
     fun configure(romLoaded: Boolean) {
         romActive = romLoaded
         playRequested = false
-        turboMuted = false
         stopWriterThread()
         releaseTrackOnly()
         clearPipelineState()
@@ -219,24 +221,14 @@ internal class AudioController(
     }
 
 
+
     /**
-     * Emergency throughput fallback for a device/ROM that cannot sustain its
-     * selected extreme-turbo speed even after renderer adaptation. Normal 8x/16x
-     * now remains audible through the native speed-aware FIR path.
+     * Apply a new emulation speed immediately, before the first frame at that speed runs.
+     * This prevents queued PCM from the previous time scale leaking into the next slice
+     * and gives the fade-in/reset path a deterministic transition point.
      */
-    fun setTurboMuted(muted: Boolean) {
-        if (turboMuted == muted) return
-        turboMuted = muted
-        pendingOffset = 0
-        pendingCount = 0
-        clearOutputQueue()
-        requestOutputReset(clearQueuedAudio = true)
-        if (muted) {
-            try { audioTrack?.pause() } catch (_: Exception) {}
-            try { audioTrack?.flush() } catch (_: Exception) {}
-        } else {
-            requestFadeIn()
-        }
+    fun onSpeedChanged(speed: Double) {
+        prepareTransform(normalizeSpeed(speed))
     }
 
     /**
@@ -246,19 +238,22 @@ internal class AudioController(
      * sub-frame so 8x/16x still produces a sensible writer block size.
      */
     fun pump(speed: Double, flushOutput: Boolean = true) {
-        if (turboMuted) return
         val normalizedSpeed = normalizeSpeed(speed)
         prepareTransform(normalizedSpeed)
 
+        val nativeTurboResampling = normalizedSpeed > 1.0
         var chunks = 0
         while (chunks < 8) {
-            // Retra v1.0.1 audio reference: always drain the normal mGBA PCM
-            // stream, then perform the speed transform with the lightweight
-            // integer accumulator below. This avoids the newer speed-aware
-            // 24-tap FIR changing turbo tone/texture between ROMs and restores
-            // the older audio character while keeping the dedicated writer.
+            // Turbo PCM is compressed inside native code with the existing 32-tap
+            // polyphase FIR. Only the wall-clock audio that Android can actually
+            // play crosses JNI, instead of copying up to 16x raw PCM into Kotlin
+            // and averaging it there. 1x/slow-motion keep the established path.
             val shortCount = try {
-                readSamples(nativeScratch)
+                if (nativeTurboResampling) {
+                    readSamplesAtSpeed(nativeScratch, normalizedSpeed)
+                } else {
+                    readSamples(nativeScratch)
+                }
             } catch (_: Throwable) {
                 0
             }
@@ -269,10 +264,13 @@ internal class AudioController(
             if (count > 0 && isEnabled() && romActive) {
                 if (pendingOffset > 0) compactPendingOutput()
                 val appendedFrom = pendingCount
-                // v1.0.1 transformed all non-normal speeds in the Android audio
-                // stage: integer turbo ratios are averaged, slow motion is linearly
-                // interpolated, and 1x remains a raw copy.
-                appendSpeedAdjusted(nativeScratch, count)
+                if (nativeTurboResampling) {
+                    // Native output is already time-compressed to the selected
+                    // multiplier and device output rate; never transform it twice.
+                    appendRaw(nativeScratch, count)
+                } else {
+                    appendSpeedAdjusted(nativeScratch, count)
+                }
                 applyFadeIn(pendingOutput, appendedFrom, pendingCount - appendedFrom)
                 trimAudioBacklogIfNeeded()
             }
@@ -330,7 +328,8 @@ internal class AudioController(
             return
         }
 
-        val packet = pendingOutput.copyOfRange(pendingOffset, pendingOffset + alignedCount)
+        val packet = acquireOutputPacket(alignedCount)
+        System.arraycopy(pendingOutput, pendingOffset, packet, 0, alignedCount)
         pendingOffset += alignedCount
         if (pendingOffset >= pendingCount) {
             pendingOffset = 0
@@ -350,7 +349,10 @@ internal class AudioController(
         if (data.size > maxQueuedShorts) {
             var keep = maxQueuedShorts
             keep -= keep % CHANNEL_COUNT
-            data = data.copyOfRange(data.size - keep, data.size)
+            val trimmed = ShortArray(keep)
+            System.arraycopy(data, data.size - keep, trimmed, 0, keep)
+            recycleOutputPacket(data)
+            data = trimmed
         }
 
         synchronized(outputLock) {
@@ -359,8 +361,7 @@ internal class AudioController(
             // burst when the route returns, so retain only fresh audio and make
             // the writer re-prime from a clean boundary.
             if (queuedOutputShorts + data.size > maxQueuedShorts) {
-                outputQueue.clear()
-                queuedOutputShorts = 0
+                clearOutputQueueLocked()
                 outputResetSerial++
                 requestFadeIn()
             }
@@ -465,12 +466,15 @@ internal class AudioController(
                         break
                     }
 
-                    val primePacket = if (primeCount == packet.size) {
+                    val fullPacket = primeCount == packet.size
+                    val primePacket = if (fullPacket) {
                         packet
                     } else {
                         packet.copyOfRange(0, primeCount)
                     }
                     if (!writeFully(track, primePacket)) {
+                        if (!fullPacket) recycleOutputPacket(primePacket)
+                        recycleOutputPacket(packet)
                         primeFailed = true
                         break
                     }
@@ -479,8 +483,13 @@ internal class AudioController(
                     // A 0.2x frame can contain more PCM than the small startup
                     // pre-buffer target. Keep its unwritten tail queued rather
                     // than trying to fill a paused AudioTrack beyond the target.
-                    if (primeCount < packet.size) {
-                        prependOutput(packet.copyOfRange(primeCount, packet.size))
+                    if (!fullPacket) {
+                        val tail = packet.copyOfRange(primeCount, packet.size)
+                        recycleOutputPacket(primePacket)
+                        recycleOutputPacket(packet)
+                        prependOutput(tail)
+                    } else {
+                        recycleOutputPacket(packet)
                     }
                 }
 
@@ -534,12 +543,14 @@ internal class AudioController(
             }
 
             if (!writeFully(track, packet)) {
+                recycleOutputPacket(packet)
                 recoverWriterTrack()
                 playbackStarted = false
                 seenResetSerial = outputResetSerial
                 continue
             }
 
+            recycleOutputPacket(packet)
             lastUnderrunCount = safeUnderrunCount(track)
             relaxAdaptiveBufferingIfStable(track)
         }
@@ -661,17 +672,49 @@ internal class AudioController(
 
     private fun clearOutputQueue() {
         synchronized(outputLock) {
-            outputQueue.clear()
-            queuedOutputShorts = 0
+            clearOutputQueueLocked()
             outputLock.notifyAll()
         }
+    }
+
+    private fun clearOutputQueueLocked() {
+        while (outputQueue.isNotEmpty()) {
+            recycleOutputPacketLocked(outputQueue.removeFirst())
+        }
+        queuedOutputShorts = 0
+    }
+
+    private fun acquireOutputPacket(size: Int): ShortArray {
+        if (size <= 0) return ShortArray(0)
+        synchronized(outputLock) {
+            val iterator = outputPacketPool.iterator()
+            while (iterator.hasNext()) {
+                val candidate = iterator.next()
+                if (candidate.size == size) {
+                    iterator.remove()
+                    return candidate
+                }
+            }
+        }
+        return ShortArray(size)
+    }
+
+    private fun recycleOutputPacket(packet: ShortArray) {
+        if (packet.isEmpty()) return
+        synchronized(outputLock) {
+            recycleOutputPacketLocked(packet)
+        }
+    }
+
+    private fun recycleOutputPacketLocked(packet: ShortArray) {
+        if (packet.isEmpty() || outputPacketPool.size >= MAX_PACKET_POOL_SIZE) return
+        outputPacketPool.addLast(packet)
     }
 
     private fun requestOutputReset(clearQueuedAudio: Boolean) {
         synchronized(outputLock) {
             if (clearQueuedAudio) {
-                outputQueue.clear()
-                queuedOutputShorts = 0
+                clearOutputQueueLocked()
             }
             outputResetSerial++
             outputLock.notifyAll()
@@ -684,9 +727,19 @@ internal class AudioController(
         0
     }
 
-    private fun prebufferShorts(): Int =
-        (configuredRate * CHANNEL_COUNT * adaptivePrebufferMs / 1000)
+    private fun prebufferShorts(): Int {
+        // Speed changes reset/flush the AudioTrack so samples from two different
+        // time scales never overlap. Turbo produces PCM quickly, therefore it can
+        // restart with a smaller prebuffer than 1x without becoming fragile. This
+        // removes the noticeable silent pause when fast-forward is engaged.
+        val targetMs = if (transformMode == MODE_TURBO) {
+            minOf(adaptivePrebufferMs, TURBO_PREBUFFER_MS)
+        } else {
+            adaptivePrebufferMs
+        }
+        return (configuredRate * CHANNEL_COUNT * targetMs / 1000)
             .coerceAtLeast(CHANNEL_COUNT)
+    }
 
     private fun maxQueuedShorts(): Int =
         (configuredRate * CHANNEL_COUNT * MAX_PENDING_AUDIO_MS / 1000)
@@ -999,7 +1052,9 @@ internal class AudioController(
         const val STABLE_RELAX_AFTER_NS = 30_000_000_000L
 
         const val MAX_PENDING_AUDIO_MS = 200
+        const val MAX_PACKET_POOL_SIZE = 16
         const val TURBO_PACKET_MS = 16
+        const val TURBO_PREBUFFER_MS = 16
         const val MODE_NORMAL = 0
         const val MODE_TURBO = 1
         const val MODE_SLOW = 2

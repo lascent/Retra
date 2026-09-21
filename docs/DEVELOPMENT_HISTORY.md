@@ -11,8 +11,9 @@ v0.8.0 → v0.8.9
 v0.9.0 → v0.9.12
 v1.0.0  First stable public release
 v1.0.1  Create Backup and Restore Backup
-v1.0.3  ROM title editing and storage polish
 v1.0.2  Update checker and reinstall recovery
+v1.0.3  ROM title editing and storage polish
+v1.0.4  SmoothTurbo frame/audio hardening
 ```
 
 ## v0.9 series — release preparation
@@ -92,3 +93,13 @@ See [`history/`](history/) and the other engineering documents indexed in [`docs
 - Added persistent per-ROM display-name editing from the ROM detail overflow menu.
 - Kept ROM filenames and immutable ROM IDs unchanged.
 - Carried forward the controller, rewind, save import and Google Drive restore hardening.
+
+
+## v1.0.4 — SmoothTurbo frame/audio hardening
+
+- Expanded the latest-frame mailbox to four permanently preallocated buffers with explicit spare headroom.
+- Reused producer/render result holders to remove normal per-frame Kotlin object allocation from the mailbox handoff.
+- Dropped a visual publish rather than allocating a new framebuffer if an unexpected pool invariant is violated during a GPU stall.
+- Hardened VSync scheduling with reusable Runnables, CAS generation coalescing, direct UI-thread rescheduling, and per-session generation reset.
+- Reset pacing and audio time-scale state immediately when changing 1×/2×/4×/8×/16× speed.
+- Preserved the fractional turbo slice planner, cumulative hitch-safe governor, native speed-aware FIR audio path, and latest-frame-only GL presentation.

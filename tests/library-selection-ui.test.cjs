@@ -36,7 +36,7 @@ test('saving multi-select categories exits selection mode automatically', () => 
 test('selection actions are centered and larger for touch use', () => {
   assert.match(css, /\.library-selection-actions\s*\{[\s\S]*left:\s*50%;[\s\S]*width:\s*min\(372px,[\s\S]*transform:\s*translateX\(-50%\)/);
   assert.match(css, /\.library-selection-action\s*\{[\s\S]*height:\s*56px/);
-  assert.match(css, /\.library-selection-action svg\s*\{\s*width:\s*23px;\s*height:\s*23px/);
+  assert.match(css, /\.library-selection-action svg\s*\{\s*width:\s*29px;\s*height:\s*29px/);
 });
 
 test('additional selections patch only the changed rendered card', () => {
@@ -55,8 +55,8 @@ test('long-press click suppression is scoped to the pressed ROM only', () => {
 });
 
 test('bulk More popup sits lower, stays compact and uses a solid themed background', () => {
-  assert.match(css, /\.library-selection-more-menu\s*\{[\s\S]*right:\s*max\(calc\(var\(--device-safe-right\) \+ 12px\), clamp\(16px, 7vw, 28px\)\);[\s\S]*bottom:\s*calc\(86px \+ var\(--device-safe-bottom\)\);[\s\S]*z-index:\s*180;[\s\S]*width:\s*min\(184px, calc\(100vw - 38px\)\);[\s\S]*background:\s*linear-gradient\(180deg,/);
-  assert.match(css, /\.library-selection-more-menu button\s*\{[\s\S]*min-height:\s*44px/);
+  assert.match(css, /\.library-selection-more-menu\s*\{[\s\S]*right:\s*max\(calc\(var\(--device-safe-right\) \+ 10px\), clamp\(14px, 6vw, 24px\)\);[\s\S]*bottom:\s*calc\(88px \+ var\(--device-safe-bottom\)\);[\s\S]*z-index:\s*180;[\s\S]*width:\s*min\(220px, calc\(100vw - 30px\)\);[\s\S]*background:\s*linear-gradient\(180deg,/);
+  assert.match(css, /\.library-selection-more-menu button\s*\{[\s\S]*min-height:\s*60px/);
 });
 
 

@@ -4,6 +4,8 @@ This directory contains release, architecture, validation, and historical engine
 
 ## Current release
 
+- [`RELEASE_NOTES_v1.0.4.md`](RELEASE_NOTES_v1.0.4.md) — user-facing release notes for Retra v1.0.4
+- [`RETRA_V104_SMOOTH_TURBO_HARDENING.md`](RETRA_V104_SMOOTH_TURBO_HARDENING.md) — v1.0.4 frame-mailbox, VSync, pacing, and turbo-audio hardening
 - [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) — user-facing release notes for Retra v1.0.0
 - [`RELEASE_CHECKLIST_v1.0.0.md`](RELEASE_CHECKLIST_v1.0.0.md) — final publication and device-smoke-test checklist
 - [`DEVELOPMENT_HISTORY.md`](DEVELOPMENT_HISTORY.md) — organized pre-v1.0 development version history
@@ -13,6 +15,8 @@ This directory contains release, architecture, validation, and historical engine
 
 ## Architecture and validation
 
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — current application architecture, module boundaries, and regression guardrails
+- [`CONTROLLER_FEEDBACK.md`](CONTROLLER_FEEDBACK.md) — controller haptic/sound feedback architecture and behavior
 - [`PERSISTENT_STORAGE_ARCHITECTURE.md`](PERSISTENT_STORAGE_ARCHITECTURE.md) — persistent ROM identity, storage, migration, and recovery model
 - [`STORAGE_UPGRADE_VALIDATION.md`](STORAGE_UPGRADE_VALIDATION.md) — storage migration/upgrade validation notes
 - [`HOME_NAVIGATION_PERFORMANCE_FIX.md`](HOME_NAVIGATION_PERFORMANCE_FIX.md) — warm-return/Home navigation performance notes
@@ -32,3 +36,4 @@ The main archive is under [`history/`](history/). Additional implementation note
 - [`../SECURITY.md`](../SECURITY.md) — security policy
 - [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) — third-party licensing notices
 - [`../LICENSE`](../LICENSE) — MPL-2.0 license
+- `RETRA_V103_LATEST_FRAME_GPU_PRESENTATION.md` — v1.0.3 latest-frame GPU presentation foundation; superseded for current mailbox details by the v1.0.4 SmoothTurbo hardening document.

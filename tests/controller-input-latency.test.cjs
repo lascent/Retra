@@ -8,6 +8,7 @@ const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const layout = read('app/src/main/java/com/retra/emulator/GameplayTouchController.kt');
 const activity = read('app/src/main/java/com/retra/emulator/MainActivity.kt');
+const inputState = read('app/src/main/java/com/retra/emulator/GameplayInputState.kt');
 const gameplay = read('app/src/main/java/com/retra/emulator/GameplayController.kt');
 const multiplayer = read('app/src/main/java/com/retra/emulator/MultiplayerController.kt');
 const native = read('app/src/main/cpp/native-lib.cpp');
@@ -26,10 +27,10 @@ test('A/B and single-key controls assert on ACTION_DOWN with pointer ownership a
 });
 
 test('controller touch path suppresses duplicate Android-side key transitions', () => {
-  assert.match(activity, /internal var activeGameplayKeyMask = 0/);
+  assert.match(inputState, /var activeGameplayKeyMask: Int = 0/);
   assert.match(multiplayer, /if \(wasPressed == pressed\) return/);
-  assert.match(multiplayer, /activeGameplayKeyMask = if \(pressed\)/);
-  assert.match(gameplay, /val heldMask = activeGameplayKeyMask/);
+  assert.match(multiplayer, /gameplayInputState\.activeGameplayKeyMask = if \(pressed\)/);
+  assert.match(gameplay, /val heldMask = gameplayInputState\.activeGameplayKeyMask/);
   assert.match(gameplay, /if \(heldMask and \(1 shl key\) == 0\) continue/);
 });
 

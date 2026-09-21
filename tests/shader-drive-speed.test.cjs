@@ -57,7 +57,7 @@ test('slow motion and turbo share one exact supported speed policy', () => {
   assert.match(html, /data-fastforward-value="1x"/);
   assert.match(html, /data-fastforward-value="16x"/);
   assert.match(session, /val speed = EmulationSpeedPolicy\.sanitize\(activeEmulationSpeed\)/);
-  assert.match(session, /TurboFramePolicy\.framesPerSlice\(speed, FRAME_TIME_NS\)/);
+  assert.match(session, /turboSlicePlanner\.nextFrames\(\)/);
   assert.match(session, /TurboFramePolicy\.sliceCadenceNs\(/);
   assert.match(main, /removeSuffix\("x"\)\.toDoubleOrNull\(\)/);
   assert.match(main, /putString\(EMULATION_SPEED_PREF, preferredEmulationSpeed\.toString\(\)\)/);

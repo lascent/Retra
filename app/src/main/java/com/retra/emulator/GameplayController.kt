@@ -502,9 +502,9 @@ internal fun MainActivity.loadStateFromSlot(
 
 internal fun MainActivity.snapshotCurrentFrame(): Bitmap? {
     if (!romLoaded || videoWidth <= 0 || videoHeight <= 0) return null
-    val pixels = synchronized(frameLock) { presentationPixels.copyOf() }
+    val frame = gameplayFrameMailbox.copyPresentedOrLatest() ?: return null
     return try {
-        Bitmap.createBitmap(pixels, videoWidth, videoHeight, Bitmap.Config.ARGB_8888)
+        Bitmap.createBitmap(frame.pixels, frame.width, frame.height, Bitmap.Config.ARGB_8888)
     } catch (_: Throwable) {
         null
     }
@@ -1152,20 +1152,20 @@ internal fun MainActivity.releaseAllKeys() {
     // Invalidate every in-flight touch stream / delayed turbo callback before
     // clearing effective state. Old-generation callbacks may still arrive, but
     // their listeners will abandon locally without touching new key holds.
-    controllerInputGeneration++
+    gameplayInputState.generation++
 
     // Only emit releases for keys that Android currently considers held. This
     // avoids up to ten unnecessary JNI calls / Remote Link packets on every
     // menu open, pause or lifecycle transition.
-    val heldMask = activeGameplayKeyMask
+    val heldMask = gameplayInputState.activeGameplayKeyMask
     for (key in 0..9) {
         if (heldMask and (1 shl key) == 0) continue
         try { setGameplayKey(key, false) } catch (_: Throwable) {}
     }
-    activeGameplayKeyMask = 0
-    gameplayKeyHoldCounts.fill(0)
-    activeDpadMask = 0
-    activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
+    gameplayInputState.activeGameplayKeyMask = 0
+    gameplayInputState.keyHoldCounts.fill(0)
+    gameplayInputState.activeDpadMask = 0
+    gameplayInputState.activeDpadPointerId = MotionEvent.INVALID_POINTER_ID
 
     // A sub-frame tap is latched natively so mGBA cannot miss it. When controls
     // are intentionally cancelled (menu/background/close), discard any latch
