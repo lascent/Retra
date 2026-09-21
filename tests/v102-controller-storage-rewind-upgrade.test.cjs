@@ -39,12 +39,12 @@ test('gameplay menu exposes bounded Rewind, Edit layout, and strict per-ROM save
   assert.match(native, /RETRA_REWIND_MAX_AGE_MS = 16'500/);
   assert.match(native, /lastRewindFrameWallClock/);
   assert.match(native, /Java_com_retra_emulator_MainActivity_rewindSeconds/);
-  assert.match(transfer, /endsWith\("\.sav", ignoreCase = true\)/);
-  assert.match(transfer, /This \.sav does not match/);
+  assert.match(transfer, /importExt !in setOf\("sav", "srm"\)/);
+  assert.match(transfer, /This \.\$importExt does not match/);
   assert.match(transfer, /existing\.length\(\) != importedSize/);
 });
 
-test('single .sav import is gameplay-menu only and safely reloads the current ROM', () => {
+test('single .sav/.srm import is gameplay-menu only and safely reloads the current ROM', () => {
   const html = read('app/src/main/assets/retra/index.html');
   const settings = read('app/src/main/assets/retra/settings-ui.js');
   const main = read('app/src/main/java/com/retra/emulator/MainActivity.kt');

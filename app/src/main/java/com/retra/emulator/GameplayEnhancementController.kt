@@ -27,7 +27,7 @@ internal fun MainActivity.addLayoutAndImportGameplayActions(parent: LinearLayout
     addMenuAction(
         parent,
         "Import save",
-        if (localLinkActive || remoteTransport.isActive) "Unavailable while linked" else ".sav for $currentRomTitle"
+        if (localLinkActive || remoteTransport.isActive) "Unavailable while linked" else ".sav / .srm for $currentRomTitle"
     ) {
         beginGameplaySaveImport(dialog)
     }

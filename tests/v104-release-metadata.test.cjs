@@ -18,5 +18,5 @@ test('v1.0.4 Android release metadata and user-facing fallbacks stay aligned', (
   assert.match(settings, /let versionName = '1\.0\.4'/);
   assert.match(html, /Retra v1\.0\.4/);
   assert.match(html, /Stable 1\.0\.4/);
-  assert.match(readme, /Current stable release: \*\*Retra v1\.0\.4\*\*/);
+  assert.match(readme, /Current stable release: \*\*\[Retra v1\.0\.4\]\(https:\/\/github\.com\/lascent\/Retra\/releases\/tag\/v1\.0\.4\)\*\*/);
 });

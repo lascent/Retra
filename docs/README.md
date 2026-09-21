@@ -4,6 +4,7 @@ This directory contains release, architecture, validation, and historical engine
 
 ## Current release
 
+- [Retra v1.0.4 on GitHub Releases](https://github.com/lascent/Retra/releases/tag/v1.0.4) — current stable release and downloadable APK assets
 - [`RELEASE_NOTES_v1.0.4.md`](RELEASE_NOTES_v1.0.4.md) — user-facing release notes for Retra v1.0.4
 - [`RETRA_V104_SMOOTH_TURBO_HARDENING.md`](RETRA_V104_SMOOTH_TURBO_HARDENING.md) — v1.0.4 frame-mailbox, VSync, pacing, and turbo-audio hardening
 - [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md) — user-facing release notes for Retra v1.0.0
@@ -30,8 +31,9 @@ The main archive is under [`history/`](history/). Additional implementation note
 
 ## Repository-level documents
 
-- [`../README.md`](../README.md) — project overview, build instructions, and release summary
+- [`../README.md`](../README.md) — project overview, v1.0.4 download link, build instructions, and release summary
 - [`../CHANGELOG.md`](../CHANGELOG.md) — public changelog
+- [`../TROUBLESHOOTING.md`](../TROUBLESHOOTING.md) — current v1.0.4 installation, performance, backup, Drive, and multiplayer troubleshooting
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — contribution guide
 - [`../SECURITY.md`](../SECURITY.md) — security policy
 - [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) — third-party licensing notices

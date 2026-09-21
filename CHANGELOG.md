@@ -9,6 +9,8 @@
 - Kept native speed-aware 32-tap FIR turbo audio so only wall-clock PCM crosses JNI at 2×/4×/8×/16×.
 - Retained the stable 60/120 Hz gameplay presentation policy while emulation throughput remains independent from display presentation.
 - Added v1.0.4 release notes, architecture documentation, and regression guards for release metadata and SmoothTurbo hardening.
+- Refreshed README branding with the Retra logo, linked downloads directly to the v1.0.4 release, modernized `.gitignore`, and updated troubleshooting for the current Data and Storage, Google Drive, Single-Pak, and SmoothTurbo behavior.
+- Gameplay **Import save** now accepts both `.sav` and `.srm` battery saves, while preserving strict per-ROM filename matching, save-size validation, automatic backup, and canonical `.sav` storage.
 
 ## v1.0.3 — Latest-frame GPU presentation architecture
 

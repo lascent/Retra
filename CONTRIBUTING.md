@@ -24,6 +24,12 @@ For Android work, also run:
 
 A full native APK build additionally requires the validated mGBA source checkout expected by `app/src/main/cpp/CMakeLists.txt`.
 
+## Repository hygiene
+
+- Do not commit `local.properties`, Android Studio workspace files, generated APK/AAB files, signing keys, `.env` files, native build output, or Gradle caches.
+- `tools/prepare_mgba.py` prepares `third_party/mgba/` locally; commit the lock metadata in `third_party/mgba.lock`, not the generated mGBA checkout.
+- Keep release documentation and version-specific links current when changing public release metadata.
+
 ## Code organization
 
 Prefer focused controllers/repositories over adding responsibilities back into `MainActivity`. Keep Web UI features in bounded modules and avoid per-frame preference/database/file I/O.

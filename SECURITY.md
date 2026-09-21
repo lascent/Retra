@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Security fixes are currently targeted at the latest Retra 1.x release.
+Security fixes are currently targeted at the latest stable Retra 1.x release, currently **v1.0.4**.
 
 ## Reporting a vulnerability
 

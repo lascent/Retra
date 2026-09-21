@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * Strict per-game battery-save import flow exposed from the gameplay menu.
- * Raw GBA .sav files have no universal ROM identifier, so Retra combines exact
+ * Raw GBA .sav/.srm files have no universal ROM identifier, so Retra combines exact
  * normalized ROM-name matching with save-size checks and always backs up the
  * previous canonical save before replacing it.
  */
@@ -95,7 +95,7 @@ internal fun MainActivity.handleSaveImportPickerResult(uri: Uri?) {
         val result = saveTransfer.importBatterySave(uri, targetRomId)
         if (result.success) {
             // An auto state captures the entire old emulation state, not just
-            // SRAM. Loading it immediately after a new .sav would effectively
+            // SRAM. Loading it immediately after a new .sav/.srm would effectively
             // undo the import, so retire only that automatic resume snapshot.
             runCatching { saveStates.autoFile(session.romId).delete() }
             runCatching { saveStates.autoMetadataFile(session.romId).delete() }

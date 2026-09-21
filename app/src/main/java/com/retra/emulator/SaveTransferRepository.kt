@@ -208,18 +208,22 @@ class SaveTransferRepository(
     }
 
     /**
-     * Imports one raw battery .sav. When targetRomId is supplied (gameplay
-     * menu), the filename must match that exact ROM. From Data & Storage, the
-     * filename must resolve to exactly one ROM already present in the library.
+     * Imports one raw battery save in .sav or .srm format. When targetRomId is
+     * supplied (gameplay menu), the filename must match that exact ROM. From
+     * Data & Storage, the filename must resolve to exactly one ROM already
+     * present in the library.
      *
-     * Raw .sav files do not contain a universal ROM identifier, so Retra uses
-     * strict normalized filename matching plus save-size compatibility and an
-     * automatic pre-replacement backup to prevent accidental cross-ROM imports.
+     * Raw .sav/.srm files do not contain a universal ROM identifier, so Retra
+     * uses strict normalized filename matching plus save-size compatibility and
+     * an automatic pre-replacement backup to prevent accidental cross-ROM imports.
+     * .srm is treated as a raw battery-save container and is normalized into
+     * Retra's canonical per-ROM .sav storage after validation.
      */
     fun importBatterySave(uri: Uri, targetRomId: String? = null): ImportSaveResult {
         val displayName = fileOps.queryDisplayName(uri)?.trim().orEmpty()
-        if (displayName.isBlank() || !displayName.endsWith(".sav", ignoreCase = true)) {
-            return ImportSaveResult(false, message = "Choose a .sav battery save file")
+        val importExt = displayName.substringAfterLast('.', "").lowercase(Locale.US)
+        if (displayName.isBlank() || importExt !in setOf("sav", "srm")) {
+            return ImportSaveResult(false, message = "Choose a .sav or .srm battery save file")
         }
 
         val targets = romSaveTargets()
@@ -241,14 +245,14 @@ class SaveTransferRepository(
 
         val targetAliases = setOf(normalizedSaveBase(target.fileName), normalizedSaveBase(target.title))
         if (selectedBase !in targetAliases) {
-            return ImportSaveResult(false, target.id, target.title, "This .sav does not match ${target.title}")
+            return ImportSaveResult(false, target.id, target.title, "This .$importExt does not match ${target.title}")
         }
 
         val tempDir = File(appContext.cacheDir, "save_import").apply { mkdirs() }
         val temp = File(tempDir, "${fileOps.sanitizeFileName(target.id)}_${System.nanoTime()}.sav")
         return try {
             val input = resolver.openInputStream(uri)
-                ?: return ImportSaveResult(false, target.id, target.title, "Could not read the selected .sav")
+                ?: return ImportSaveResult(false, target.id, target.title, "Could not read the selected .$importExt")
             input.use { source ->
                 FileOutputStream(temp).use { output ->
                     source.copyTo(output, 64 * 1024)
@@ -259,11 +263,11 @@ class SaveTransferRepository(
 
             val importedSize = temp.length()
             if (!isPlausibleBatterySaveSize(importedSize)) {
-                return ImportSaveResult(false, target.id, target.title, "The selected .sav has an unsupported save size")
+                return ImportSaveResult(false, target.id, target.title, "The selected .$importExt has an unsupported save size")
             }
             val existing = saveData.batterySaveFile(target.id)
             if (existing.exists() && existing.length() > 0L && existing.length() != importedSize) {
-                return ImportSaveResult(false, target.id, target.title, "This .sav size does not match ${target.title}")
+                return ImportSaveResult(false, target.id, target.title, "This .$importExt size does not match ${target.title}")
             }
 
             if (!saveData.replaceBatterySaveFromFile(target.id, temp)) {
@@ -272,7 +276,7 @@ class SaveTransferRepository(
                 ImportSaveResult(true, target.id, target.title, "${target.title} save imported")
             }
         } catch (error: Exception) {
-            ImportSaveResult(false, target.id, target.title, error.message ?: "Could not import this .sav")
+            ImportSaveResult(false, target.id, target.title, error.message ?: "Could not import this .$importExt")
         } finally {
             if (temp.exists()) temp.delete()
         }

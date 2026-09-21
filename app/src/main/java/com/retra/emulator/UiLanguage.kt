@@ -14,6 +14,10 @@ internal fun MainActivity.uiText(english: String): String {
     if (rewindSeconds != null) return if (language == "vi") "Tua ngược $rewindSeconds giây" else "Putar mundur $rewindSeconds detik"
     val upToSeconds = Regex("^Up to (\\d+) sec available$").matchEntire(english)?.groupValues?.getOrNull(1)
     if (upToSeconds != null) return if (language == "vi") "Có thể tua ngược tối đa $upToSeconds giây" else "Tersedia hingga $upToSeconds detik"
+    if (english.startsWith(".sav / .srm for ")) {
+        val title = english.removePrefix(".sav / .srm for ")
+        return if (language == "vi") ".sav / .srm cho $title" else ".sav / .srm untuk $title"
+    }
     if (english.startsWith(".sav for ")) {
         val title = english.removePrefix(".sav for ")
         return if (language == "vi") ".sav cho $title" else ".sav untuk $title"

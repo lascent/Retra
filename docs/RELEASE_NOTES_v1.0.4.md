@@ -1,5 +1,7 @@
 # Retra v1.0.4 — Release Notes
 
+**Release:** [Retra v1.0.4 on GitHub](https://github.com/lascent/Retra/releases/tag/v1.0.4)
+
 Retra v1.0.4 focuses on high-speed gameplay smoothness and production hardening of the latest-frame GPU pipeline. The emulation core, video presentation, and audio output remain decoupled so Speed Mode can advance the game at the selected multiplier without building a renderer backlog.
 
 ## Highlights
@@ -26,3 +28,7 @@ The v1.0.4 changes do not alter save formats, ROM identity, save-state storage, 
 The dependency-light release gate passes **423/423 regression tests** and protects the four-buffer pool, allocation-free hot publish/acquire paths, session generation reset, reusable VSync scheduling, speed-transition resets, exact cumulative turbo behavior, latest-frame stale dropping, native turbo audio path, UI/XML integrity, and release metadata consistency.
 
 Physical-device validation is still recommended across low-, mid-, and high-end Android hardware, especially sustained 8×/16× sessions, audio transitions, lifecycle pause/resume, and thermal load.
+
+## Save import
+
+- Gameplay **Import save** supports both `.sav` and `.srm` battery-save files with ROM-match and save-size validation.

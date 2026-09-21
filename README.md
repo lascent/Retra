@@ -1,15 +1,17 @@
 <div align="center">
 
+<img src="docs/images/retra-logo.webp" alt="Retra logo" width="132">
+
 # Retra
 
 **A modern open-source Android emulator built around mGBA, focused on a polished Game Boy Advance experience.**
 
-[![Release](https://img.shields.io/github/v/release/lascent/Retra?label=release)](https://github.com/lascent/Retra/releases)
-[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/lascent/Retra/releases)
+[![Release](https://img.shields.io/github/v/release/lascent/Retra?label=release)](https://github.com/lascent/Retra/releases/tag/v1.0.4)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/lascent/Retra/releases/tag/v1.0.4)
 [![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](LICENSE)
 [![Core](https://img.shields.io/badge/core-mGBA-8A2BE2)](https://mgba.io/)
 
-[**Download latest release**](https://github.com/lascent/Retra/releases) ·
+[**Download Retra v1.0.4**](https://github.com/lascent/Retra/releases/tag/v1.0.4) ·
 [**Changelog**](CHANGELOG.md) ·
 [**Troubleshooting**](TROUBLESHOOTING.md) ·
 [**Contributing**](CONTRIBUTING.md)
@@ -33,7 +35,7 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 
 - GB, GBC, and GBA emulation through the mGBA integration.
 - Fast-forward and slow-motion speed controls.
-- Adaptive 60/90/120 Hz interface presentation while keeping emulation timing independent from display refresh rate.
+- Adaptive high-refresh interface presentation, with gameplay using a stable cadence-compatible 60/120 Hz presentation path while emulation timing remains independent from display refresh rate.
 - BIOS support, ROM patches, cheats, statistics, and per-ROM configuration.
 - Optional GLSL shaders and gameplay Color Style presets.
 
@@ -50,6 +52,7 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 ### Saves & persistent data
 
 - Battery saves, save states, and automatic resume.
+- Gameplay **Import save** accepts both `.sav` and `.srm` battery-save files with per-ROM filename and save-size safety checks.
 - Persistent ROM identity based on SHA-256 content hashes.
 - Compatible saves and metadata can reconnect after a ROM is moved, renamed, removed, or re-imported.
 - Portable **Create Backup** and **Restore Backup** using `.retra` files.
@@ -85,9 +88,9 @@ It combines emulation with a mobile-first interface, persistent game data, custo
 
 The latest stable APK and release notes are available from:
 
-### **[GitHub Releases →](https://github.com/lascent/Retra/releases)**
+### **[Download Retra v1.0.4 →](https://github.com/lascent/Retra/releases/tag/v1.0.4)**
 
-Current stable release: **Retra v1.0.4**
+Current stable release: **[Retra v1.0.4](https://github.com/lascent/Retra/releases/tag/v1.0.4)**
 
 | Item | Current status |
 |---|---|

@@ -1,27 +1,60 @@
+# Android Studio / IntelliJ IDEA
+.idea/
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+*.ipr
+*.iws
+
+# Local Android / SDK configuration
 local.properties
 
-# Generated outputs and local backup files
-**/build/
+# Gradle
+.gradle/
 **/.gradle/
+build/
+**/build/
+
+# Native Android / CMake outputs
+.cxx/
 **/.cxx/
+.externalNativeBuild/
 **/.externalNativeBuild/
-*.orig
-*.rej
-*.log
+
+# Generated application packages and reports
 *.apk
 *.aab
+*.ap_
+*.mapping
+mapping.txt
+captures/
+
+# Downloaded third-party source prepared by tools/prepare_mgba.py
+/third_party/mgba/
+
+# Signing material and local secrets
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+.env
+.env.*
+!.env.example
+
+# Logs, temporary files, and merge leftovers
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.orig
+*.rej
+*~
+
+# Operating system metadata
+.DS_Store
 Thumbs.db
+desktop.ini
+
+# Editor-local settings
+.vscode/
